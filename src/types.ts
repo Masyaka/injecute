@@ -2,75 +2,38 @@ export type ValueOf<T> = T[keyof T];
 export type Empty = {
   /*  */
 };
-export type Constructor<TParams extends readonly any[], TResult> = { new (...params: TParams): TResult };
+export type Constructor<TParams extends readonly any[], TResult> = { new(...params: TParams): TResult };
 export type Func<TParams extends readonly any[], TResult> = (...params: TParams) => TResult;
 export type Callable<TParams extends readonly any[], TResult> = Constructor<TParams, TResult> | Func<TParams, TResult>;
-export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
-  ? InstanceType<TCallable>
-  : TCallable extends Func<any, any>
-    ? ReturnType<TCallable>
-    : unknown;
+export type CallableResult<TCallable> = TCallable extends Constructor<any, any> ? InstanceType<TCallable> : TCallable extends Func<any, any> ? ReturnType<TCallable> : unknown;
 export type Argument = { name: string; required: boolean };
 export type Resolver<TServices> = <Key extends keyof TServices>(name: Key) => TServices[Key] | undefined;
-export type Factory<K, TServices> = K extends keyof TServices
-  ? Callable<ValueOf<TServices>[], TServices[K]>
-  : Callable<ValueOf<TServices>[], any>;
+export type Factory<K, TServices> = K extends keyof TServices ? Callable<ValueOf<TServices>[], TServices[K]> : Callable<ValueOf<TServices>[], any>;
 
-type DependenciesTypesEntry<
-  TServices extends Record<string, any>,
-  K extends keyof TServices,
-> = K extends OptionalDependencySkipKey ? undefined : TServices[K];
+type DependenciesTypesEntry<TServices extends Record<string, any>, K extends keyof TServices, > = K extends OptionalDependencySkipKey ? undefined : TServices[K];
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
-export type DependenciesTypes<
-  TServices extends Record<string, any>,
-  // todo: fix this with TS 5.0 const generic
-  Keys extends readonly (keyof TServices)[] = readonly (keyof TServices)[],
-> = [
-  DependenciesTypesEntry<TServices, Keys[0]>,
-  DependenciesTypesEntry<TServices, Keys[1]>,
-  DependenciesTypesEntry<TServices, Keys[2]>,
-  DependenciesTypesEntry<TServices, Keys[3]>,
-  DependenciesTypesEntry<TServices, Keys[4]>,
-  DependenciesTypesEntry<TServices, Keys[5]>,
-  DependenciesTypesEntry<TServices, Keys[6]>,
-  DependenciesTypesEntry<TServices, Keys[7]>,
-  DependenciesTypesEntry<TServices, Keys[8]>,
-  DependenciesTypesEntry<TServices, Keys[9]>,
-];
+export type DependenciesTypes<TServices extends Record<string, any>, // todo: fix this with TS 5.0 const generic
+  Keys extends readonly (keyof TServices)[] = readonly (keyof TServices)[], > = [DependenciesTypesEntry<TServices, Keys[0]>, DependenciesTypesEntry<TServices, Keys[1]>, DependenciesTypesEntry<TServices, Keys[2]>, DependenciesTypesEntry<TServices, Keys[3]>, DependenciesTypesEntry<TServices, Keys[4]>, DependenciesTypesEntry<TServices, Keys[5]>, DependenciesTypesEntry<TServices, Keys[6]>, DependenciesTypesEntry<TServices, Keys[7]>, DependenciesTypesEntry<TServices, Keys[8]>, DependenciesTypesEntry<TServices, Keys[9]>,];
 
-export type UseExplicitContainerKeys<
-  TServices extends Record<K, V>,
-  TResult extends any,
-  K extends keyof TServices = keyof TServices,
-  V extends TServices[K] = TServices[K],
-> = <Keys extends K[]>(keys: [...Keys], callable: Callable<DependenciesTypes<TServices, Keys>, TResult>) => TResult;
+export type UseExplicitContainerKeys<TServices extends Record<K, V>, TResult extends any, K extends keyof TServices = keyof TServices, V extends TServices[K] = TServices[K], > = <Keys extends K[]>(keys: [...Keys], callable: Callable<DependenciesTypes<TServices, Keys>, TResult>) => TResult;
 
 export type ArgumentsKey = string | symbol | number;
 
-export type ArgumentsResolver = <
-  TServices extends Record<ArgumentsKey, any>,
-  TContainerKey extends keyof TServices,
-  C extends IDIContainer<TServices, TContainerKey>,
->(
-  this: C,
-  fn: Callable<any, any>,
-  argumentsKey?: ArgumentsKey,
-) => Argument[] | undefined;
+export type ArgumentsResolver = <TServices extends Record<ArgumentsKey, any>, TContainerKey extends keyof TServices, C extends IDIContainer<TServices, TContainerKey>, >(this: C, fn: Callable<any, any>, argumentsKey?: ArgumentsKey) => Argument[] | undefined;
 
-export type IDIContainerExtension<
-  In extends Record<string, any>,
-  Added extends Record<string, any>,
-  Out extends In & Added = In & Added,
-> = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
+export type IDIContainerExtension<In extends Record<string, any>, Added extends Record<string, any>, Out extends In & Added = In & Added, > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
 export type ContainerServices<C> = C extends IDIContainer<infer S> ? S : never;
-export interface IDIContainer<
-  TServices extends Record<ArgumentsKey, any> = Empty,
-  TContainerKey extends keyof TServices = keyof TServices,
-> {
+
+export interface IDIContainer<TServices extends Record<ArgumentsKey, any> = Empty, TContainerKey extends keyof TServices = keyof TServices, > {
   readonly arguments: { [key in keyof TServices]?: Argument[] };
   readonly resolveArguments: ArgumentsResolver
+  /**
+   * Internal get. Can return undefined. Not throws error when something is not resolved.
+   */
+  readonly safeGet: Resolver<TServices>;
+
   /**
    * true if services with such key is registered, false otherwise
    * @param name
@@ -83,17 +46,7 @@ export interface IDIContainer<
    * @param instance
    * @param options {{ override: boolean }}
    */
-  addInstance<
-    K extends string | symbol,
-    NewServices extends { [k in K]: TResult } & TServices,
-    TResult extends any,
-    C extends IDIContainer<NewServices>,
-  >(
-    this: unknown,
-    name: Exclude<K, OptionalDependencySkipKey>,
-    instance: TResult,
-    options?: { override: boolean },
-  ): C;
+  addInstance<K extends string | symbol, NewServices extends { [k in K]: TResult } & TServices, TResult extends any, C extends IDIContainer<NewServices>, >(this: unknown, name: Exclude<K, OptionalDependencySkipKey>, instance: TResult, options?: { override: boolean }): C;
 
   /**
    * Each time requested transient service - factory will be executed and returned new instance.
@@ -104,25 +57,9 @@ export interface IDIContainer<
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addTransient<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends { [k in K]: TResult } & TServices,
-  >(
-    this: unknown,
-    name: Exclude<K, OptionalDependencySkipKey>,
-    factory: TCallable,
-    options?:
-      | {
-      override?: boolean;
-      isConstructor?: boolean;
-      explicitArgumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): C;
+  addTransient<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], C extends IDIContainer<NewServices>, TResult extends CallableResult<TCallable>, NewServices extends { [k in K]: TResult } & TServices, >(this: unknown, name: Exclude<K, OptionalDependencySkipKey>, factory: TCallable, options?: | {
+    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
+  } | [...Keys]): C;
 
   /**
    * Once created instance will be returned for each service request
@@ -133,25 +70,9 @@ export interface IDIContainer<
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addSingleton<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[] = TContainerKey[],
-    TResult extends CallableResult<TCallable> = CallableResult<TCallable>,
-    NewServices extends { [k in K]: TResult } & TServices = { [k in K]: TResult } & TServices,
-    C extends IDIContainer<NewServices> = IDIContainer<NewServices>,
-  >(
-    this: unknown,
-    name: Exclude<K, OptionalDependencySkipKey>,
-    factory: TCallable,
-    options?:
-      | {
-      override?: boolean;
-      isConstructor?: boolean;
-      explicitArgumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): C;
+  addSingleton<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[] = TContainerKey[], TResult extends CallableResult<TCallable> = CallableResult<TCallable>, NewServices extends { [k in K]: TResult } & TServices = { [k in K]: TResult } & TServices, C extends IDIContainer<NewServices> = IDIContainer<NewServices>, >(this: unknown, name: Exclude<K, OptionalDependencySkipKey>, factory: TCallable, options?: | {
+    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
+  } | [...Keys]): C;
 
   /**
    * When the service with `name` needed - `aliasTo` service will be given.
@@ -164,15 +85,7 @@ export interface IDIContainer<
    * @param name
    * @param aliasTo
    */
-  addAlias<T extends TServices[A], K extends ArgumentsKey, A extends TContainerKey>(
-    name: Exclude<K, OptionalDependencySkipKey>,
-    aliasTo: A,
-  ): IDIContainer<{ [k in K]: T } & TServices>;
-
-  /**
-   * Internal get. Can return undefined. Not throws error when something is not resolved.
-   */
-  readonly safeGet: Resolver<TServices>;
+  addAlias<T extends TServices[A], K extends ArgumentsKey, A extends TContainerKey>(name: Exclude<K, OptionalDependencySkipKey>, aliasTo: A): IDIContainer<{ [k in K]: T } & TServices>;
 
   /**
    * Get registered service from container
@@ -206,10 +119,7 @@ export interface IDIContainer<
    * @param keys
    * @param callable
    */
-  bind<TResult extends any, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(
-    keys: [...Keys],
-    callable: Callable<DependenciesTypes<TServices, Keys>, TResult>,
-  ): () => TResult;
+  bind<TResult extends any, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(keys: [...Keys], callable: Callable<DependenciesTypes<TServices, Keys>, TResult>): () => TResult;
 
   /**
    * Creates child container.
@@ -232,13 +142,7 @@ export interface IDIContainer<
    * container.get('srv1') // Srv
    * ```
    */
-  extend<
-    Added extends Record<ArgumentsKey, any>,
-    In extends TServices = TServices,
-    Out extends In & Added = In & Added,
-  >(
-    extensionFunction: IDIContainerExtension<In, Added, Out>,
-  ): IDIContainer<Out>;
+  extend<Added extends Record<ArgumentsKey, any>, In extends TServices = TServices, Out extends In & Added = In & Added, >(extensionFunction: IDIContainerExtension<In, Added, Out>): IDIContainer<Out>;
 
   /**
    * Executes function or constructor using container dependencies without adding it to container.
@@ -254,18 +158,7 @@ export interface IDIContainer<
    * @param callable
    * @param options
    */
-  injecute<
-    TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
-    TResult,
-  >(
-    callable: TCallable,
-    options?:
-      | {
-      argumentsKey?: TContainerKey | undefined;
-      isConstructor?: boolean;
-      argumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): CallableResult<TCallable>;
+  injecute<TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], TResult, >(callable: TCallable, options?: | {
+    argumentsKey?: TContainerKey | undefined; isConstructor?: boolean; argumentsNames?: [...Keys];
+  } | [...Keys]): CallableResult<TCallable>;
 }

@@ -76,8 +76,8 @@ export class DIContainer<
     this.addSingleton(
       name,
       () => instance,
-      { override: options?.override, isConstructor: false, explicitArgumentsNames: [] }
-    )
+      { override: options?.override, isConstructor: false, explicitArgumentsNames: [] },
+    );
     return this as any;
   }
 
