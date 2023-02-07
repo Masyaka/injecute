@@ -8,6 +8,7 @@ import {
   DependenciesTypes,
   Empty,
   Func,
+  GetOptions,
   IDIContainer,
   IDIContainerExtension,
   optionalDependencySkipKey,
@@ -16,6 +17,8 @@ import {
   ValueOf,
 } from './types';
 import { argumentsNamesToArguments, firstResult } from './utils';
+
+export type Middleware<TServices extends Record<ArgumentsKey, any>, Key extends keyof TServices = keyof TServices> = (this: DIContainer<TServices>, name: Key, next: Resolver<TServices>) => Resolver<TServices>;
 
 export class CircularDependencyError extends Error {
   constructor(stack: ArgumentsKey[]) {
@@ -29,24 +32,28 @@ export class CircularDependencyError extends Error {
 /**
  * Dependency Injection container
  */
-export class DIContainer<
-  TParentServices extends Record<ArgumentsKey, any> = Empty,
-  TServices extends TParentServices & Record<ArgumentsKey, any> = TParentServices & Empty,
-  TContainerKey extends keyof TServices = keyof TServices,
-> implements IDIContainer<TServices, TContainerKey> {
+export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Empty, TServices extends TParentServices & Record<ArgumentsKey, any> = TParentServices & Empty, TContainerKey extends keyof TServices = keyof TServices> implements IDIContainer<TServices, TContainerKey> {
   constructor(protected parentContainer?: IDIContainer<TParentServices>) {
     this.addArgumentsResolver(DIContainer.resolveArgumentsFromCache);
+    this.use(firstResult([this.resolveInstance, this.resolveFromFactory, this.resolveFromParent]) as Middleware<any>)
   }
 
+  proxy: Readonly<TServices> = new Proxy({} as TServices, {
+    get: (target, p) => this.get(p as TContainerKey),
+  });
+
   public readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
+
   protected factories: {
     [key in keyof TServices]?: {
-      callable: Callable<ValueOf<TServices>[], TServices[key]>,
-      isConstructor?: boolean
-    }
+      callable: Callable<ValueOf<TServices>[], TServices[key]>; isConstructor?: boolean;
+    };
   } = {};
+
   protected instances: { [key in keyof TServices]?: TServices[key] } = {};
+
   private readonly argumentsResolvers: ArgumentsResolver[] = [];
+  private readonly middlewares: Middleware<TServices>[] = [];
 
   static readonly resolveArgumentsFromCache: ArgumentsResolver = function (this, _, argumentsKey) {
     if (!argumentsKey) return;
@@ -67,17 +74,10 @@ export class DIContainer<
    * @param instance
    * @param options {{ override: boolean }}
    */
-  addInstance<
-    K extends ArgumentsKey,
-    NewServices extends { [k in K]: TResult } & TServices,
-    TResult extends any,
-    C extends IDIContainer<NewServices>,
-  >(name: Exclude<K, OptionalDependencySkipKey>, instance: TResult, options?: { override: boolean }): C {
-    this.addSingleton(
-      name,
-      () => instance,
-      { override: options?.override, isConstructor: false, explicitArgumentsNames: [] },
-    );
+  addInstance<K extends ArgumentsKey, NewServices extends TServices & { [k in K]: TResult }, TResult extends any, C extends IDIContainer<NewServices>>(name: Exclude<K, OptionalDependencySkipKey & TContainerKey>, instance: TResult, options?: { override: boolean }): C {
+    this.addSingleton(name, () => instance, {
+      override: options?.override, isConstructor: false, explicitArgumentsNames: [],
+    });
     return this as any;
   }
 
@@ -90,24 +90,9 @@ export class DIContainer<
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addTransient<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends { [k in K]: TResult } & TServices,
-  >(
-    name: Exclude<K, OptionalDependencySkipKey>,
-    factory: TCallable,
-    options?:
-      | {
-      override?: boolean;
-      isConstructor?: boolean;
-      explicitArgumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): C {
+  addTransient<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], C extends IDIContainer<NewServices>, TResult extends CallableResult<TCallable>, NewServices extends TServices & { [k in K]: TResult }>(name: Exclude<K, Keys[number]>, factory: TCallable, options?: | {
+    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
+  } | [...Keys]): C {
     const optionsIsArray = Array.isArray(options);
     const override = !optionsIsArray && !!options?.override;
     const explicitArgumentsNames = optionsIsArray ? options : options?.explicitArgumentsNames;
@@ -129,25 +114,9 @@ export class DIContainer<
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addSingleton<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends { [k in K]: TResult } & TServices,
-  >(
-    name: Exclude<K, OptionalDependencySkipKey>,
-    factory: TCallable,
-    options?:
-      | {
-      override?: boolean;
-      isConstructor?: boolean;
-      explicitArgumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): C {
-
+  addSingleton<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], C extends IDIContainer<NewServices>, TResult extends CallableResult<TCallable>, NewServices extends TServices & { [k in K]: TResult }>(name: Exclude<K, Keys[number]>, factory: TCallable, options?: | {
+    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
+  } | [...Keys]): C {
     const optionsIsArray = Array.isArray(options);
     const explicitArgumentsNames = optionsIsArray ? options : options?.explicitArgumentsNames;
     const override = !optionsIsArray && !!options?.override;
@@ -162,8 +131,7 @@ export class DIContainer<
         }) as NewServices[typeof name];
         this.instances[name] = instance;
         return instance;
-      },
-      isConstructor: false,
+      }, isConstructor: false,
     };
     return this as any;
   }
@@ -180,11 +148,14 @@ export class DIContainer<
    * @param name
    * @param aliasTo
    */
-  addAlias<T extends TServices[A], K extends ArgumentsKey, A extends TContainerKey>(
-    name: Exclude<K, OptionalDependencySkipKey>,
-    aliasTo: A,
-  ): IDIContainer<{ [k in K]: T } & TServices> {
+  addAlias<T extends TServices[A], K extends ArgumentsKey, A extends TContainerKey>(name: Exclude<K, OptionalDependencySkipKey & A>, aliasTo: A): IDIContainer<{ [k in K]: T } & TServices> {
     return this.addTransient(name, () => this.get(aliasTo), []);
+  }
+
+  use(middleware: Middleware<any>): DIContainer<TParentServices, TServices, TContainerKey> {
+    this.middlewares.push(middleware);
+    this.rebuildMiddlewareStack();
+    return this;
   }
 
   /**
@@ -201,12 +172,17 @@ export class DIContainer<
    * If no service registered it would try to get service from parent container.
    * If no service registered in parent container or no parent container set. It will throw Error
    * @param serviceName
+   * @param options {GetOptions}
    */
-  get<Key extends TContainerKey = TContainerKey, T extends any = TServices[Key]>(serviceName: Key): T {
-    const instance = this.safeGet(serviceName);
+  get<Key extends TContainerKey, O extends GetOptions, T extends any = TServices[Key]>(serviceName: Key, options?: O): O['allowUnresolved'] extends true ? T | undefined : T {
+    const instance = this.middlewareStack(serviceName);
 
     if (instance) {
       return instance;
+    }
+
+    if (options?.allowUnresolved) {
+      return undefined as any;
     }
 
     throw new Error(`No service registered for "${String(serviceName)}" key.`);
@@ -220,7 +196,7 @@ export class DIContainer<
 
   readonly resolveArguments: ArgumentsResolver = (fn, argumentsKey) => {
     for (const argumentsResolver of this.argumentsResolvers) {
-      const args = argumentsResolver.call(this as IDIContainer, fn, argumentsKey);
+      const args = argumentsResolver.call(this as IDIContainer<TServices>, fn, argumentsKey);
       if (args) return args;
     }
   };
@@ -238,10 +214,7 @@ export class DIContainer<
    * @param keys
    * @param callable
    */
-  bind<TResult extends any, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(
-    keys: [...Keys],
-    callable: Callable<DependenciesTypes<TServices, Keys>, TResult>,
-  ): () => TResult {
+  bind<TResult extends any, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(keys: [...Keys], callable: Callable<DependenciesTypes<TServices, Keys>, TResult>): () => TResult {
     return () => this.injecute(callable, { argumentsNames: keys });
   }
 
@@ -272,9 +245,7 @@ export class DIContainer<
    * container.get('srv1') // Srv
    * ```
    */
-  extend<In extends TServices, Added extends Record<ArgumentsKey, any>, Out extends In & Added>(
-    extensionFunction: IDIContainerExtension<In, Added, Out>,
-  ): IDIContainer<Out> {
+  extend<In extends TServices, Added extends Record<ArgumentsKey, any>, Out extends In & Added>(extensionFunction: IDIContainerExtension<In, Added, Out>): IDIContainer<Out> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);
   }
@@ -293,42 +264,30 @@ export class DIContainer<
    * @param callable
    * @param options
    */
-  injecute<
-    TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
-    TResult,
-  >(
-    callable: TCallable,
-    options?:
-      | {
-      argumentsKey?: TContainerKey | ArgumentsKey | undefined;
-      isConstructor?: boolean;
-      argumentsNames?: [...Keys];
-    }
-      | [...Keys],
-  ): CallableResult<TCallable> {
+  injecute<TResult, TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(callable: TCallable, options?: | {
+    argumentsKey?: TContainerKey | ArgumentsKey | undefined; isConstructor?: boolean; argumentsNames?: [...Keys];
+  } | [...Keys]): CallableResult<TCallable> {
     const optionsIsArray = Array.isArray(options);
     const argumentsNames = optionsIsArray ? options : options?.argumentsNames;
     const argumentsKey = !optionsIsArray ? options?.argumentsKey : undefined;
     const args = this.resolveAndCacheArguments(callable, argumentsKey, argumentsNames);
 
     if (!args) {
-      throw new Error(`Not resolved arguments for ${String(argumentsKey)} "${callable.toString().substring(0, 50)}"`);
+      throw new Error(`Not resolved arguments for ${String(argumentsKey)} "${callable
+        .toString()
+        .substring(0, 50)}"`);
     }
 
     const dependencies = this.mapAgrsToInstances(args);
 
-    const useNewKeyword = !optionsIsArray && (typeof options?.isConstructor === 'boolean')
-      ? options.isConstructor
-      : !!callable.prototype?.constructor;
+    const useNewKeyword = !optionsIsArray && typeof options?.isConstructor === 'boolean' ? options.isConstructor : !!callable.prototype?.constructor;
 
     if (useNewKeyword) {
       const constructor = callable as Constructor<any, any>;
       return new constructor(...(dependencies as ConstructorParameters<typeof constructor>));
-    } else {
-      const func = callable as Func<any, any>;
-      return func(...(dependencies as Parameters<typeof func>));
     }
+    const func = callable as Func<any, any>;
+    return func(...(dependencies as Parameters<typeof func>));
   }
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
@@ -337,9 +296,7 @@ export class DIContainer<
     }
   }
 
-  protected resolveInstance: Resolver<TServices> = (name) => {
-    return this.instances[name];
-  };
+  protected resolveInstance: Resolver<TServices> = (name) => this.instances[name];
 
   // TODO: change signature to accept ArgumentsResolverCreator <T>(this: DIContainer<TServices>):
   //  DIContainer<TServices & T> =>
@@ -348,21 +305,14 @@ export class DIContainer<
     const factory = this.factories[name];
     if (factory) {
       return this.injecute(factory.callable as Callable<any, TServices[typeof name]>, {
-        argumentsKey: name as any,
-        isConstructor: factory.isConstructor,
+        argumentsKey: name as any, isConstructor: factory.isConstructor,
       });
     }
   };
 
-  protected resolveFromParent: Resolver<TServices> = (name) => {
-    return this.parentContainer?.safeGet(name);
-  };
+  protected resolveFromParent: Resolver<TServices> = (name) => this.parentContainer?.get(name, { allowUnresolved: true });
 
-  readonly safeGet: Resolver<TServices> = firstResult([
-    this.resolveInstance,
-    this.resolveFromFactory,
-    this.resolveFromParent,
-  ]);
+  private middlewareStack!: Resolver<TServices>;
 
   protected assertFactoryIsAcceptable(factory: any, name: TContainerKey | ArgumentsKey) {
     if (!factory) {
@@ -376,14 +326,12 @@ export class DIContainer<
     }
   }
 
-  private resolveAndCacheArguments(
-    fn: Callable<any, any>,
-    argumentsKey?: ArgumentsKey,
-    argumentsNames?: (OptionalDependencySkipKey | TContainerKey)[],
-  ) {
-    const args: Argument[] | undefined = argumentsNames
-      ? argumentsNamesToArguments(argumentsNames as string[])
-      : (this as IDIContainer).resolveArguments(fn as Callable<any, any>, argumentsKey);
+  private rebuildMiddlewareStack() {
+    this.middlewareStack = this.middlewares.reduce((next, current) => (message) => current.apply(this, [message, next as Resolver<TServices>])) as Resolver<TServices>;
+  }
+
+  private resolveAndCacheArguments(fn: Callable<any, any>, argumentsKey?: ArgumentsKey, argumentsNames?: (OptionalDependencySkipKey | TContainerKey)[]) {
+    const args: Argument[] | undefined = argumentsNames ? argumentsNamesToArguments(argumentsNames as string[]) : (this as IDIContainer<TServices>).resolveArguments(fn as Callable<any, any>, argumentsKey);
 
     if (args && argumentsKey && !this.arguments[argumentsKey]) {
       this.cacheArguments(args, argumentsKey);
@@ -393,9 +341,7 @@ export class DIContainer<
   }
 
   private mapAgrsToInstances(args: Argument[]) {
-    return args.map((arg) =>
-      arg.required ? this.get(arg.name as TContainerKey) : this.safeGet(arg.name as TContainerKey),
-    );
+    return args.map((arg) => this.get(arg.name as TContainerKey, { allowUnresolved: !arg.required }));
   }
 
   private ensureNoCirculars(key: ArgumentsKey, stack: ArgumentsKey[] = []): ArgumentsKey[][] {
