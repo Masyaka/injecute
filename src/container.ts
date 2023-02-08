@@ -15,16 +15,23 @@ import {
   OptionalDependencySkipKey,
   Resolver,
   ValueOf,
-} from './types';
-import { argumentsNamesToArguments, firstResult } from './utils';
+} from "./types";
+import { argumentsNamesToArguments, firstResult } from "./utils";
 
-export type Middleware<TServices extends Record<ArgumentsKey, any>, Key extends keyof TServices = keyof TServices> = (this: DIContainer<TServices>, name: Key, next: Resolver<TServices>) => Resolver<TServices>;
+export type Middleware<
+  TServices extends Record<ArgumentsKey, any>,
+  Key extends keyof TServices = keyof TServices
+> = (
+  this: DIContainer<TServices>,
+  name: Key,
+  next: Resolver<TServices>
+) => Resolver<TServices>;
 
 export class CircularDependencyError extends Error {
   constructor(stack: ArgumentsKey[]) {
     const circularStackDescription = stack
       .map((k) => (k === stack[stack.length - 1] ? `*${k.toString()}*` : k))
-      .join(' -> ');
+      .join(" -> ");
     super(`Circular dependency detected ${circularStackDescription}.`);
   }
 }
@@ -32,10 +39,16 @@ export class CircularDependencyError extends Error {
 /**
  * Dependency Injection container
  */
-export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Empty, TServices extends TParentServices & Record<ArgumentsKey, any> = TParentServices & Empty, TContainerKey extends keyof TServices = keyof TServices> implements IDIContainer<TServices, TContainerKey> {
+export class DIContainer<
+  TParentServices extends Record<ArgumentsKey, any> = Empty,
+  TServices extends TParentServices &
+    Record<ArgumentsKey, any> = TParentServices & Empty,
+  TContainerKey extends keyof TServices = keyof TServices
+> implements IDIContainer<TServices, TContainerKey>
+{
   constructor(protected parentContainer?: IDIContainer<TParentServices>) {
     this.addArgumentsResolver(DIContainer.resolveArgumentsFromCache);
-    this.use(firstResult([this.resolveInstance, this.resolveFromFactory, this.resolveFromParent]) as Middleware<any>)
+    this.rebuildMiddlewareStack();
   }
 
   proxy: Readonly<TServices> = new Proxy({} as TServices, {
@@ -46,7 +59,10 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
 
   protected factories: {
     [key in keyof TServices]?: {
-      callable: Callable<ValueOf<TServices>[], TServices[key]>; isConstructor?: boolean;
+      callable: Callable<ValueOf<TServices>[], TServices[key]>;
+      isConstructor?: boolean;
+      beforeResolving?: (k: key) => void;
+      afterResolving?: (k: key, instance: TServices[key]) => void;
     };
   } = {};
 
@@ -54,8 +70,13 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
 
   private readonly argumentsResolvers: ArgumentsResolver[] = [];
   private readonly middlewares: Middleware<TServices>[] = [];
+  private middlewareStack!: Resolver<TServices>;
 
-  static readonly resolveArgumentsFromCache: ArgumentsResolver = function (this, _, argumentsKey) {
+  static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
+    this,
+    _,
+    argumentsKey
+  ) {
     if (!argumentsKey) return;
     return this.arguments[argumentsKey];
   };
@@ -65,7 +86,10 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param name
    */
   has(name: TContainerKey | ArgumentsKey): boolean {
-    return !!(this.factories[name as TContainerKey] || this.instances[name as TContainerKey]);
+    return !!(
+      this.factories[name as TContainerKey] ||
+      this.instances[name as TContainerKey]
+    );
   }
 
   /**
@@ -74,9 +98,20 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param instance
    * @param options {{ override: boolean }}
    */
-  addInstance<K extends ArgumentsKey, NewServices extends TServices & { [k in K]: TResult }, TResult extends any, C extends IDIContainer<NewServices>>(name: Exclude<K, OptionalDependencySkipKey & TContainerKey>, instance: TResult, options?: { override: boolean }): C {
+  addInstance<
+    K extends ArgumentsKey,
+    NewServices extends TServices & { [k in K]: TResult },
+    TResult extends any,
+    C extends IDIContainer<NewServices>
+  >(
+    name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
+    instance: TResult,
+    options?: { override: boolean }
+  ): C {
     this.addSingleton(name, () => instance, {
-      override: options?.override, isConstructor: false, explicitArgumentsNames: [],
+      override: options?.override,
+      isConstructor: false,
+      explicitArgumentsNames: [],
     });
     return this as any;
   }
@@ -90,15 +125,36 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addTransient<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], C extends IDIContainer<NewServices>, TResult extends CallableResult<TCallable>, NewServices extends TServices & { [k in K]: TResult }>(name: Exclude<K, Keys[number]>, factory: TCallable, options?: | {
-    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
-  } | [...Keys]): C {
+  addTransient<
+    K extends ArgumentsKey,
+    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    C extends IDIContainer<NewServices>,
+    TResult extends CallableResult<TCallable>,
+    NewServices extends TServices & { [k in K]: TResult }
+  >(
+    name: Exclude<K, Keys[number]>,
+    factory: TCallable,
+    options?:
+      | {
+          override?: boolean;
+          isConstructor?: boolean;
+          explicitArgumentsNames?: [...Keys];
+          beforeResolving?: (k: K) => void;
+          afterResolving?: (k: K, instance: TResult) => void;
+        }
+      | [...Keys]
+  ): C {
     const optionsIsArray = Array.isArray(options);
     const override = !optionsIsArray && !!options?.override;
-    const explicitArgumentsNames = optionsIsArray ? options : options?.explicitArgumentsNames;
+    const explicitArgumentsNames = optionsIsArray
+      ? options
+      : options?.explicitArgumentsNames;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.factories[name] = {
+      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
+      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       callable: factory as Callable<any[], NewServices[typeof name]>,
       isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
     };
@@ -114,11 +170,30 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    *  explicitArgumentsNames: string[] | undefined
    * } | string[]}
    */
-  addSingleton<K extends ArgumentsKey, TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>, Keys extends (OptionalDependencySkipKey | TContainerKey)[], C extends IDIContainer<NewServices>, TResult extends CallableResult<TCallable>, NewServices extends TServices & { [k in K]: TResult }>(name: Exclude<K, Keys[number]>, factory: TCallable, options?: | {
-    override?: boolean; isConstructor?: boolean; explicitArgumentsNames?: [...Keys];
-  } | [...Keys]): C {
+  addSingleton<
+    K extends ArgumentsKey,
+    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    C extends IDIContainer<NewServices>,
+    TResult extends CallableResult<TCallable>,
+    NewServices extends TServices & { [k in K]: TResult }
+  >(
+    name: Exclude<K, Keys[number]>,
+    factory: TCallable,
+    options?:
+      | {
+          override?: boolean;
+          isConstructor?: boolean;
+          explicitArgumentsNames?: [...Keys];
+          beforeResolving?: (k: K) => void;
+          afterResolving?: (k: K, instance: TResult) => void;
+        }
+      | [...Keys]
+  ): C {
     const optionsIsArray = Array.isArray(options);
-    const explicitArgumentsNames = optionsIsArray ? options : options?.explicitArgumentsNames;
+    const explicitArgumentsNames = optionsIsArray
+      ? options
+      : options?.explicitArgumentsNames;
     const override = !optionsIsArray && !!options?.override;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
@@ -131,7 +206,10 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
         }) as NewServices[typeof name];
         this.instances[name] = instance;
         return instance;
-      }, isConstructor: false,
+      },
+      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
+      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
+      isConstructor: false,
     };
     return this as any;
   }
@@ -148,11 +226,20 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param name
    * @param aliasTo
    */
-  addAlias<T extends TServices[A], K extends ArgumentsKey, A extends TContainerKey>(name: Exclude<K, OptionalDependencySkipKey & A>, aliasTo: A): IDIContainer<{ [k in K]: T } & TServices> {
+  addAlias<
+    T extends TServices[A],
+    K extends ArgumentsKey,
+    A extends TContainerKey
+  >(
+    name: Exclude<K, OptionalDependencySkipKey & A>,
+    aliasTo: A
+  ): IDIContainer<{ [k in K]: T } & TServices> {
     return this.addTransient(name, () => this.get(aliasTo), []);
   }
 
-  use(middleware: Middleware<any>): DIContainer<TParentServices, TServices, TContainerKey> {
+  use(
+    middleware: Middleware<any>
+  ): DIContainer<TParentServices, TServices, TContainerKey> {
     this.middlewares.push(middleware);
     this.rebuildMiddlewareStack();
     return this;
@@ -174,7 +261,14 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param serviceName
    * @param options {GetOptions}
    */
-  get<Key extends TContainerKey, O extends GetOptions, T extends any = TServices[Key]>(serviceName: Key, options?: O): O['allowUnresolved'] extends true ? T | undefined : T {
+  get<
+    Key extends TContainerKey,
+    O extends GetOptions,
+    T extends any = TServices[Key]
+  >(
+    serviceName: Key,
+    options?: O
+  ): O["allowUnresolved"] extends true ? T | undefined : T {
     const instance = this.middlewareStack(serviceName);
 
     if (instance) {
@@ -196,7 +290,11 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
 
   readonly resolveArguments: ArgumentsResolver = (fn, argumentsKey) => {
     for (const argumentsResolver of this.argumentsResolvers) {
-      const args = argumentsResolver.call(this as IDIContainer<TServices>, fn, argumentsKey);
+      const args = argumentsResolver.call(
+        this as IDIContainer<TServices>,
+        fn,
+        argumentsKey
+      );
       if (args) return args;
     }
   };
@@ -214,7 +312,13 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param keys
    * @param callable
    */
-  bind<TResult extends any, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(keys: [...Keys], callable: Callable<DependenciesTypes<TServices, Keys>, TResult>): () => TResult {
+  bind<
+    TResult extends any,
+    Keys extends (OptionalDependencySkipKey | TContainerKey)[]
+  >(
+    keys: [...Keys],
+    callable: Callable<DependenciesTypes<TServices, Keys>, TResult>
+  ): () => TResult {
     return () => this.injecute(callable, { argumentsNames: keys });
   }
 
@@ -228,10 +332,21 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * localRequestContainer.get('request') === request;
    * ```
    */
-  fork<T extends TServices = TServices>(): IDIContainer<T> {
+  fork<T extends TServices = TServices>(options?: {
+    skipMiddlewares?: boolean;
+    skipResolvers?: boolean;
+  }): IDIContainer<T> {
     const child = new DIContainer<T>(this as IDIContainer<TServices>);
-    child.argumentsResolvers.length = 0;
-    this.argumentsResolvers.forEach((ar) => child.addArgumentsResolver(ar));
+
+    if (!options?.skipMiddlewares) {
+      child.argumentsResolvers.length = 0;
+      this.argumentsResolvers.forEach((ar) => child.addArgumentsResolver(ar));
+    }
+
+    if (!options?.skipResolvers) {
+      this.middlewares.forEach((m) => child.use(m));
+    }
+
     return child as IDIContainer<T>;
   }
 
@@ -245,7 +360,13 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * container.get('srv1') // Srv
    * ```
    */
-  extend<In extends TServices, Added extends Record<ArgumentsKey, any>, Out extends In & Added>(extensionFunction: IDIContainerExtension<In, Added, Out>): IDIContainer<Out> {
+  extend<
+    In extends TServices,
+    Added extends Record<ArgumentsKey, any>,
+    Out extends In & Added
+  >(
+    extensionFunction: IDIContainerExtension<In, Added, Out>
+  ): IDIContainer<Out> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);
   }
@@ -264,27 +385,49 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
    * @param callable
    * @param options
    */
-  injecute<TResult, TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>, Keys extends (OptionalDependencySkipKey | TContainerKey)[]>(callable: TCallable, options?: | {
-    argumentsKey?: TContainerKey | ArgumentsKey | undefined; isConstructor?: boolean; argumentsNames?: [...Keys];
-  } | [...Keys]): CallableResult<TCallable> {
+  injecute<
+    TResult,
+    TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey)[]
+  >(
+    callable: TCallable,
+    options?:
+      | {
+          argumentsKey?: TContainerKey | ArgumentsKey | undefined;
+          isConstructor?: boolean;
+          argumentsNames?: [...Keys];
+        }
+      | [...Keys]
+  ): CallableResult<TCallable> {
     const optionsIsArray = Array.isArray(options);
     const argumentsNames = optionsIsArray ? options : options?.argumentsNames;
     const argumentsKey = !optionsIsArray ? options?.argumentsKey : undefined;
-    const args = this.resolveAndCacheArguments(callable, argumentsKey, argumentsNames);
+    const args = this.resolveAndCacheArguments(
+      callable,
+      argumentsKey,
+      argumentsNames
+    );
 
     if (!args) {
-      throw new Error(`Not resolved arguments for ${String(argumentsKey)} "${callable
-        .toString()
-        .substring(0, 50)}"`);
+      throw new Error(
+        `Not resolved arguments for ${String(argumentsKey)} "${callable
+          .toString()
+          .substring(0, 50)}"`
+      );
     }
 
     const dependencies = this.mapAgrsToInstances(args);
 
-    const useNewKeyword = !optionsIsArray && typeof options?.isConstructor === 'boolean' ? options.isConstructor : !!callable.prototype?.constructor;
+    const useNewKeyword =
+      !optionsIsArray && typeof options?.isConstructor === "boolean"
+        ? options.isConstructor
+        : !!callable.prototype?.constructor;
 
     if (useNewKeyword) {
       const constructor = callable as Constructor<any, any>;
-      return new constructor(...(dependencies as ConstructorParameters<typeof constructor>));
+      return new constructor(
+        ...(dependencies as ConstructorParameters<typeof constructor>)
+      );
     }
     const func = callable as Func<any, any>;
     return func(...(dependencies as Parameters<typeof func>));
@@ -292,46 +435,82 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
     if (this.has(name)) {
-      throw new Error(`Factory or instance with name "${String(name)}" already registered`);
+      throw new Error(
+        `Factory or instance with name "${String(name)}" already registered`
+      );
     }
   }
-
-  protected resolveInstance: Resolver<TServices> = (name) => this.instances[name];
 
   // TODO: change signature to accept ArgumentsResolverCreator <T>(this: DIContainer<TServices>):
   //  DIContainer<TServices & T> =>
 
+  protected resolveInstance: Resolver<TServices> = (name) =>
+    this.instances[name];
+
   protected resolveFromFactory: Resolver<TServices> = (name) => {
     const factory = this.factories[name];
     if (factory) {
-      return this.injecute(factory.callable as Callable<any, TServices[typeof name]>, {
-        argumentsKey: name as any, isConstructor: factory.isConstructor,
-      });
+      factory.beforeResolving?.(name);
+      const result = this.injecute(
+        factory.callable as Callable<any, TServices[typeof name]>,
+        {
+          argumentsKey: name as any,
+          isConstructor: factory.isConstructor,
+        }
+      );
+      factory.afterResolving?.(name, result);
+      return result;
     }
   };
 
-  protected resolveFromParent: Resolver<TServices> = (name) => this.parentContainer?.get(name, { allowUnresolved: true });
+  protected resolveFromParent: Resolver<TServices> = (name) =>
+    this.parentContainer?.get(name, { allowUnresolved: true });
 
-  private middlewareStack!: Resolver<TServices>;
+  protected readonly resolve = firstResult([
+    this.resolveInstance,
+    this.resolveFromFactory,
+    this.resolveFromParent,
+  ]) as Middleware<TServices>;
 
-  protected assertFactoryIsAcceptable(factory: any, name: TContainerKey | ArgumentsKey) {
+  protected assertFactoryIsAcceptable(
+    factory: any,
+    name: TContainerKey | ArgumentsKey
+  ) {
     if (!factory) {
-      throw new Error(`Falsy factory or class constructor added for "${String(name)}" key`);
+      throw new Error(
+        `Falsy factory or class constructor added for "${String(name)}" key`
+      );
     }
   }
 
-  protected assertKeyIsValid(k: unknown): asserts k is Exclude<any, OptionalDependencySkipKey> {
+  protected assertKeyIsValid(
+    k: unknown
+  ): asserts k is Exclude<any, OptionalDependencySkipKey> {
     if (k === optionalDependencySkipKey) {
-      throw new Error(`"${optionalDependencySkipKey}" key is not allowed as key for service.`);
+      throw new Error(
+        `"${optionalDependencySkipKey}" key is not allowed as key for service.`
+      );
     }
   }
 
   private rebuildMiddlewareStack() {
-    this.middlewareStack = this.middlewares.reduce((next, current) => (message) => current.apply(this, [message, next as Resolver<TServices>])) as Resolver<TServices>;
+    this.middlewareStack = [this.resolve, ...this.middlewares].reduce(
+      (next, current) => (message) =>
+        current.apply(this, [message, next as Resolver<TServices>])
+    ) as Resolver<TServices>;
   }
 
-  private resolveAndCacheArguments(fn: Callable<any, any>, argumentsKey?: ArgumentsKey, argumentsNames?: (OptionalDependencySkipKey | TContainerKey)[]) {
-    const args: Argument[] | undefined = argumentsNames ? argumentsNamesToArguments(argumentsNames as string[]) : (this as IDIContainer<TServices>).resolveArguments(fn as Callable<any, any>, argumentsKey);
+  private resolveAndCacheArguments(
+    fn: Callable<any, any>,
+    argumentsKey?: ArgumentsKey,
+    argumentsNames?: (OptionalDependencySkipKey | TContainerKey)[]
+  ) {
+    const args: Argument[] | undefined = argumentsNames
+      ? argumentsNamesToArguments(argumentsNames as string[])
+      : (this as IDIContainer<TServices>).resolveArguments(
+          fn as Callable<any, any>,
+          argumentsKey
+        );
 
     if (args && argumentsKey && !this.arguments[argumentsKey]) {
       this.cacheArguments(args, argumentsKey);
@@ -341,10 +520,15 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
   }
 
   private mapAgrsToInstances(args: Argument[]) {
-    return args.map((arg) => this.get(arg.name as TContainerKey, { allowUnresolved: !arg.required }));
+    return args.map((arg) =>
+      this.get(arg.name as TContainerKey, { allowUnresolved: !arg.required })
+    );
   }
 
-  private ensureNoCirculars(key: ArgumentsKey, stack: ArgumentsKey[] = []): ArgumentsKey[][] {
+  private ensureNoCirculars(
+    key: ArgumentsKey,
+    stack: ArgumentsKey[] = []
+  ): ArgumentsKey[][] {
     // todo: use same mechanism to build dep tree
     const args = this.arguments[key];
     if (!args) return [stack];
@@ -357,13 +541,20 @@ export class DIContainer<TParentServices extends Record<ArgumentsKey, any> = Emp
     });
   }
 
-  private cacheArguments(args: Argument[], argumentsKey: TContainerKey | ArgumentsKey) {
+  private cacheArguments(
+    args: Argument[],
+    argumentsKey: TContainerKey | ArgumentsKey
+  ) {
     this.arguments[argumentsKey] = args;
     this.ensureNoCirculars(argumentsKey);
     return args;
   }
 
-  private validateAdd(name: Exclude<ArgumentsKey, OptionalDependencySkipKey>, factory: Callable<any, any>, override?: boolean) {
+  private validateAdd(
+    name: Exclude<ArgumentsKey, OptionalDependencySkipKey>,
+    factory: Callable<any, any>,
+    override?: boolean
+  ) {
     this.assertKeyIsValid(name);
     this.assertFactoryIsAcceptable(factory, name);
     if (!override) {
