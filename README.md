@@ -86,6 +86,11 @@ const service = container.get('service');
 ```
 
 ### Nested containers
+Containers nesting allows to keep local services out of parent context but use the parents services.
+All services registered in parent container can be accessed seamlessly.
+There is two ways to derive container.
+- Put the parent container as argument of new container.
+- Use `.fork()` method. In this case child container will use same resolvers and middlewares. It can be changed by providing optional argument.
 
 ```javascript
 import { DIContainer } from './container';
@@ -226,7 +231,18 @@ function addLoggingServices(config) {
           .addAlias('logger', config.NODE_ENV === 'production' ? 'elkLogger' : 'console');
 }
 
-container.extend(addLoggingServices(config));
+container
+        .extend(addLoggingServices(config))
+        .extend(addCryptoModules)
+        .extend(addBusinessServices);
+```
+```typescript
+const p = new DIContainer().addTransient("s", () => ({ x: 1 }), []);
+      const c = new DIContainer(p).extend((c) => {
+        const s = c.get("s");
+        return c.addTransient("s", () => ({ ...s, y: 2 }), []);
+      });
+      expect(c.get("s")).to.be.eql({ x: 1, y: 2 });
 ```
 
 ### Middlewares

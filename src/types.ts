@@ -143,6 +143,8 @@ export interface IDIContainer<
           override?: boolean;
           isConstructor?: boolean;
           explicitArgumentsNames?: [...Keys];
+          beforeResolving?: (k: K) => void;
+          afterResolving?: (k: K, instance: TResult) => void;
         }
       | [...Keys]
   ): C;
@@ -172,6 +174,8 @@ export interface IDIContainer<
           override?: boolean;
           isConstructor?: boolean;
           explicitArgumentsNames?: [...Keys];
+          beforeResolving?: (k: K) => void;
+          afterResolving?: (k: K, instance: TResult) => void;
         }
       | [...Keys]
   ): C;
@@ -253,7 +257,10 @@ export interface IDIContainer<
    * localRequestContainer.get('request') === request;
    * ```
    */
-  fork<T extends TServices = TServices>(): IDIContainer<T>;
+  fork<T extends TServices = TServices>(options?: {
+    skipMiddlewares?: boolean;
+    skipResolvers?: boolean;
+  }): IDIContainer<T>;
 
   /**
    * Use extension function to add services.

@@ -10,12 +10,18 @@ import {
 describe("injecute container", () => {
   describe("DI container general", () => {
     it("should allow to override parent service using parent service", () => {
-      const p = new DIContainer().addTransient("s", () => ({ x: 1 }), []);
-      const c = new DIContainer(p).extend((c) => {
-        const s = c.get("s");
-        return c.addTransient("s", () => ({ ...s, y: 2 }), []);
+      const parent = new DIContainer().addTransient("s", () => ({ x: 1 }), []);
+      const child = new DIContainer(parent).extend((c) => {
+        return c.addTransient(
+          "s",
+          () => {
+            const s = parent.get("s");
+            return { ...s, y: 2 };
+          },
+          []
+        );
       });
-      expect(c.get("s")).to.be.eql({ x: 1, y: 2 });
+      expect(child.get("s")).to.be.eql({ x: 1, y: 2 });
     });
 
     it("should prevent creating of circular dependencies", () => {
@@ -110,12 +116,16 @@ describe("injecute container", () => {
   describe("proxy", () => {
     it("resolves services with access throw the container.proxy", () => {
       const container = new DIContainer()
-        .addSingleton("rootService", () => {
-          return {
-            x: 1,
-            y: 2,
-          };
-        }, [])
+        .addSingleton(
+          "rootService",
+          () => {
+            return {
+              x: 1,
+              y: 2,
+            };
+          },
+          []
+        )
         .addTransient(
           "dependentService",
           (s) => {
@@ -130,26 +140,43 @@ describe("injecute container", () => {
       expect(r).is.eql({ s: { x: 1, y: 2 } });
     });
   });
-  describe('middlewares', () => {
-    it('allow to use few middlewares', () => {
+  describe("middlewares", () => {
+    it("allow to use few middlewares", () => {
       const checkpoints: string[] = [];
       new DIContainer()
         .use((name, next) => {
-          checkpoints.push('before1');
-          const r = next(name)
-          checkpoints.push('after1')
+          checkpoints.push("before1");
+          const r = next(name);
+          checkpoints.push("after1");
           return r;
         })
         .use((name, next) => {
-          checkpoints.push('before2');
-          const r = next(name)
-          checkpoints.push('after2')
+          checkpoints.push("before2");
+          const r = next(name);
+          checkpoints.push("after2");
           return r;
         })
-        .addSingleton('x', () => 'y', [])
-        .get('x');
+        .addSingleton("x", () => "y", [])
+        .get("x");
 
-      expect(checkpoints).to.be.eql(['before2', 'before1', 'after1', 'after2'])
-    })
-  })
+      expect(checkpoints).to.be.eql(["before2", "before1", "after1", "after2"]);
+    });
+    it("child container will use parent middlewares", () => {
+      const checkpoints: string[] = [];
+      const parentContainer = new DIContainer().use((name, next) => {
+        checkpoints.push("before1");
+        const r = next(name);
+        checkpoints.push("after1");
+        return r;
+      });
+
+      const r = parentContainer
+        .fork()
+        .addSingleton("x", () => "y", [])
+        .get("x");
+
+      expect(r).to.be.eql("y");
+      expect(checkpoints).to.be.eql(["before1", "after1"]);
+    });
+  });
 });
