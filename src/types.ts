@@ -91,8 +91,9 @@ export interface IDIContainer<
   TContainerKey extends keyof TServices = keyof TServices
 > {
   readonly proxy: Readonly<TServices>;
-  readonly arguments: { [key in keyof TServices]?: Argument[] };
   readonly resolveArguments: ArgumentsResolver;
+
+  getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
 
   /**
    * true if services with such key is registered, false otherwise

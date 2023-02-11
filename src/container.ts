@@ -55,7 +55,7 @@ export class DIContainer<
     get: (target, p) => this.get(p as TContainerKey),
   });
 
-  public readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
+  private readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
 
   protected factories: {
     [key in keyof TServices]?: {
@@ -77,9 +77,12 @@ export class DIContainer<
     _,
     argumentsKey
   ) {
-    if (!argumentsKey) return;
-    return this.arguments[argumentsKey];
+    return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
+
+  public getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined {
+    return this.arguments[argumentsKey];
+  }
 
   /**
    * true if services with such name is registered, false otherwise
