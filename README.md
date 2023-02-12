@@ -162,48 +162,45 @@ app.post('/api/user-stuff', useRequestContainer(['requestContextService'], (requ
 
 ### Injecute
 Best way to use container is hiding container with some helpers. Injecute will help there.
+
 ```typescript
+import { default as Express, Handler } from "express";
+import { ArgumentsKey, DependenciesTypes, DIContainer, Func, IDIContainer } from "injecute";
+
 // helper that helps to pull services from container
-export const useContainerServices =
-  <S extends Record<ArgumentsKey, any>>(container: IDIContainer<S>) =>
-  <
-    Keys extends readonly (keyof S)[],
-    RequiredServices extends DependenciesTypes<S, Keys>
-  >(
-    servicesNames: [...Keys],
-    handlerCreator: Callable<RequiredServices, Handler>
-  ): Handler => {
-    return container.injecute<Handler, any, any>(handlerCreator, servicesNames);
-  };
+export const useContainerServices = <S extends Record<ArgumentsKey, any>>(container: IDIContainer<S>) => <Keys extends readonly (keyof S)[], RequiredServices extends DependenciesTypes<S, Keys>, H extends Func<RequiredServices, Handler>>(servicesNames: [...Keys], handlerCreator: H): Handler => {
+  return container.injecute<() => Handler, any, any>(handlerCreator, servicesNames);
+};
 
 // business stuff service
 class MyBusinessService {
-  constructor(private readonly logger: any) {}
+  constructor(private readonly logger: any) {
+  }
 
   doBusinessStuff(parameter: string) {
     this.logger.log(parameter);
-    return 42;
+    return Number(parameter);
   }
 }
 
 // root app container
 const c = new DIContainer()
-  .addInstance("logger", console)
-  .addSingleton("businessService", MyBusinessService, ['logger']);
+        .addInstance("logger", console)
+        .addSingleton("businessService", MyBusinessService, ['logger']);
 
 // handler creator bounded to your app container
 const useServices = useContainerServices(c);
 
-// the result helper which uses MyBusinessService to handle the request.
-const handler = useServices(
-  ["businessService"],
-  (service) => (req, res, next) => {
-    res.send(service.doBusinessStuff(req.params.parameterFromRoute));
-  }
-);
+const app = Express();
 
 // use handler on route
-app.use('api/business/stuff', handler);
+app.use('/api/business/stuff/:id', useServices(["businessService"], (service) => (req, res, next) => {
+  res.json(service.doBusinessStuff(req.params.id));
+}));
+
+app.listen(3000)
+c.get('logger').log('Listening at port 3000')
+
 ```
 
 ### OOP factories
@@ -238,11 +235,13 @@ container
 ```
 ```typescript
 const p = new DIContainer().addTransient("s", () => ({ x: 1 }), []);
-      const c = new DIContainer(p).extend((c) => {
-        const s = c.get("s");
-        return c.addTransient("s", () => ({ ...s, y: 2 }), []);
-      });
-      expect(c.get("s")).to.be.eql({ x: 1, y: 2 });
+
+const c = new DIContainer(p).extend((c) => {
+  const s = c.get("s");
+  return c.addTransient("s", () => ({ ...s, y: 2 }), []);
+});
+
+expect(c.get("s")).to.be.eql({ x: 1, y: 2 });
 ```
 
 ### Middlewares
