@@ -1,5 +1,5 @@
 # injecute
-Lightweight extendable typesafe dependency injection container
+Lightweight extendable typesafe dependency injection container written in TypeScript.
 
 ### Key features
 - typesafe
@@ -18,45 +18,55 @@ Solution is not use the decorators as default way to register services.
 
 ## How to use
 
+1) Create container
+2) Add services
+3) Get your services or use `.injecute` method when needed.
+
+### Basic usage
+```typescript
+interface IDependency {
+  value: number;
+  method(): string;
+}
+
+class NotBasicService {
+  constructor(srv: IDependency, logger: Logger) {
+  }
+}
+
+const container = new DIContainer()
+        .addInstance("logger", console)
+        .addSingleton("myService", (): IDependency => ({
+          value: 42, method() {
+            return "The answer";
+          }
+        }), [])
+        .addTransient("notBasicService", NotBasicService, ["myService", "logger"]);
+
+// TS will know that notBasicService is the NotBasicService;
+const notBasicService = container.get('notBasicService');
+
+assert(myDependantService instanceof NotBasicService)
+```
+
 ### Services registration
 Constructors and functions (factories) supported. You can add your ready to use instances as well.
 
 #### Service types
 
-- Singleton 
-  
+- Singleton
+
   Instantiated/executed once. Each time will return the same result.
 - Transient
 
   Each time will be created new instance.
 - Instance
-  
+
   Created outside of container instance.
 
 Each added service will change the result type of container.
 So you should to add services in initialization order low level services first.
 
-### Basic usage
-```typescript
-class MyService {
-}
-
-class MyDependentService {
-  constructor(srv: MyService, logger: Logger) {
-  }
-}
-
-const container = new DIContainer()
-  .addSingleton('myService', MyService, [])
-  .addInstance('logger', console)
-  .addTransient('myDependantService', MyDependentService, ['myService', 'logger'])
-
-// TS will know that myDependantService is the MyDependentService;
-
-const myDependantService = container.get('myDependantService');
-
-assert(myDependantService instanceof MyDependentService)
-```
 
 ### Configuration based service
 
