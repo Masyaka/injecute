@@ -233,7 +233,7 @@ Also, it allows to add service without breaking the chaining
 ```typescript
 function addLoggingServices(config) {
   return (c) => c.addSingleton('elkUrl', () => config.ELK_URL, [])
-          .addSingleton('elkLogger', (url) => ElkLogger, ['elkUrl'])
+          .addSingleton('elkLogger', (url) => ElkLogger(url), ['elkUrl'])
           .addInstance('console', console)
           .addAlias('logger', config.NODE_ENV === 'production' ? 'elkLogger' : 'console');
 }
