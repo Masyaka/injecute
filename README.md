@@ -264,8 +264,10 @@ You have access to container as `this` in middleware.
 ```typescript
 container.use(function (key, next) {
   const willCreateNewInstance = !this.instances[key] && !!this.factories[key];
-  const instanceMessage = willCreateNewInstance ? 'New instance will be created.' : 'Existing instance will be used.';
-  this.get('logger').debug(`Resolving ${key}. ${instanceMessage}`);
+  if (willCreateNewInstance) {
+    this.get('logger').debug(`New instance will be created for ${key} key.`);
+  }
+  
   return next(key);
 });
 ```
