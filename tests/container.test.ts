@@ -37,6 +37,7 @@ describe("injecute container", () => {
       const c = new DIContainer()
         .addTransient("x", (z: any) => ({ ...z, x: 1 }), ["z"] as any)
         .addTransient("y", (x) => ({ ...x, y: 1 }), ["x"]);
+      
       expect(() => c.extend(addZ)).to.throw(CircularDependencyError);
     });
   });

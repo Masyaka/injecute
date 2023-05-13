@@ -41,7 +41,7 @@ const container = new DIContainer()
             return "The answer";
           }
         }), [])
-        .addTransient("notBasicService", NotBasicService, ["myService", "logger"]);
+        .addTransient("notBasicService", asNew(NotBasicService), ["myService", "logger"]);
 
 // TS will know that notBasicService is the NotBasicService;
 const notBasicService = container.get('notBasicService');
@@ -88,7 +88,7 @@ const container = new DIContainer()
   .addSingleton('productionLogger', productionLoggerFactory, [])
   .addInstance('console', console)
   .addAlias('logger', config.useProductionLogger ? 'productionLogger' : 'console')
-  .addTransient('service', LoggerUsingService, ['logger'])
+  .addTransient('service', asNew(LoggerUsingService), ['logger'])
 
 // service will use as logger `productionLogger` or `console` based on config.;
 
@@ -152,7 +152,7 @@ export const createRequestContainerWrapper = <RootServices extends Record<Argume
 };
 
 const rootContainer = new DIContainer()
-        .addSingleton('userResolvingService', UserResolvingService, ['db', 'etc...']);
+        .addSingleton('userResolvingService', asNew(UserResolvingService), ['db', 'etc...']);
 
 const useRequestContainer = createRequestContainerWrapper(rootContainer, (c) => {
   return c
@@ -196,7 +196,7 @@ class MyBusinessService {
 // root app container
 const c = new DIContainer()
         .addInstance("logger", console)
-        .addSingleton("businessService", MyBusinessService, ['logger']);
+        .addSingleton("businessService", asNew(MyBusinessService), ['logger']);
 
 // handler creator bounded to your app container
 const useServices = useContainerServices(c);
