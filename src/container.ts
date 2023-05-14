@@ -15,8 +15,8 @@ import {
   OptionalDependencySkipKey,
   Resolver,
   ValueOf,
-} from "./types";
-import { argumentsNamesToArguments, firstResult } from "./utils";
+} from './types';
+import { argumentsNamesToArguments, firstResult } from './utils';
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -31,7 +31,7 @@ export class CircularDependencyError extends Error {
   constructor(stack: ArgumentsKey[]) {
     const circularStackDescription = stack
       .map((k) => (k === stack[stack.length - 1] ? `*${k.toString()}*` : k))
-      .join(" -> ");
+      .join(' -> ');
     super(`Circular dependency detected ${circularStackDescription}.`);
   }
 }
@@ -54,9 +54,6 @@ export class DIContainer<
   proxy: Readonly<TServices> = new Proxy({} as TServices, {
     get: (target, p) => this.get(p as TContainerKey),
   });
-
-  private readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
-
   protected factories: {
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
@@ -65,12 +62,15 @@ export class DIContainer<
       afterResolving?: (k: key, instance: TServices[key]) => void;
     };
   } = {};
-
   protected instances: { [key in keyof TServices]?: TServices[key] } = {};
-
+  private readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
   private readonly argumentsResolvers: ArgumentsResolver[] = [];
   private readonly middlewares: Middleware<TServices>[] = [];
   private middlewareStack!: Resolver<TServices>;
+
+  get keys(): TContainerKey[] {
+    return Object.keys(this.factories) as TContainerKey[];
+  }
 
   static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
     this,
@@ -109,7 +109,9 @@ export class DIContainer<
   >(
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
-    options?: { override: boolean }
+    options?: {
+      override: boolean;
+    }
   ): C {
     this.addSingleton(name, () => instance, {
       override: options?.override,
@@ -270,7 +272,7 @@ export class DIContainer<
   >(
     serviceName: Key,
     options?: O
-  ): O["allowUnresolved"] extends true ? T | undefined : T {
+  ): O['allowUnresolved'] extends true ? T | undefined : T {
     const instance = this.middlewareStack(serviceName);
 
     if (instance) {
@@ -421,7 +423,7 @@ export class DIContainer<
     const dependencies = this.mapAgrsToInstances(args);
 
     const useNewKeyword =
-      !optionsIsArray && typeof options?.isConstructor === "boolean"
+      !optionsIsArray && typeof options?.isConstructor === 'boolean'
         ? options.isConstructor
         : !!callable.prototype?.constructor;
 

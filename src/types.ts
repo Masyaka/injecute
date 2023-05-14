@@ -101,6 +101,8 @@ export interface IDIContainer<
    */
   has(name: TContainerKey | string): boolean;
 
+  get keys(): TContainerKey[]
+
   /**
    * Adds existing instance to collection
    * @param name
