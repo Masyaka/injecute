@@ -37,6 +37,23 @@ export class CircularDependencyError extends Error {
   }
 }
 
+const callFactory = <D extends any[]>(
+  callable: Callable<D, any>,
+  dependencies: D,
+  isConstructor?: boolean
+) => {
+  const useNewKeyword = isConstructor ?? !!callable.prototype?.constructor;
+
+  if (useNewKeyword) {
+    const constructor = callable as Constructor<any, any>;
+    return new constructor(
+      ...(dependencies as ConstructorParameters<typeof constructor>)
+    );
+  }
+  const func = callable as Func<any, any>;
+  return func(...(dependencies as Parameters<typeof func>));
+};
+
 /**
  * Dependency Injection container
  */
@@ -211,18 +228,13 @@ export class DIContainer<
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.factories.set(name, {
-      callable: () => {
-        const instance = this.injecute(factory, {
-          argumentsKey: name,
-          argumentsNames: explicitArgumentsNames,
-          isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
-        }) as NewServices[typeof name];
-        this.singletonInstances.set(name, instance);
-        return instance;
-      },
+      callable: factory,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
-      isConstructor: false,
+      afterResolving: (k: typeof name, instance: TResult) => {
+        this.singletonInstances.set(name, instance);
+        !optionsIsArray && options?.afterResolving?.(k, instance);
+      },
+      isConstructor: optionsIsArray ? undefined : options?.isConstructor,
     });
     return this as any;
   }
@@ -443,25 +455,20 @@ export class DIContainer<
       );
     }
 
-    const dependencies = this.mapAgrsToInstances(args);
+    const dependencies = this.mapAgrsToInstances(args) as DependenciesTypes<
+      TServices,
+      Keys
+    >;
 
-    const useNewKeyword =
-      !optionsIsArray && typeof options?.isConstructor === 'boolean'
-        ? options.isConstructor
-        : !!callable.prototype?.constructor;
-
-    if (useNewKeyword) {
-      const constructor = callable as Constructor<any, any>;
-      return new constructor(
-        ...(dependencies as ConstructorParameters<typeof constructor>)
-      );
-    }
-    const func = callable as Func<any, any>;
-    return func(...(dependencies as Parameters<typeof func>));
+    return callFactory(
+      callable,
+      dependencies,
+      !optionsIsArray && options?.isConstructor
+    );
   }
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
-    if (this.has(name)) {
+    if (this.has(name, false)) {
       throw new Error(
         `Factory or instance with name "${String(name)}" already registered`
       );
