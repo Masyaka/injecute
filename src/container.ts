@@ -11,6 +11,7 @@ import {
   GetOptions,
   IDIContainer,
   IDIContainerExtension,
+  MapOf,
   optionalDependencySkipKey,
   OptionalDependencySkipKey,
   Resolver,
@@ -53,16 +54,21 @@ export class DIContainer<
 
   proxy: Readonly<TServices> = new Proxy({} as TServices, {
     get: (target, p) => this.get(p as TContainerKey),
+    set: () => {
+      throw new Error('Set through proxy is not supported');
+    },
   });
-  protected factories: {
+  protected factories: MapOf<{
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
       isConstructor?: boolean;
       beforeResolving?: (k: key) => void;
       afterResolving?: (k: key, instance: TServices[key]) => void;
     };
-  } = {};
-  protected instances: { [key in keyof TServices]?: TServices[key] } = {};
+  }> = new Map();
+  protected singletonInstances: MapOf<{
+    [key in keyof TServices]?: TServices[key];
+  }> = new Map();
   private readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
   private readonly argumentsResolvers: ArgumentsResolver[] = [];
   private readonly middlewares: Middleware<TServices>[] = [];
@@ -87,11 +93,13 @@ export class DIContainer<
   /**
    * true if services with such name is registered, false otherwise
    * @param name
+   * @param askParent true by default
    */
-  has(name: TContainerKey | ArgumentsKey): boolean {
-    return !!(
-      this.factories[name as TContainerKey] ||
-      this.instances[name as TContainerKey]
+  has(name: TContainerKey | ArgumentsKey, askParent: boolean = true): boolean {
+    return (
+      this.factories.has(name) ||
+      this.singletonInstances.has(name) ||
+      (askParent ? !!this.parentContainer?.has(name) : false)
     );
   }
 
@@ -157,12 +165,12 @@ export class DIContainer<
       : options?.explicitArgumentsNames;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
-    this.factories[name] = {
+    this.factories.set(name, {
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       callable: factory as Callable<any[], NewServices[typeof name]>,
       isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
-    };
+    });
     return this as any;
   }
 
@@ -202,20 +210,20 @@ export class DIContainer<
     const override = !optionsIsArray && !!options?.override;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
-    this.factories[name] = {
+    this.factories.set(name, {
       callable: () => {
         const instance = this.injecute(factory, {
           argumentsKey: name,
           argumentsNames: explicitArgumentsNames,
           isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
         }) as NewServices[typeof name];
-        this.instances[name] = instance;
+        this.singletonInstances.set(name, instance);
         return instance;
       },
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       isConstructor: false,
-    };
+    });
     return this as any;
   }
 
@@ -376,6 +384,21 @@ export class DIContainer<
   }
 
   /**
+   * Clear singletons instances cache.
+   * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
+   * Helpful when some service is replaced and cached dependant should be created once more.
+   *
+   * @param resetParent false by default.
+   */
+  reset(resetParent = false): IDIContainer<TServices> {
+    this.singletonInstances.clear();
+    if (resetParent) {
+      this.parentContainer?.reset();
+    }
+    return this as IDIContainer<TServices>;
+  }
+
+  /**
    * Executes function or constructor using container dependencies without adding it to container.
    * @example ```
    * container.addInstance('logger', console);
@@ -449,10 +472,10 @@ export class DIContainer<
   //  DIContainer<TServices & T> =>
 
   protected resolveInstance: Resolver<TServices> = (name) =>
-    this.instances[name];
+    this.singletonInstances.get(name);
 
   protected resolveFromFactory: Resolver<TServices> = (name) => {
-    const factory = this.factories[name];
+    const factory = this.factories.get(name);
     if (factory) {
       factory.beforeResolving?.(name);
       const result = this.injecute(

@@ -30,7 +30,7 @@ type DependenciesTypesEntry<
   TServices extends Record<string, any>,
   K extends keyof TServices
 > = K extends OptionalDependencySkipKey ? undefined : TServices[K];
-export const optionalDependencySkipKey = "undefined" as const;
+export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
 export type DependenciesTypes<
   TServices extends Record<string, any>, // todo: fix this with TS 5.0 const generic
@@ -76,7 +76,7 @@ export type IDIContainerExtension<
   Out extends In & Added = In & Added
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
-export type ContainerServices<C extends IDIContainer<any>> = C["proxy"];
+export type ContainerServices<C extends IDIContainer<any>> = C['proxy'];
 export type InjecuteOptions<
   TContainerKey,
   Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
@@ -84,6 +84,14 @@ export type InjecuteOptions<
   argumentsKey?: TContainerKey | undefined;
   isConstructor?: boolean;
   argumentsNames?: [...Keys];
+};
+
+export type MapOf<T> = Map<keyof T, ValueOf<T>> & {
+  get<K extends keyof T>(k: K): T[K];
+  set<K extends ArgumentsKey, V extends any>(
+    k: K,
+    v: V
+  ): MapOf<T & Record<K, V>>;
 };
 
 export interface IDIContainer<
@@ -101,7 +109,7 @@ export interface IDIContainer<
    */
   has(name: TContainerKey | string): boolean;
 
-  get keys(): TContainerKey[]
+  get keys(): TContainerKey[];
 
   /**
    * Adds existing instance to collection
@@ -228,7 +236,7 @@ export interface IDIContainer<
   >(
     serviceName: Key,
     options?: O
-  ): O["allowUnresolved"] extends true ? T | undefined : T;
+  ): O['allowUnresolved'] extends true ? T | undefined : T;
 
   /**
    * Binds Callable to container with specific arguments keys.
@@ -282,6 +290,15 @@ export interface IDIContainer<
   >(
     extensionFunction: IDIContainerExtension<In, Added, Out>
   ): IDIContainer<Out>;
+
+  /**
+   * Clear singletons instances cache.
+   * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
+   * Helpful when some service is replaced and cached dependant should be created once more.
+   *
+   * @param resetParent false by default.
+   */
+  reset(resetParent?: boolean): IDIContainer<TServices>;
 
   /**
    * Executes function or constructor using container dependencies without adding it to container.
