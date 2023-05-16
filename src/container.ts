@@ -54,6 +54,12 @@ const callFactory = <D extends any[]>(
   return func(...(dependencies as Parameters<typeof func>));
 };
 
+export type DIContainerConstructorArguments<
+  TParentServices extends Record<ArgumentsKey, any> = Empty
+> = {
+  parentContainer?: IDIContainer<TParentServices>;
+};
+
 /**
  * Dependency Injection container
  */
@@ -64,18 +70,20 @@ export class DIContainer<
   TContainerKey extends keyof TServices = keyof TServices
 > implements IDIContainer<TServices, TContainerKey>
 {
-  constructor(protected parentContainer?: IDIContainer<TParentServices>) {
+  constructor(p?: DIContainerConstructorArguments<TParentServices>) {
+    this.#parentContainer = p?.parentContainer;
     this.addArgumentsResolver(DIContainer.resolveArgumentsFromCache);
     this.rebuildMiddlewareStack();
   }
 
-  proxy: Readonly<TServices> = new Proxy({} as TServices, {
+  readonly proxy: Readonly<TServices> = new Proxy({} as TServices, {
     get: (target, p) => this.get(p as TContainerKey),
     set: () => {
       throw new Error('Set through proxy is not supported');
     },
   });
-  protected factories: MapOf<{
+  readonly #parentContainer: IDIContainer<TParentServices> | undefined;
+  readonly #factories: MapOf<{
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
       isConstructor?: boolean;
@@ -83,16 +91,17 @@ export class DIContainer<
       afterResolving?: (k: key, instance: TServices[key]) => void;
     };
   }> = new Map();
-  protected singletonInstances: MapOf<{
+  readonly #singletonInstances: MapOf<{
     [key in keyof TServices]?: TServices[key];
   }> = new Map();
-  private readonly arguments: { [key in keyof TServices]?: Argument[] } = {};
-  private readonly argumentsResolvers: ArgumentsResolver[] = [];
-  private readonly middlewares: Middleware<TServices>[] = [];
-  private middlewareStack!: Resolver<TServices>;
+  readonly #arguments: MapOf<{ [key in keyof TServices]?: Argument[] }> =
+    new Map();
+  readonly #argumentsResolvers: ArgumentsResolver[] = [];
+  readonly #middlewares: Middleware<TServices>[] = [];
+  #middlewareStack!: Resolver<TServices>;
 
   get keys(): TContainerKey[] {
-    return Object.keys(this.factories) as TContainerKey[];
+    return Object.keys(this.#factories) as TContainerKey[];
   }
 
   static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
@@ -104,7 +113,7 @@ export class DIContainer<
   };
 
   public getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined {
-    return this.arguments[argumentsKey];
+    return this.#arguments.get(argumentsKey);
   }
 
   /**
@@ -114,9 +123,9 @@ export class DIContainer<
    */
   has(name: TContainerKey | ArgumentsKey, askParent: boolean = true): boolean {
     return (
-      this.factories.has(name) ||
-      this.singletonInstances.has(name) ||
-      (askParent ? !!this.parentContainer?.has(name) : false)
+      this.#factories.has(name) ||
+      this.#singletonInstances.has(name) ||
+      (askParent ? !!this.#parentContainer?.has(name) : false)
     );
   }
 
@@ -182,12 +191,14 @@ export class DIContainer<
       : options?.explicitArgumentsNames;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
-    this.factories.set(name, {
+    this.#factories.set(name, {
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       callable: factory as Callable<any[], NewServices[typeof name]>,
       isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
     });
+    // @ts-expect-error name already is the TContainerKey
+    this.afterAdd(name);
     return this as any;
   }
 
@@ -227,15 +238,17 @@ export class DIContainer<
     const override = !optionsIsArray && !!options?.override;
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
-    this.factories.set(name, {
+    this.#factories.set(name, {
       callable: factory,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: (k: typeof name, instance: TResult) => {
-        this.singletonInstances.set(name, instance);
+        this.#singletonInstances.set(name, instance);
         !optionsIsArray && options?.afterResolving?.(k, instance);
       },
       isConstructor: optionsIsArray ? undefined : options?.isConstructor,
     });
+    // @ts-expect-error name already is the TContainerKey
+    this.afterAdd(name);
     return this as any;
   }
 
@@ -264,7 +277,7 @@ export class DIContainer<
   use(
     middleware: Middleware<any>
   ): DIContainer<TParentServices, TServices, TContainerKey> {
-    this.middlewares.push(middleware);
+    this.#middlewares.push(middleware);
     this.rebuildMiddlewareStack();
     return this;
   }
@@ -293,7 +306,7 @@ export class DIContainer<
     serviceName: Key,
     options?: O
   ): O['allowUnresolved'] extends true ? T | undefined : T {
-    const instance = this.middlewareStack(serviceName);
+    const instance = this.#middlewareStack(serviceName);
 
     if (instance) {
       return instance;
@@ -307,13 +320,15 @@ export class DIContainer<
   }
 
   //  ArgumentsResolver
-  public addArgumentsResolver(ar: ArgumentsResolver): DIContainer<TServices> {
-    this.argumentsResolvers.push(ar);
+  public addArgumentsResolver(
+    ar: ArgumentsResolver
+  ): DIContainer<TParentServices, TServices> {
+    this.#argumentsResolvers.push(ar);
     return this;
   }
 
   readonly resolveArguments: ArgumentsResolver = (fn, argumentsKey) => {
-    for (const argumentsResolver of this.argumentsResolvers) {
+    for (const argumentsResolver of this.#argumentsResolvers) {
       const args = argumentsResolver.call(
         this as IDIContainer<TServices>,
         fn,
@@ -360,15 +375,17 @@ export class DIContainer<
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<T> {
-    const child = new DIContainer<T>(this as IDIContainer<TServices>);
+    const child = new DIContainer<T>({
+      parentContainer: this as IDIContainer<TServices>,
+    });
 
     if (!options?.skipMiddlewares) {
-      child.argumentsResolvers.length = 0;
-      this.argumentsResolvers.forEach((ar) => child.addArgumentsResolver(ar));
+      child.#argumentsResolvers.length = 0;
+      this.#argumentsResolvers.forEach((ar) => child.addArgumentsResolver(ar));
     }
 
     if (!options?.skipResolvers) {
-      this.middlewares.forEach((m) => child.use(m));
+      this.#middlewares.forEach((m) => child.use(m));
     }
 
     return child as IDIContainer<T>;
@@ -403,9 +420,9 @@ export class DIContainer<
    * @param resetParent false by default.
    */
   reset(resetParent = false): IDIContainer<TServices> {
-    this.singletonInstances.clear();
+    this.#singletonInstances.clear();
     if (resetParent) {
-      this.parentContainer?.reset();
+      this.#parentContainer?.reset();
     }
     return this as IDIContainer<TServices>;
   }
@@ -479,10 +496,10 @@ export class DIContainer<
   //  DIContainer<TServices & T> =>
 
   protected resolveInstance: Resolver<TServices> = (name) =>
-    this.singletonInstances.get(name);
+    this.#singletonInstances.get(name);
 
   protected resolveFromFactory: Resolver<TServices> = (name) => {
-    const factory = this.factories.get(name);
+    const factory = this.#factories.get(name);
     if (factory) {
       factory.beforeResolving?.(name);
       const result = this.injecute(
@@ -498,7 +515,7 @@ export class DIContainer<
   };
 
   protected resolveFromParent: Resolver<TServices> = (name) =>
-    this.parentContainer?.get(name, { allowUnresolved: true });
+    this.#parentContainer?.get(name, { allowUnresolved: true });
 
   protected readonly resolve = firstResult([
     this.resolveInstance,
@@ -528,7 +545,7 @@ export class DIContainer<
   }
 
   private rebuildMiddlewareStack() {
-    this.middlewareStack = [this.resolve, ...this.middlewares].reduce(
+    this.#middlewareStack = [this.resolve, ...this.#middlewares].reduce(
       (next, current) => (message) =>
         current.apply(this, [message, next as Resolver<TServices>])
     ) as Resolver<TServices>;
@@ -546,7 +563,7 @@ export class DIContainer<
           argumentsKey
         );
 
-    if (args && argumentsKey && !this.arguments[argumentsKey]) {
+    if (args && argumentsKey && !this.#arguments.get(argumentsKey)) {
       this.cacheArguments(args, argumentsKey);
     }
 
@@ -564,7 +581,7 @@ export class DIContainer<
     stack: ArgumentsKey[] = []
   ): ArgumentsKey[][] {
     // todo: use same mechanism to build dep tree
-    const args = this.arguments[key];
+    const args = this.#arguments.get(key);
     if (!args) return [stack];
     return args.flatMap((a) => {
       const newStack = [...stack, a.name];
@@ -579,7 +596,7 @@ export class DIContainer<
     args: Argument[],
     argumentsKey: TContainerKey | ArgumentsKey
   ) {
-    this.arguments[argumentsKey] = args;
+    this.#arguments.set(argumentsKey, args);
     this.ensureNoCirculars(argumentsKey);
     return args;
   }
@@ -595,4 +612,6 @@ export class DIContainer<
       this.assertNotRegistered(name);
     }
   }
+
+  protected afterAdd(name: TContainerKey) {}
 }

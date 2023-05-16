@@ -33,7 +33,7 @@ type DependenciesTypesEntry<
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
 export type DependenciesTypes<
-  TServices extends Record<string, any>, // todo: fix this with TS 5.0 const generic
+  TServices extends Record<string, any>,
   Keys extends readonly (keyof TServices)[] = readonly (keyof TServices)[]
 > = [
   DependenciesTypesEntry<TServices, Keys[0]>,
