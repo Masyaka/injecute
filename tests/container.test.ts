@@ -9,6 +9,7 @@ import {
 
 describe('injecute container', () => {
   describe('DI container general', () => {
+    describe('namespaces', () => {});
     describe('reset', () => {
       it('removes cached singleton instances', () => {
         let singletonFactoryRuns = 0;
@@ -75,7 +76,7 @@ describe('injecute container', () => {
 
     it('should allow to override parent service using parent service', () => {
       const parent = new DIContainer().addTransient('s', () => ({ x: 1 }), []);
-      const child = new DIContainer(parent).extend((c) => {
+      const child = new DIContainer({ parentContainer: parent }).extend((c) => {
         return c.addTransient(
           's',
           () => {
@@ -176,33 +177,6 @@ describe('injecute container', () => {
           })
           .get('multiplied2');
       expect(getMultiplied2By2()).to.be.eql(4);
-    });
-  });
-  describe('proxy', () => {
-    it('resolves services with access throw the container.proxy', () => {
-      const container = new DIContainer()
-        .addSingleton(
-          'rootService',
-          () => {
-            return {
-              x: 1,
-              y: 2,
-            };
-          },
-          []
-        )
-        .addTransient(
-          'dependentService',
-          (s) => {
-            return {
-              s,
-            };
-          },
-          ['rootService']
-        );
-
-      const r = container.proxy.dependentService;
-      expect(r).is.eql({ s: { x: 1, y: 2 } });
     });
   });
   describe('middlewares', () => {

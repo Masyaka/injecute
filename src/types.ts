@@ -76,7 +76,9 @@ export type IDIContainerExtension<
   Out extends In & Added = In & Added
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
-export type ContainerServices<C extends IDIContainer<any>> = C['proxy'];
+export type ContainerServices<C extends IDIContainer<any>> =
+  C extends IDIContainer<infer S> ? S : never;
+
 export type InjecuteOptions<
   TContainerKey,
   Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
@@ -98,7 +100,6 @@ export interface IDIContainer<
   TServices extends Record<ArgumentsKey, any>,
   TContainerKey extends keyof TServices = keyof TServices
 > {
-  readonly proxy: Readonly<TServices>;
   readonly resolveArguments: ArgumentsResolver;
 
   getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;

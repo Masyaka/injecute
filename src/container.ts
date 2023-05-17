@@ -76,12 +76,6 @@ export class DIContainer<
     this.rebuildMiddlewareStack();
   }
 
-  readonly proxy: Readonly<TServices> = new Proxy({} as TServices, {
-    get: (target, p) => this.get(p as TContainerKey),
-    set: () => {
-      throw new Error('Set through proxy is not supported');
-    },
-  });
   readonly #parentContainer: IDIContainer<TParentServices> | undefined;
   readonly #factories: MapOf<{
     [key in keyof TServices]?: {

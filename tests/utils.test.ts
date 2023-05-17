@@ -3,8 +3,30 @@ import { describe } from 'mocha';
 import { DIContainer } from '../src';
 import { asNew } from '../src/utils/construct';
 import { preload } from '../src/utils/preload';
+import { createProxyAccessor } from '../src/utils/proxy';
 
 describe('utils', () => {
+  describe('proxy', () => {
+    const accessor = createProxyAccessor(
+      new DIContainer()
+        .addInstance('listener', 'Listener')
+        .addSingleton('sing', (listener) => `I'm singing for ${listener}`, [
+          'listener',
+        ])
+    );
+
+    it('reads values', () => {
+      expect(accessor.listener).to.be.eq('Listener');
+      expect(accessor.sing).to.be.eq("I'm singing for Listener");
+    });
+
+    it('throws on write attempt', () => {
+      // @ts-expect-error testing
+      expect(() => (accessor.listener = '')).to.throw(
+        'Set through proxy is not supported'
+      );
+    });
+  });
   describe('preload', () => {
     it('works without second argument', () => {
       let singletonCalled = false;
