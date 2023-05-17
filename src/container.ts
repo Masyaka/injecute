@@ -95,7 +95,7 @@ export class DIContainer<
   #middlewareStack!: Resolver<TServices>;
 
   get keys(): TContainerKey[] {
-    return Object.keys(this.#factories) as TContainerKey[];
+    return Array.from(this.#factories.keys()) as TContainerKey[];
   }
 
   static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
