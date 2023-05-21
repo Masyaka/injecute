@@ -5,6 +5,7 @@ import {
   Callable,
   CallableResult,
   Constructor,
+  ContainerServices,
   DependenciesTypes,
   Empty,
   Events,
@@ -126,20 +127,33 @@ export class DIContainer<
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
 
+  private eventNotSupported(e: string) {
+    const supportedEvents = Object.keys(this.eventHandlers)
+      .map((k) => `"${k}"`)
+      .join(', ');
+    return new Error(`Event "${e}" not supported. ${supportedEvents} allowed`);
+  }
+
   addEventListener<E extends keyof Events>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ) {
-    this.eventHandlers[e].add(handler);
-    return this;
+    if (e in this.eventHandlers) {
+      this.eventHandlers[e].add(handler);
+      return this;
+    }
+    throw this.eventNotSupported(e);
   }
 
   removeEventListener<E extends keyof Events>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ) {
-    this.eventHandlers[e].delete(handler);
-    return this;
+    if (e in this.eventHandlers) {
+      this.eventHandlers[e].delete(handler);
+      return this;
+    }
+    throw this.eventNotSupported(e);
   }
 
   public getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined {
@@ -224,6 +238,9 @@ export class DIContainer<
       ? options
       : options?.explicitArgumentsNames;
     this.validateAdd(name, factory, override);
+    if (override) {
+      this.#singletonInstances.delete(name);
+    }
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.#factories.set(name, {
       type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
@@ -274,6 +291,9 @@ export class DIContainer<
       : options?.explicitArgumentsNames;
     const override = !optionsIsArray && !!options?.override;
     this.validateAdd(name, factory, override);
+    if (override) {
+      this.#singletonInstances.delete(name);
+    }
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.#factories.set(name, {
       callable: factory,

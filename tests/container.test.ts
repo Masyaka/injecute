@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { describe, it } from 'mocha';
 import {
+  ArgumentsKey,
   CircularDependencyError,
   DIContainer,
   IDIContainer,
@@ -11,6 +12,84 @@ import {
 
 describe('injecute container', () => {
   describe('DI container general', () => {
+    describe('events', () => {
+      it('emit add event', () => {
+        let added: ArgumentsKey = '';
+        const handler: any = ({ name }: { name: ArgumentsKey }) => {
+          added = name;
+        };
+        const container = new DIContainer().addEventListener('add', handler);
+        container.addInstance('instance', 'instance value');
+        expect(added).to.be.eq('instance');
+        container.removeEventListener('add', handler);
+        container.addSingleton('singleton', () => 'singleton value', []);
+        expect(added).to.be.eq('instance');
+      });
+      it('emit reset event', () => {
+        let resetContainer: any;
+        const handler: any = ({ container }: { container: any }) => {
+          resetContainer = container;
+        };
+        const container = new DIContainer()
+          .addEventListener('reset', handler)
+          .addSingleton('singleton', () => 'singleton value', []);
+        container.reset();
+        expect(resetContainer).to.be.eq(container);
+        container.removeEventListener('reset', handler);
+        resetContainer = undefined;
+        container.reset();
+        expect(resetContainer).to.be.undefined;
+      });
+      it('emit get event', () => {
+        let requested: ArgumentsKey = '';
+        let gotValue: any;
+        const handler: any = ({
+          name,
+          value,
+        }: {
+          name: ArgumentsKey;
+          value: any;
+        }) => {
+          requested = name;
+          gotValue = value;
+        };
+        const container = new DIContainer()
+          .addEventListener('get', handler)
+          .addInstance('instance', 'instance value');
+
+        container.get('instance');
+        expect(requested).to.be.eq('instance');
+        expect(gotValue).to.be.eq('instance value');
+
+        // should return new value after override
+        container.addSingleton('instance', () => 'new value', {
+          explicitArgumentsNames: [],
+          override: true,
+        });
+        container.get('instance');
+        expect(requested).to.be.eq('instance');
+        expect(gotValue).to.be.eq('new value');
+
+        // after remove handler
+        container.removeEventListener('get', handler);
+        requested = '';
+        gotValue = undefined;
+        container.get('instance');
+        expect(requested).to.be.eq('');
+        expect(gotValue).to.be.undefined;
+      });
+      it('throws when event is wrong', () => {
+        const container = new DIContainer();
+        expect(() => container.addEventListener('add', () => {})).to.not.throw;
+        expect(() => container.removeEventListener('add', () => {})).to.not
+          .throw;
+        // @ts-expect-error event not exists
+        expect(() => container.addEventListener('added', () => {})).to.throw;
+        // @ts-expect-error event not exists
+        expect(() => container.removeEventListener('added', () => {})).to.throw;
+      });
+    });
+
     describe('namespaces', () => {
       it('creates namespace container with added services', () => {
         const feat = 'feature implementation' as const;
