@@ -1,4 +1,7 @@
-import { Argument, optionalDependencySkipKey } from "./types";
+import { Argument, optionalDependencySkipKey } from '../types';
+import { asNew } from './construct';
+import { preload } from './preload';
+import { createProxyAccessor } from './proxy';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
 export const firstResult =
@@ -18,3 +21,9 @@ export const argumentsNamesToArguments = (argsNames: string[]): Argument[] =>
     name: a as string,
     required: a !== optionalDependencySkipKey,
   }));
+
+export const utils = {
+  preload,
+  asNew,
+  createProxyAccessor,
+};

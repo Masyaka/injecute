@@ -1,17 +1,35 @@
 /**
- * TODO: Add decorators services registering strategy
- * TODO: Fix ObjectKeyOfType<TServices, T> to constraint allowed aliases for type in addAlias method
- * todo: Add lazy wrapper for function. Wrapped function should not execute any code or retrieve services from container before function call.
- * todo: Add addMemoized add service option which will return new instance if dependencies is changed
- * todo: Add dedicated utils for list services and see their dependencies
- * todo: Add description option when services added
- * todo: Remove implicit constructors support.
- * todo: Add auto resolvers with typescript parser.
- * todo: Add reset method for specific singleton and his dependencies.
- * todo: Update typescript to 5.x and add decorators support. Decorators should be retrieved from the container.
- * todo: Add namespace feature.
- * todo: Add arguments names param truly optional or required.
- * todo: Change preload util to await async services and change result type of container
+ * - TODO: Add decorators services registering strategy
+ *
+ * - TODO: Fix ObjectKeyOfType<TServices, T> to constraint allowed aliases for type in addAlias method
+ *
+ * - todo: Add lazy wrapper for function. Wrapped function should not execute any code or retrieve services from container before function call.
+ *
+ * - todo: Add addMemoized add service option which will return new instance if dependencies is changed
+ *
+ * - todo: Add dedicated utils for list services and see their dependencies
+ *
+ * - todo: Add description option when services added
+ *
+ * - todo: Remove implicit constructors support.
+ *
+ * - todo: Add auto resolvers with typescript parser.
+ *
+ * - todo: Add reset method for specific singleton and his dependencies.
+ *
+ * - todo: Update typescript to 5.x and add decorators support. Decorators should be retrieved from the container.
+ *
+ * - todo: Add namespace feature.
+ *
+ * - todo: Add arguments names param truly optional or required.
+ *
+ * - todo: Change preload util to await async services and change result type of container
+ *
+ * - todo: Add services utilization on reset, add dispose option which is callback on reset. Add lifetime option, which will remove singleton instance after time is up.
+ *
+ * - todo: Rename `explicitArgumentsNames` to (dependencies/deps/args/require)
+ *
+ * - todo: Fix `DependenciesTypes` with TS 5.0 const generic
  *  @example
  * ```typescript
  * container.addNamespace(namespace: string): IDIContainer. // probably namespace container should know about parent container and register services in it when receives registration.
@@ -19,7 +37,8 @@
  * container.get('FooDomain.fooService')
  * ```
  *
- * TODO: Support child container first resolving strategy.
+ *
+ * - TODO: Support child container first resolving strategy.
  * It can be done by collecting vertical projection of existing instances and factories.
  * Steps:
  * 1) Collect all needed dependencies. Instances (i) and factories (f) independent.
@@ -33,7 +52,8 @@
  * child1     |   i   |   .   |   f   |
  * child2     |   .   |   .   |   .   |   i
  *
- * TODO: add external dynamic services config.
+ *
+ * - TODO: add external dynamic services config.
  * It can be implemented by adding new arguments resolvers
  * .yml or .json like this:
  * @example

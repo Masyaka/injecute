@@ -3,13 +3,50 @@ import { describe, it } from 'mocha';
 import {
   CircularDependencyError,
   DIContainer,
+  IDIContainer,
   IDIContainerExtension,
+  NamespaceServices,
   optionalDependencySkipKey,
 } from '../src';
 
 describe('injecute container', () => {
   describe('DI container general', () => {
-    describe('namespaces', () => {});
+    describe('namespaces', () => {
+      it('creates namespace container with added services', () => {
+        const feat = 'feature implementation' as const;
+        const container = new DIContainer().namespace(
+          'Domain.Context',
+          (namespace, parent) => {
+            return namespace.addSingleton('feature', () => feat, []);
+          }
+        );
+
+        const addAliasAndExntendFeature = (
+          namespaceContainer: IDIContainer<
+            NamespaceServices<typeof container, 'Domain.Context'>
+          >
+        ) =>
+          namespaceContainer
+            .addAlias('feature alias', 'feature')
+            .addTransient('extendedFeature', (f) => `${f} extended` as const, [
+              'feature',
+            ]);
+
+        const extendedNamespaceOwnerContainer = container.namespace(
+          'Domain.Context',
+          addAliasAndExntendFeature
+        );
+        expect(container.get('Domain.Context.feature')).to.be.eq(feat);
+        expect(container.get('Domain.Context')).to.be.instanceOf(DIContainer);
+        expect(container.get('Domain.Context').get('feature')).to.be.eq(feat);
+        expect(
+          extendedNamespaceOwnerContainer.get('Domain.Context.feature alias')
+        ).to.be.eq(feat);
+        expect(
+          extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature')
+        ).to.be.eq(feat + ' extended');
+      });
+    });
     describe('reset', () => {
       it('removes cached singleton instances', () => {
         let singletonFactoryRuns = 0;

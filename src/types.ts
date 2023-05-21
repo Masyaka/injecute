@@ -79,6 +79,13 @@ export type IDIContainerExtension<
 export type ContainerServices<C extends IDIContainer<any>> =
   C extends IDIContainer<infer S> ? S : never;
 
+export type NamespaceServices<
+  C extends IDIContainer<any>,
+  N extends keyof ContainerServices<C>
+> = ContainerServices<C>[N] extends IDIContainer<any>
+  ? ContainerServices<ContainerServices<C>[N]>
+  : never;
+
 export type InjecuteOptions<
   TContainerKey,
   Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
@@ -88,12 +95,15 @@ export type InjecuteOptions<
   argumentsNames?: [...Keys];
 };
 
-export type MapOf<T> = Map<keyof T, ValueOf<T>> & {
+export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   get<K extends keyof T>(k: K): T[K];
-  set<K extends ArgumentsKey, V extends any>(
-    k: K,
-    v: V
-  ): MapOf<T & Record<K, V>>;
+  set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
+}
+
+export type Events<C extends IDIContainer<any> = IDIContainer<any>> = {
+  add: { name: ArgumentsKey; container: C };
+  reset: { resetParent: boolean; container: C };
+  get: { name: ArgumentsKey; value: any; container: C };
 };
 
 export interface IDIContainer<
@@ -101,6 +111,16 @@ export interface IDIContainer<
   TContainerKey extends keyof TServices = keyof TServices
 > {
   readonly resolveArguments: ArgumentsResolver;
+
+  addEventListener<E extends keyof Events>(
+    e: E,
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+  ): this;
+
+  removeEventListener<E extends keyof Events>(
+    e: E,
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+  ): this;
 
   getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
 
@@ -119,7 +139,7 @@ export interface IDIContainer<
    * @param options {{ override: boolean }}
    */
   addInstance<
-    K extends string | symbol,
+    K extends ArgumentsKey,
     NewServices extends TServices & { [k in K]: TResult },
     TResult extends any,
     C extends IDIContainer<NewServices>
@@ -127,7 +147,9 @@ export interface IDIContainer<
     this: unknown,
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
-    options?: { override: boolean }
+    options?: {
+      override: boolean;
+    }
   ): C;
 
   /**
@@ -148,7 +170,7 @@ export interface IDIContainer<
     NewServices extends TServices & { [k in K]: TResult }
   >(
     this: unknown,
-    name: Exclude<K, Keys[number]>,
+    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
     options?:
       | {
@@ -179,7 +201,7 @@ export interface IDIContainer<
     NewServices extends TServices & { [k in K]: TResult }
   >(
     this: unknown,
-    name: Exclude<K, Keys[number]>,
+    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
     options?:
       | {
@@ -262,6 +284,7 @@ export interface IDIContainer<
 
   /**
    * Creates child container.
+   * Child container will have access to all parent services but not vice versa.
    * For cases when you don`t want to add service to main container.
    * @example ```
    * const localRequestContainer = container.fork().addInstance('request', request);
@@ -273,6 +296,44 @@ export interface IDIContainer<
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<T>;
+
+  /**
+   * Creates isolated container inside current container.
+   * Current container will have access to namespace services, but not vice versa.
+   * For cases when you want to avoid keys intersection conflict.
+   * @param namespace
+   * @param extension
+   */
+  namespace<
+    TNamespace extends Exclude<
+      string,
+      OptionalDependencySkipKey &
+        (TServices[TContainerKey] extends IDIContainer<any>
+          ? never
+          : TContainerKey)
+    >,
+    TExtension extends (
+      namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
+        ? IDIContainer<NS>
+        : IDIContainer<{}>,
+      parentNamespaceContainer: IDIContainer<TServices>
+    ) => IDIContainer<any>,
+    TNamespaceServices extends ReturnType<TExtension> extends IDIContainer<
+      infer TNamespaceServices
+    >
+      ? TNamespaceServices
+      : never
+  >(
+    namespace: TNamespace,
+    extension: TExtension
+  ): IDIContainer<
+    TServices & {
+      [k in TNamespace]: IDIContainer<TNamespaceServices>;
+    } & {
+      [K in `${TNamespace}.${(string | number) &
+        keyof TNamespaceServices}`]: TNamespaceServices[K];
+    }
+  >;
 
   /**
    * Use extension function to add services.

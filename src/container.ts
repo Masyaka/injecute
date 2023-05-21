@@ -7,6 +7,7 @@ import {
   Constructor,
   DependenciesTypes,
   Empty,
+  Events,
   Func,
   GetOptions,
   IDIContainer,
@@ -60,6 +61,15 @@ export type DIContainerConstructorArguments<
   parentContainer?: IDIContainer<TParentServices>;
 };
 
+const factoryTypeKey = Symbol('TransientType');
+
+type FactoryType =
+  | 'singleton'
+  | 'transient'
+  | 'instance'
+  | 'alias'
+  | 'namespace-passthrough';
+
 /**
  * Dependency Injection container
  */
@@ -76,10 +86,20 @@ export class DIContainer<
     this.rebuildMiddlewareStack();
   }
 
+  protected readonly eventHandlers: {
+    [E in keyof Events<IDIContainer<TServices>>]: Set<
+      (e: Events<IDIContainer<TServices>>[E]) => void
+    >;
+  } = {
+    add: new Set(),
+    reset: new Set(),
+    get: new Set(),
+  };
   readonly #parentContainer: IDIContainer<TParentServices> | undefined;
   readonly #factories: MapOf<{
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
+      type: FactoryType;
       isConstructor?: boolean;
       beforeResolving?: (k: key) => void;
       afterResolving?: (k: key, instance: TServices[key]) => void;
@@ -105,6 +125,22 @@ export class DIContainer<
   ) {
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
+
+  addEventListener<E extends keyof Events>(
+    e: E,
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+  ) {
+    this.eventHandlers[e].add(handler);
+    return this;
+  }
+
+  removeEventListener<E extends keyof Events>(
+    e: E,
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+  ) {
+    this.eventHandlers[e].delete(handler);
+    return this;
+  }
 
   public getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined {
     return this.#arguments.get(argumentsKey);
@@ -166,10 +202,14 @@ export class DIContainer<
     TResult extends CallableResult<TCallable>,
     NewServices extends TServices & { [k in K]: TResult }
   >(
-    name: Exclude<K, Keys[number]>,
+    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
     options?:
       | {
+          [factoryTypeKey]?: Extract<
+            FactoryType,
+            'alias' | 'namespace-passthrough'
+          >;
           override?: boolean;
           isConstructor?: boolean;
           explicitArgumentsNames?: [...Keys];
@@ -186,13 +226,15 @@ export class DIContainer<
     this.validateAdd(name, factory, override);
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.#factories.set(name, {
+      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
+        'transient') as FactoryType,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       callable: factory as Callable<any[], NewServices[typeof name]>,
       isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
     });
     // @ts-expect-error name already is the TContainerKey
-    this.afterAdd(name);
+    this.onAdd(name);
     return this as any;
   }
 
@@ -213,10 +255,11 @@ export class DIContainer<
     TResult extends CallableResult<TCallable>,
     NewServices extends TServices & { [k in K]: TResult }
   >(
-    name: Exclude<K, Keys[number]>,
+    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
     options?:
       | {
+          [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           override?: boolean;
           isConstructor?: boolean;
           explicitArgumentsNames?: [...Keys];
@@ -234,6 +277,8 @@ export class DIContainer<
     this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
     this.#factories.set(name, {
       callable: factory,
+      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
+        'singleton') as FactoryType,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: (k: typeof name, instance: TResult) => {
         this.#singletonInstances.set(name, instance);
@@ -242,7 +287,7 @@ export class DIContainer<
       isConstructor: optionsIsArray ? undefined : options?.isConstructor,
     });
     // @ts-expect-error name already is the TContainerKey
-    this.afterAdd(name);
+    this.onAdd(name);
     return this as any;
   }
 
@@ -265,7 +310,10 @@ export class DIContainer<
     name: Exclude<K, OptionalDependencySkipKey & A>,
     aliasTo: A
   ): IDIContainer<{ [k in K]: T } & TServices> {
-    return this.addTransient(name, () => this.get(aliasTo), []);
+    return this.addTransient(name, () => this.get(aliasTo), {
+      explicitArgumentsNames: [],
+      [factoryTypeKey]: 'alias',
+    });
   }
 
   use(
@@ -301,6 +349,8 @@ export class DIContainer<
     options?: O
   ): O['allowUnresolved'] extends true ? T | undefined : T {
     const instance = this.#middlewareStack(serviceName);
+
+    this.onGet(serviceName, instance);
 
     if (instance) {
       return instance;
@@ -386,6 +436,79 @@ export class DIContainer<
   }
 
   /**
+   * Creates isolated container inside current container.
+   * Current container will have access to namespace services, but not vice versa.
+   * For cases when you want to avoid keys intersection conflict.
+   * @param namespace
+   * @param extension
+   */
+  namespace<
+    TNamespace extends Exclude<
+      string,
+      OptionalDependencySkipKey &
+        (TServices[TContainerKey] extends IDIContainer<any>
+          ? never
+          : TContainerKey)
+    >,
+    TExtension extends (
+      namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
+        ? IDIContainer<NS>
+        : IDIContainer<{}>,
+      parentNamespaceContainer: IDIContainer<TServices>
+    ) => IDIContainer<any>,
+    TNamespaceServices extends ReturnType<TExtension> extends IDIContainer<
+      infer TNamespaceServices
+    >
+      ? TNamespaceServices
+      : never
+  >(
+    namespace: TNamespace,
+    extension: TExtension
+  ): IDIContainer<
+    TServices & {
+      [k in TNamespace]: IDIContainer<TNamespaceServices>;
+    } & {
+      [K in `${TNamespace}.${(string | number) &
+        keyof TNamespaceServices}`]: TNamespaceServices[K];
+    }
+  > {
+    const instance = this.get(namespace as any, { allowUnresolved: true });
+    const isContainer =
+      typeof instance === 'object' && (instance as any) instanceof DIContainer;
+    if (instance && !isContainer) {
+      throw new Error(
+        `Namespace key "${namespace}" already used with non container entry.`
+      );
+    }
+    const namespaceContainer =
+      instance ||
+      new DIContainer<any>().addEventListener('add', ({ name, container }) => {
+        if (['string', 'number'].includes(typeof name)) {
+          this.addTransient(
+            `${namespace}.${name as string}`,
+            () => container.get(name),
+            {
+              explicitArgumentsNames: [],
+              [factoryTypeKey]: 'namespace-passthrough',
+            }
+          );
+        }
+      });
+    if (!instance) {
+      this.addInstance(namespace as any, namespaceContainer);
+    }
+    extension(namespaceContainer as any, this as any);
+    return this as IDIContainer<
+      TServices & {
+        [k in TNamespace]: IDIContainer<TNamespaceServices>;
+      } & {
+        [K in `${TNamespace}.${(string | number) &
+          keyof TNamespaceServices}`]: TNamespaceServices[K];
+      }
+    >;
+  }
+
+  /**
    * Use extension function to add services.
    * @example ```
    * const addSrv1 = function(this: IDIContainer<T>): IDIContainer<T & { srv1: Srv }> {
@@ -416,8 +539,9 @@ export class DIContainer<
   reset(resetParent = false): IDIContainer<TServices> {
     this.#singletonInstances.clear();
     if (resetParent) {
-      this.#parentContainer?.reset();
+      this.#parentContainer?.reset(resetParent);
     }
+    this.onReset(resetParent);
     return this as IDIContainer<TServices>;
   }
 
@@ -538,6 +662,34 @@ export class DIContainer<
     }
   }
 
+  protected onAdd(name: TContainerKey) {
+    for (const handler of this.eventHandlers.add) {
+      handler({
+        name,
+        container: this as IDIContainer<TServices>,
+      });
+    }
+  }
+
+  protected onReset(resetParent: boolean) {
+    for (const handler of this.eventHandlers.reset) {
+      handler({
+        resetParent,
+        container: this as IDIContainer<TServices>,
+      });
+    }
+  }
+
+  protected onGet(name: ArgumentsKey, value: any) {
+    for (const handler of this.eventHandlers.get) {
+      handler({
+        name,
+        value,
+        container: this as IDIContainer<TServices>,
+      });
+    }
+  }
+
   private rebuildMiddlewareStack() {
     this.#middlewareStack = [this.resolve, ...this.#middlewares].reduce(
       (next, current) => (message) =>
@@ -606,6 +758,4 @@ export class DIContainer<
       this.assertNotRegistered(name);
     }
   }
-
-  protected afterAdd(name: TContainerKey) {}
 }
