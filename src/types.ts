@@ -32,6 +32,14 @@ type DependenciesTypesEntry<
 > = K extends OptionalDependencySkipKey ? undefined : TServices[K];
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
+
+/**
+ * Map keys tuple to types tuple
+ * @example
+ * ```
+ * type deps = DependenciesTypes<{ x: 1, y: string  }, ['x', 'y']> // === [number, string]
+ * ```
+ */
 export type DependenciesTypes<
   TServices extends Record<string, any>,
   Keys extends readonly (keyof TServices)[] = readonly (keyof TServices)[]
@@ -47,16 +55,6 @@ export type DependenciesTypes<
   DependenciesTypesEntry<TServices, Keys[8]>,
   DependenciesTypesEntry<TServices, Keys[9]>
 ];
-
-export type UseExplicitContainerKeys<
-  TServices extends Record<K, V>,
-  TResult extends any,
-  K extends keyof TServices = keyof TServices,
-  V extends TServices[K] = TServices[K]
-> = <Keys extends K[]>(
-  keys: [...Keys],
-  callable: Callable<DependenciesTypes<TServices, Keys>, TResult>
-) => TResult;
 
 export type ArgumentsKey = string | symbol | number;
 
@@ -95,6 +93,9 @@ export type InjecuteOptions<
   argumentsNames?: [...Keys];
 };
 
+/**
+ * Actually the Map but...
+ */
 export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   get<K extends keyof T>(k: K): T[K];
   set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
