@@ -63,7 +63,7 @@ describe('injecute container', () => {
 
         // should return new value after override
         container.addSingleton('instance', () => 'new value', {
-          explicitArgumentsNames: [],
+          dependencies: [],
           override: true,
         });
         container.get('instance');
@@ -273,7 +273,7 @@ describe('injecute container', () => {
       const c = new DIContainer<{}>();
       const getMultiplied2By2 = () =>
         c
-          .addTransient('multiplier', () => 2, { explicitArgumentsNames: [] })
+          .addTransient('multiplier', () => 2, { dependencies: [] })
           .addTransient('multiplied2', (n) => 2 * n, ['multiplier'])
           .get('multiplied2');
       expect(getMultiplied2By2()).to.be.eql(4);
@@ -286,10 +286,10 @@ describe('injecute container', () => {
         c
           .addInstance(multiplierStringKey, '2')
           .addSingleton(multiplierKey, (str) => Number(str), {
-            explicitArgumentsNames: [multiplierStringKey],
+            dependencies: [multiplierStringKey],
           })
           .addTransient('multiplied2', (n: number) => 2 * n, {
-            explicitArgumentsNames: [multiplierKey],
+            dependencies: [multiplierKey],
           })
           .get('multiplied2');
       expect(getMultiplied2By2()).to.be.eql(4);

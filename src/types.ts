@@ -158,7 +158,7 @@ export interface IDIContainer<
    * @param factory
    * @param options {{
    *  override: boolean | undefined,
-   *  explicitArgumentsNames: string[] | undefined
+   *  dependencies: string[] | undefined
    * } | string[]}
    */
   addTransient<
@@ -176,7 +176,7 @@ export interface IDIContainer<
       | {
           override?: boolean;
           isConstructor?: boolean;
-          explicitArgumentsNames?: [...Keys];
+          dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
         }
@@ -189,7 +189,7 @@ export interface IDIContainer<
    * @param factory function or constructor
    * @param options {{
    *  override: boolean | undefined,
-   *  explicitArgumentsNames: string[] | undefined
+   *  dependencies: string[] | undefined
    * } | string[]}
    */
   addSingleton<
@@ -207,7 +207,7 @@ export interface IDIContainer<
       | {
           override?: boolean;
           isConstructor?: boolean;
-          explicitArgumentsNames?: [...Keys];
+          dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
         }

@@ -194,7 +194,7 @@ export class DIContainer<
     this.addSingleton(name, () => instance, {
       override: options?.override,
       isConstructor: false,
-      explicitArgumentsNames: [],
+      dependencies: [],
     });
     return this as any;
   }
@@ -205,7 +205,7 @@ export class DIContainer<
    * @param factory
    * @param options {{
    *  override: boolean | undefined,
-   *  explicitArgumentsNames: string[] | undefined
+   *  dependencies: string[] | undefined
    * } | string[]}
    */
   addTransient<
@@ -226,7 +226,7 @@ export class DIContainer<
           >;
           override?: boolean;
           isConstructor?: boolean;
-          explicitArgumentsNames?: [...Keys];
+          dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
         }
@@ -234,14 +234,12 @@ export class DIContainer<
   ): C {
     const optionsIsArray = Array.isArray(options);
     const override = !optionsIsArray && !!options?.override;
-    const explicitArgumentsNames = optionsIsArray
-      ? options
-      : options?.explicitArgumentsNames;
+    const dependencies = optionsIsArray ? options : options?.dependencies;
     this.validateAdd(name, factory, override);
     if (override) {
       this.#singletonInstances.delete(name);
     }
-    this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
+    this.resolveAndCacheArguments(factory, name, dependencies);
     this.#factories.set(name, {
       type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
         'transient') as FactoryType,
@@ -261,7 +259,7 @@ export class DIContainer<
    * @param factory
    * @param options {{
    *  override: boolean | undefined,
-   *  explicitArgumentsNames: string[] | undefined
+   *  dependencies: string[] | undefined
    * } | string[]}
    */
   addSingleton<
@@ -279,22 +277,20 @@ export class DIContainer<
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           override?: boolean;
           isConstructor?: boolean;
-          explicitArgumentsNames?: [...Keys];
+          dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
         }
       | [...Keys]
   ): C {
     const optionsIsArray = Array.isArray(options);
-    const explicitArgumentsNames = optionsIsArray
-      ? options
-      : options?.explicitArgumentsNames;
+    const dependencies = optionsIsArray ? options : options?.dependencies;
     const override = !optionsIsArray && !!options?.override;
     this.validateAdd(name, factory, override);
     if (override) {
       this.#singletonInstances.delete(name);
     }
-    this.resolveAndCacheArguments(factory, name, explicitArgumentsNames);
+    this.resolveAndCacheArguments(factory, name, dependencies);
     this.#factories.set(name, {
       callable: factory,
       type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
@@ -331,7 +327,7 @@ export class DIContainer<
     aliasTo: A
   ): IDIContainer<{ [k in K]: T } & TServices> {
     return this.addTransient(name, () => this.get(aliasTo), {
-      explicitArgumentsNames: [],
+      dependencies: [],
       [factoryTypeKey]: 'alias',
     });
   }
@@ -508,7 +504,7 @@ export class DIContainer<
             `${namespace}.${name as string}`,
             () => container.get(name),
             {
-              explicitArgumentsNames: [],
+              dependencies: [],
               [factoryTypeKey]: 'namespace-passthrough',
             }
           );
