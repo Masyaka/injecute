@@ -1,6 +1,8 @@
 # injecute
 Lightweight extendable typesafe dependency injection container written in TypeScript.
 
+![Build and tests](https://github.com/Masyaka/injecute/actions/workflows/tests.yml/badge.svg)
+
 ### Key features
 - typesafe
 - explicit dependencies by default
