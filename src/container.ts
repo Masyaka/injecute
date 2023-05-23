@@ -5,10 +5,10 @@ import {
   Callable,
   CallableResult,
   Constructor,
-  ContainerServices,
   DependenciesTypes,
   Empty,
   Events,
+  FactoryType,
   Func,
   GetOptions,
   IDIContainer,
@@ -42,11 +42,9 @@ export class CircularDependencyError extends Error {
 const callFactory = <D extends any[]>(
   callable: Callable<D, any>,
   dependencies: D,
-  isConstructor?: boolean
+  isConstructor: boolean
 ) => {
-  const useNewKeyword = isConstructor ?? !!callable.prototype?.constructor;
-
-  if (useNewKeyword) {
+  if (isConstructor) {
     const constructor = callable as Constructor<any, any>;
     return new constructor(
       ...(dependencies as ConstructorParameters<typeof constructor>)
@@ -63,13 +61,6 @@ export type DIContainerConstructorArguments<
 };
 
 const factoryTypeKey = Symbol('TransientType');
-
-type FactoryType =
-  | 'singleton'
-  | 'transient'
-  | 'instance'
-  | 'alias'
-  | 'namespace-passthrough';
 
 /**
  * Dependency Injection container
@@ -92,6 +83,7 @@ export class DIContainer<
       (e: Events<IDIContainer<TServices>>[E]) => void
     >;
   } = {
+    replace: new Set(),
     add: new Set(),
     reset: new Set(),
     get: new Set(),
@@ -101,9 +93,10 @@ export class DIContainer<
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
       type: FactoryType;
-      isConstructor?: boolean;
+      isConstructor: boolean;
       beforeResolving?: (k: key) => void;
       afterResolving?: (k: key, instance: TServices[key]) => void;
+      beforeReplaced?: (k: key) => void;
     };
   }> = new Map();
   readonly #singletonInstances: MapOf<{
@@ -127,14 +120,7 @@ export class DIContainer<
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
 
-  private eventNotSupported(e: string) {
-    const supportedEvents = Object.keys(this.eventHandlers)
-      .map((k) => `"${k}"`)
-      .join(', ');
-    return new Error(`Event "${e}" not supported. ${supportedEvents} allowed`);
-  }
-
-  addEventListener<E extends keyof Events>(
+  addEventListener<E extends keyof Events<IDIContainer<TServices>>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ) {
@@ -145,7 +131,7 @@ export class DIContainer<
     throw this.eventNotSupported(e);
   }
 
-  removeEventListener<E extends keyof Events>(
+  removeEventListener<E extends keyof Events<IDIContainer<TServices>>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ) {
@@ -177,7 +163,7 @@ export class DIContainer<
    * Adds existing instance to collection
    * @param name
    * @param instance
-   * @param options {{ override: boolean }}
+   * @param options {{ replace: boolean }}
    */
   addInstance<
     K extends ArgumentsKey,
@@ -188,15 +174,15 @@ export class DIContainer<
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
     options?: {
-      override: boolean;
+      replace: boolean;
     }
   ): C {
-    this.addSingleton(name, () => instance, {
-      override: options?.override,
+    return this.addFactory(name, () => instance, {
+      [factoryTypeKey]: 'instance',
+      replace: options?.replace,
       isConstructor: false,
       dependencies: [],
     });
-    return this as any;
   }
 
   /**
@@ -204,7 +190,7 @@ export class DIContainer<
    * @param name
    * @param factory
    * @param options {{
-   *  override: boolean | undefined,
+   *  replace: boolean | undefined,
    *  dependencies: string[] | undefined
    * } | string[]}
    */
@@ -220,37 +206,17 @@ export class DIContainer<
     factory: TCallable,
     options?:
       | {
-          [factoryTypeKey]?: Extract<
-            FactoryType,
-            'alias' | 'namespace-passthrough'
-          >;
-          override?: boolean;
+          [factoryTypeKey]?: FactoryType;
+          replace?: boolean;
           isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
+          beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
   ): C {
-    const optionsIsArray = Array.isArray(options);
-    const override = !optionsIsArray && !!options?.override;
-    const dependencies = optionsIsArray ? options : options?.dependencies;
-    this.validateAdd(name, factory, override);
-    if (override) {
-      this.#singletonInstances.delete(name);
-    }
-    this.resolveAndCacheArguments(factory, name, dependencies);
-    this.#factories.set(name, {
-      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
-        'transient') as FactoryType,
-      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
-      callable: factory as Callable<any[], NewServices[typeof name]>,
-      isConstructor: !optionsIsArray ? options?.isConstructor : undefined,
-    });
-    // @ts-expect-error name already is the TContainerKey
-    this.onAdd(name);
-    return this as any;
+    return this.addFactory(name, factory, options);
   }
 
   /**
@@ -258,7 +224,7 @@ export class DIContainer<
    * @param name
    * @param factory
    * @param options {{
-   *  override: boolean | undefined,
+   *  replace: boolean | undefined,
    *  dependencies: string[] | undefined
    * } | string[]}
    */
@@ -275,36 +241,29 @@ export class DIContainer<
     options?:
       | {
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
-          override?: boolean;
+          replace?: boolean;
           isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
+          beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
   ): C {
     const optionsIsArray = Array.isArray(options);
-    const dependencies = optionsIsArray ? options : options?.dependencies;
-    const override = !optionsIsArray && !!options?.override;
-    this.validateAdd(name, factory, override);
-    if (override) {
-      this.#singletonInstances.delete(name);
-    }
-    this.resolveAndCacheArguments(factory, name, dependencies);
-    this.#factories.set(name, {
-      callable: factory,
-      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
+    return this.addFactory(name, factory, {
+      [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
         'singleton') as FactoryType,
+      replace: optionsIsArray ? false : options?.replace,
+      dependencies: optionsIsArray ? options : options?.dependencies,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: (k: typeof name, instance: TResult) => {
+      afterResolving: (k: ArgumentsKey, instance: TResult) => {
         this.#singletonInstances.set(name, instance);
-        !optionsIsArray && options?.afterResolving?.(k, instance);
+        !optionsIsArray && options?.afterResolving?.(k as K, instance);
       },
+      beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
       isConstructor: optionsIsArray ? undefined : options?.isConstructor,
     });
-    // @ts-expect-error name already is the TContainerKey
-    this.onAdd(name);
-    return this as any;
   }
 
   /**
@@ -326,7 +285,7 @@ export class DIContainer<
     name: Exclude<K, OptionalDependencySkipKey & A>,
     aliasTo: A
   ): IDIContainer<{ [k in K]: T } & TServices> {
-    return this.addTransient(name, () => this.get(aliasTo), {
+    return this.addFactory(name, () => this.get(aliasTo), {
       dependencies: [],
       [factoryTypeKey]: 'alias',
     });
@@ -500,7 +459,7 @@ export class DIContainer<
       instance ||
       new DIContainer<any>().addEventListener('add', ({ name, container }) => {
         if (['string', 'number'].includes(typeof name)) {
-          this.addTransient(
+          this.addFactory(
             `${namespace}.${name as string}`,
             () => container.get(name),
             {
@@ -611,11 +570,11 @@ export class DIContainer<
       Keys
     >;
 
-    return callFactory(
-      callable,
-      dependencies,
-      !optionsIsArray && options?.isConstructor
-    );
+    const isConstructor =
+      (!optionsIsArray && options?.isConstructor) ??
+      !!callable.prototype?.constructor;
+
+    return callFactory(callable, dependencies, isConstructor);
   }
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
@@ -625,9 +584,6 @@ export class DIContainer<
       );
     }
   }
-
-  // TODO: change signature to accept ArgumentsResolverCreator <T>(this: DIContainer<TServices>):
-  //  DIContainer<TServices & T> =>
 
   protected resolveInstance: Resolver<TServices> = (name) =>
     this.#singletonInstances.get(name);
@@ -647,6 +603,9 @@ export class DIContainer<
       return result;
     }
   };
+
+  // TODO: change signature to accept ArgumentsResolverCreator <T>(this: DIContainer<TServices>):
+  //  DIContainer<TServices & T> =>
 
   protected resolveFromParent: Resolver<TServices> = (name) =>
     this.#parentContainer?.get(name, { allowUnresolved: true });
@@ -678,10 +637,28 @@ export class DIContainer<
     }
   }
 
-  protected onAdd(name: TContainerKey) {
+  protected onReplace(name: TContainerKey) {
+    const factory = this.#factories.get(name);
+    if (!factory) return;
+    factory.beforeReplaced?.(name);
+    for (const handler of this.eventHandlers.replace) {
+      handler({
+        name,
+        container: this as IDIContainer<TServices>,
+        replaced: {
+          callable: factory.callable,
+          isConstructor: factory.isConstructor,
+          type: factory.type,
+        },
+      });
+    }
+  }
+
+  protected onAdd(name: TContainerKey, replace: boolean) {
     for (const handler of this.eventHandlers.add) {
       handler({
         name,
+        replace,
         container: this as IDIContainer<TServices>,
       });
     }
@@ -704,6 +681,62 @@ export class DIContainer<
         container: this as IDIContainer<TServices>,
       });
     }
+  }
+
+  private eventNotSupported(e: string) {
+    const supportedEvents = Object.keys(this.eventHandlers)
+      .map((k) => `"${k}"`)
+      .join(', ');
+    return new Error(`Event "${e}" not supported. ${supportedEvents} allowed`);
+  }
+
+  private addFactory<
+    K extends ArgumentsKey,
+    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    C extends IDIContainer<NewServices>,
+    TResult extends CallableResult<TCallable>,
+    NewServices extends TServices & { [k in K]: TResult }
+  >(
+    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    factory: TCallable,
+    options?:
+      | {
+          [factoryTypeKey]?: FactoryType;
+          replace?: boolean;
+          isConstructor?: boolean;
+          dependencies?: [...Keys];
+          beforeResolving?: (k: K) => void;
+          afterResolving?: (k: K, instance: TResult) => void;
+          beforeReplaced?: (k: K) => void;
+        }
+      | [...Keys]
+  ): C {
+    const optionsIsArray = Array.isArray(options);
+    const replace = !optionsIsArray && !!options?.replace;
+    const dependencies = optionsIsArray ? options : options?.dependencies;
+    this.validateAdd(name, factory, replace);
+    if (replace) {
+      if (this.#factories.has(name)) {
+        this.onReplace(name as any);
+      }
+      this.#singletonInstances.delete(name);
+    }
+    this.resolveAndCacheArguments(factory, name, dependencies);
+    const isConstructor =
+      (!optionsIsArray && options?.isConstructor) ??
+      !!factory.prototype?.constructor;
+    this.#factories.set(name, {
+      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
+        'transient') as FactoryType,
+      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
+      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
+      beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
+      callable: factory,
+      isConstructor,
+    });
+    this.onAdd(name as any, replace);
+    return this as any;
   }
 
   private rebuildMiddlewareStack() {
@@ -766,11 +799,11 @@ export class DIContainer<
   private validateAdd(
     name: Exclude<ArgumentsKey, OptionalDependencySkipKey>,
     factory: Callable<any, any>,
-    override?: boolean
+    replace?: boolean
   ) {
     this.assertKeyIsValid(name);
     this.assertFactoryIsAcceptable(factory, name);
-    if (!override) {
+    if (!replace) {
       this.assertNotRegistered(name);
     }
   }

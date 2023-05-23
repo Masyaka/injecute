@@ -64,7 +64,7 @@ describe('injecute container', () => {
         // should return new value after override
         container.addSingleton('instance', () => 'new value', {
           dependencies: [],
-          override: true,
+          replace: true,
         });
         container.get('instance');
         expect(requested).to.be.eq('instance');

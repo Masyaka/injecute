@@ -101,8 +101,24 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
 }
 
-export type Events<C extends IDIContainer<any> = IDIContainer<any>> = {
-  add: { name: ArgumentsKey; container: C };
+export type FactoryType =
+  | 'singleton'
+  | 'transient'
+  | 'instance'
+  | 'alias'
+  | 'namespace-passthrough';
+
+export type Events<C extends IDIContainer<any>> = {
+  add: { name: ArgumentsKey; replace: boolean; container: C };
+  replace: {
+    name: ArgumentsKey;
+    container: C;
+    replaced: {
+      callable: Callable<any, any>;
+      isConstructor: boolean;
+      type: FactoryType;
+    };
+  };
   reset: { resetParent: boolean; container: C };
   get: { name: ArgumentsKey; value: any; container: C };
 };
@@ -113,12 +129,12 @@ export interface IDIContainer<
 > {
   readonly resolveArguments: ArgumentsResolver;
 
-  addEventListener<E extends keyof Events>(
+  addEventListener<E extends keyof Events<this>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ): this;
 
-  removeEventListener<E extends keyof Events>(
+  removeEventListener<E extends keyof Events<this>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void
   ): this;
@@ -137,7 +153,7 @@ export interface IDIContainer<
    * Adds existing instance to collection
    * @param name
    * @param instance
-   * @param options {{ override: boolean }}
+   * @param options {{ replace: boolean }}
    */
   addInstance<
     K extends ArgumentsKey,
@@ -149,7 +165,7 @@ export interface IDIContainer<
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
     options?: {
-      override: boolean;
+      replace: boolean;
     }
   ): C;
 
@@ -158,7 +174,7 @@ export interface IDIContainer<
    * @param name
    * @param factory
    * @param options {{
-   *  override: boolean | undefined,
+   *  replace: boolean | undefined,
    *  dependencies: string[] | undefined
    * } | string[]}
    */
@@ -175,11 +191,12 @@ export interface IDIContainer<
     factory: TCallable,
     options?:
       | {
-          override?: boolean;
+          replace?: boolean;
           isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
+          beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
   ): C;
@@ -189,7 +206,7 @@ export interface IDIContainer<
    * @param name
    * @param factory function or constructor
    * @param options {{
-   *  override: boolean | undefined,
+   *  replace: boolean | undefined,
    *  dependencies: string[] | undefined
    * } | string[]}
    */
@@ -206,11 +223,12 @@ export interface IDIContainer<
     factory: TCallable,
     options?:
       | {
-          override?: boolean;
+          replace?: boolean;
           isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
+          beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
   ): C;
