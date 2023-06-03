@@ -101,6 +101,17 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
 }
 
+export type Merge<
+  T1 extends Record<string, unknown>,
+  T2 extends Record<string, unknown>
+> = {
+  [K in keyof (T1 & T2)]: K extends keyof T2
+    ? T2[K]
+    : K extends keyof T1
+    ? T1[K]
+    : never;
+};
+
 export type FactoryType =
   | 'singleton'
   | 'transient'
@@ -157,7 +168,7 @@ export interface IDIContainer<
    */
   addInstance<
     K extends ArgumentsKey,
-    NewServices extends TServices & { [k in K]: TResult },
+    NewServices extends Merge<TServices, Record<K, TResult>>,
     TResult extends any,
     C extends IDIContainer<NewServices>
   >(
@@ -184,7 +195,7 @@ export interface IDIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
-    NewServices extends TServices & { [k in K]: TResult }
+    NewServices extends Merge<TServices, Record<K, TResult>>
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -216,7 +227,7 @@ export interface IDIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
-    NewServices extends TServices & { [k in K]: TResult }
+    NewServices extends Merge<TServices, Record<K, TResult>>
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -251,7 +262,7 @@ export interface IDIContainer<
   >(
     name: Exclude<K, OptionalDependencySkipKey & A>,
     aliasTo: A
-  ): IDIContainer<TServices & { [k in K]: T }>;
+  ): IDIContainer<Merge<TServices, Record<K, T>>>;
 
   /**
    * Get registered service from container
@@ -367,7 +378,7 @@ export interface IDIContainer<
   extend<
     Added extends Record<ArgumentsKey, any>,
     In extends TServices = TServices,
-    Out extends In & Added = In & Added
+    Out extends Merge<In, Added> = Merge<In, Added>
   >(
     extensionFunction: IDIContainerExtension<In, Added, Out>
   ): IDIContainer<Out>;

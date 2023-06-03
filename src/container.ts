@@ -14,6 +14,7 @@ import {
   IDIContainer,
   IDIContainerExtension,
   MapOf,
+  Merge,
   optionalDependencySkipKey,
   OptionalDependencySkipKey,
   Resolver,
@@ -167,7 +168,7 @@ export class DIContainer<
    */
   addInstance<
     K extends ArgumentsKey,
-    NewServices extends TServices & { [k in K]: TResult },
+    NewServices extends Merge<TServices, Record<K, TResult>>,
     TResult extends any,
     C extends IDIContainer<NewServices>
   >(
@@ -200,7 +201,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
-    NewServices extends TServices & { [k in K]: TResult }
+    NewServices extends Merge<TServices, Record<K, TResult>>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -234,7 +235,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
-    NewServices extends TServices & { [k in K]: TResult }
+    NewServices extends Merge<TServices, Record<K, TResult>>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -620,9 +621,11 @@ export class DIContainer<
     factory: any,
     name: TContainerKey | ArgumentsKey
   ) {
-    if (!factory) {
+    if (typeof factory !== 'function') {
       throw new Error(
-        `Falsy factory or class constructor added for "${String(name)}" key`
+        `Non function factory or class constructor added for "${String(
+          name
+        )}" key`
       );
     }
   }
@@ -696,7 +699,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
-    NewServices extends TServices & { [k in K]: TResult }
+    NewServices extends Merge<TServices, Record<K, TResult>>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
