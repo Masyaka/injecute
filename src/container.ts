@@ -802,8 +802,8 @@ export class DIContainer<
 
   private mapAgrsToInstances(args: Argument[]) {
     return args.map((arg) =>
-      'resolver' in arg
-        ? arg.resolver()
+      'getter' in arg
+        ? arg.getter()
         : this.get(arg.name as TContainerKey, {
             allowUnresolved: !arg.required,
           })
@@ -817,7 +817,7 @@ export class DIContainer<
     const args = this.#arguments.get(key);
     if (!args) return [stack];
     return args.flatMap((a) => {
-      if ('resolver' in a) {
+      if ('getter' in a) {
         return [];
       }
       const newStack = [...stack, a.name];

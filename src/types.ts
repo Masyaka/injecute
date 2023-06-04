@@ -18,7 +18,7 @@ export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   : unknown;
 export type Argument =
   | { name: ArgumentsKey; required: boolean }
-  | { resolver: () => any };
+  | { getter: () => any };
 export type Resolver<TServices> = <Key extends keyof TServices>(
   name: Key
 ) => TServices[Key] | undefined;

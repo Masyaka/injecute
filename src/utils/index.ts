@@ -21,7 +21,7 @@ export const argumentsNamesToArguments = (
 ): Argument[] =>
   argsNames.map((a) =>
     typeof a === 'function'
-      ? { resolver: a }
+      ? { getter: a }
       : {
           name: a,
           required: a !== optionalDependencySkipKey,
