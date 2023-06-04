@@ -16,7 +16,9 @@ export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   : TCallable extends Func<any, any>
   ? ReturnType<TCallable>
   : unknown;
-export type Argument = { name: string; required: boolean };
+export type Argument =
+  | { name: ArgumentsKey; required: boolean }
+  | { resolver: () => any };
 export type Resolver<TServices> = <Key extends keyof TServices>(
   name: Key
 ) => TServices[Key] | undefined;
@@ -26,10 +28,19 @@ export type Factory<K, TServices> = K extends keyof TServices
 
 export type GetOptions = { allowUnresolved: boolean };
 
+export type Getter<TServices extends Record<string, any>> =
+  () => TServices[keyof TServices];
+
 type DependenciesTypesEntry<
   TServices extends Record<string, any>,
-  K extends keyof TServices
-> = K extends OptionalDependencySkipKey ? undefined : TServices[K];
+  K extends keyof TServices | Getter<TServices>
+> = K extends OptionalDependencySkipKey
+  ? undefined
+  : K extends keyof TServices
+  ? TServices[K]
+  : K extends () => any
+  ? ReturnType<K>
+  : never;
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
 
@@ -42,7 +53,10 @@ export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
  */
 export type DependenciesTypes<
   TServices extends Record<string, any>,
-  Keys extends readonly (keyof TServices)[] = readonly (keyof TServices)[]
+  Keys extends readonly (keyof TServices | Getter<TServices>)[] = readonly (
+    | keyof TServices
+    | Getter<TServices>
+  )[]
 > = [
   DependenciesTypesEntry<TServices, Keys[0]>,
   DependenciesTypesEntry<TServices, Keys[1]>,
@@ -82,11 +96,15 @@ export type NamespaceServices<
   N extends keyof ContainerServices<C>
 > = ContainerServices<C>[N] extends IDIContainer<any>
   ? ContainerServices<ContainerServices<C>[N]>
-  : never;
+  : `${N extends string ? N : ''} is not a namespace container`;
 
 export type InjecuteOptions<
   TContainerKey,
-  Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
+  Keys extends readonly (
+    | OptionalDependencySkipKey
+    | TContainerKey
+    | Getter<any>
+  )[]
 > = {
   argumentsKey?: TContainerKey | undefined;
   isConstructor?: boolean;
@@ -98,6 +116,7 @@ export type InjecuteOptions<
  */
 export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   get<K extends keyof T>(k: K): T[K];
+
   set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
 }
 
@@ -166,19 +185,13 @@ export interface IDIContainer<
    * @param instance
    * @param options {{ replace: boolean }}
    */
-  addInstance<
-    K extends ArgumentsKey,
-    NewServices extends Merge<TServices, Record<K, TResult>>,
-    TResult extends any,
-    C extends IDIContainer<NewServices>
-  >(
-    this: unknown,
+  addInstance<K extends ArgumentsKey, TResult extends any>(
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
     options?: {
       replace: boolean;
     }
-  ): C;
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
    * Each time requested transient service - factory will be executed and returned new instance.
@@ -192,7 +205,11 @@ export interface IDIContainer<
   addTransient<
     K extends ArgumentsKey,
     TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | Getter<TServices>
+    )[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
     NewServices extends Merge<TServices, Record<K, TResult>>
@@ -224,7 +241,7 @@ export interface IDIContainer<
   addSingleton<
     K extends ArgumentsKey,
     TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends (OptionalDependencySkipKey | TContainerKey | Getter<any>)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
     NewServices extends Merge<TServices, Record<K, TResult>>
@@ -313,6 +330,23 @@ export interface IDIContainer<
   ): () => TResult;
 
   /**
+   * Create getter for specified key
+   * Useful for providing dependencies to namespace
+   * @example
+   * ```typescript
+   * container.namespace(
+   *   'Domain.Context',
+   *   (namespace, parent) => namespace
+   *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
+   *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
+   *     .addSingleton('namespaceService', asNew(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
+   * )
+   * ```
+   * @param key
+   */
+  getter<K extends TContainerKey>(key: K): () => TServices[K];
+
+  /**
    * Creates child container.
    * Child container will have access to all parent services but not vice versa.
    * For cases when you don`t want to add service to main container.
@@ -348,21 +382,17 @@ export interface IDIContainer<
         : IDIContainer<{}>,
       parentNamespaceContainer: IDIContainer<TServices>
     ) => IDIContainer<any>,
-    TNamespaceServices extends ReturnType<TExtension> extends IDIContainer<
-      infer TNamespaceServices
-    >
-      ? TNamespaceServices
-      : never
+    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>
   >(
     namespace: TNamespace,
     extension: TExtension
   ): IDIContainer<
-    TServices & {
-      [k in TNamespace]: IDIContainer<TNamespaceServices>;
-    } & {
-      [K in `${TNamespace}.${(string | number) &
-        keyof TNamespaceServices}`]: TNamespaceServices[K];
-    }
+    TServices &
+      Record<TNamespace, IDIContainer<TNamespaceServices>> & {
+        [K in keyof TNamespaceServices as K extends string
+          ? `${TNamespace}.${K}`
+          : never]: TNamespaceServices[K];
+      }
   >;
 
   /**
@@ -409,7 +439,11 @@ export interface IDIContainer<
   injecute<
     TResult,
     TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[]
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | Getter<TServices>
+    )[]
   >(
     callable: TCallable,
     options?: InjecuteOptions<TContainerKey, Keys> | [...Keys]

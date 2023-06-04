@@ -5,12 +5,14 @@ import {
   Callable,
   CallableResult,
   Constructor,
+  ContainerServices,
   DependenciesTypes,
   Empty,
   Events,
   FactoryType,
   Func,
   GetOptions,
+  Getter,
   IDIContainer,
   IDIContainerExtension,
   MapOf,
@@ -166,18 +168,13 @@ export class DIContainer<
    * @param instance
    * @param options {{ replace: boolean }}
    */
-  addInstance<
-    K extends ArgumentsKey,
-    NewServices extends Merge<TServices, Record<K, TResult>>,
-    TResult extends any,
-    C extends IDIContainer<NewServices>
-  >(
+  addInstance<K extends ArgumentsKey, TResult extends any>(
     name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
     instance: TResult,
     options?: {
       replace: boolean;
     }
-  ): C {
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     return this.addFactory(name, () => instance, {
       [factoryTypeKey]: 'instance',
       replace: options?.replace,
@@ -198,7 +195,11 @@ export class DIContainer<
   addTransient<
     K extends ArgumentsKey,
     TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | Getter<TServices>
+    )[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
     NewServices extends Merge<TServices, Record<K, TResult>>
@@ -232,7 +233,7 @@ export class DIContainer<
   addSingleton<
     K extends ArgumentsKey,
     TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends (OptionalDependencySkipKey | TContainerKey | Getter<any>)[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
     NewServices extends Merge<TServices, Record<K, TResult>>
@@ -285,7 +286,7 @@ export class DIContainer<
   >(
     name: Exclude<K, OptionalDependencySkipKey & A>,
     aliasTo: A
-  ): IDIContainer<{ [k in K]: T } & TServices> {
+  ): IDIContainer<Merge<TServices, { [k in K]: T }>> {
     return this.addFactory(name, () => this.get(aliasTo), {
       dependencies: [],
       [factoryTypeKey]: 'alias',
@@ -373,12 +374,35 @@ export class DIContainer<
    */
   bind<
     TResult extends any,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[]
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | Getter<TServices>
+    )[]
   >(
     keys: [...Keys],
     callable: Callable<DependenciesTypes<TServices, Keys>, TResult>
   ): () => TResult {
     return () => this.injecute(callable, { argumentsNames: keys });
+  }
+
+  /**
+   * Create getter for specified key
+   * Useful for providing dependencies to namespace
+   * @example
+   * ```typescript
+   * container.namespace(
+   *   'Domain.Context',
+   *   (namespace, parent) => namespace
+   *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
+   *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
+   *     .addSingleton('namespaceService', asNew(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
+   * )
+   * ```
+   * @param key
+   */
+  getter<K extends TContainerKey>(key: K): () => TServices[K] {
+    return this.get.bind(this, key) as () => TServices[K];
   }
 
   /**
@@ -432,21 +456,17 @@ export class DIContainer<
         : IDIContainer<{}>,
       parentNamespaceContainer: IDIContainer<TServices>
     ) => IDIContainer<any>,
-    TNamespaceServices extends ReturnType<TExtension> extends IDIContainer<
-      infer TNamespaceServices
-    >
-      ? TNamespaceServices
-      : never
+    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>
   >(
     namespace: TNamespace,
     extension: TExtension
   ): IDIContainer<
-    TServices & {
-      [k in TNamespace]: IDIContainer<TNamespaceServices>;
-    } & {
-      [K in `${TNamespace}.${(string | number) &
-        keyof TNamespaceServices}`]: TNamespaceServices[K];
-    }
+    TServices &
+      Record<TNamespace, IDIContainer<TNamespaceServices>> & {
+        [K in keyof TNamespaceServices as K extends string
+          ? `${TNamespace}.${K}`
+          : never]: TNamespaceServices[K];
+      }
   > {
     const instance = this.get(namespace as any, { allowUnresolved: true });
     const isContainer =
@@ -538,7 +558,11 @@ export class DIContainer<
   injecute<
     TResult,
     TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[]
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | Getter<TServices>
+    )[]
   >(
     callable: TCallable,
     options?:
@@ -696,7 +720,11 @@ export class DIContainer<
   private addFactory<
     K extends ArgumentsKey,
     TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | (() => TServices[keyof TServices])
+    )[],
     C extends IDIContainer<NewServices>,
     TResult extends CallableResult<TCallable>,
     NewServices extends Merge<TServices, Record<K, TResult>>
@@ -752,10 +780,14 @@ export class DIContainer<
   private resolveAndCacheArguments(
     fn: Callable<any, any>,
     argumentsKey?: ArgumentsKey,
-    argumentsNames?: (OptionalDependencySkipKey | TContainerKey)[]
+    argumentsNames?: (
+      | OptionalDependencySkipKey
+      | TContainerKey
+      | (() => TServices[keyof TServices])
+    )[]
   ) {
     const args: Argument[] | undefined = argumentsNames
-      ? argumentsNamesToArguments(argumentsNames as string[])
+      ? argumentsNamesToArguments(argumentsNames)
       : (this as IDIContainer<TServices>).resolveArguments(
           fn as Callable<any, any>,
           argumentsKey
@@ -770,7 +802,11 @@ export class DIContainer<
 
   private mapAgrsToInstances(args: Argument[]) {
     return args.map((arg) =>
-      this.get(arg.name as TContainerKey, { allowUnresolved: !arg.required })
+      'resolver' in arg
+        ? arg.resolver()
+        : this.get(arg.name as TContainerKey, {
+            allowUnresolved: !arg.required,
+          })
     );
   }
 
@@ -778,10 +814,12 @@ export class DIContainer<
     key: ArgumentsKey,
     stack: ArgumentsKey[] = []
   ): ArgumentsKey[][] {
-    // todo: use same mechanism to build dep tree
     const args = this.#arguments.get(key);
     if (!args) return [stack];
     return args.flatMap((a) => {
+      if ('resolver' in a) {
+        return [];
+      }
       const newStack = [...stack, a.name];
       if (stack.includes(a.name)) {
         throw new CircularDependencyError(newStack);

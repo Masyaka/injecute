@@ -1,4 +1,4 @@
-import { Argument, optionalDependencySkipKey } from '../types';
+import { Argument, ArgumentsKey, optionalDependencySkipKey } from '../types';
 import { asNew } from './construct';
 import { preload } from './preload';
 import { createProxyAccessor } from './proxy';
@@ -16,11 +16,17 @@ export const firstResult =
     }
   };
 
-export const argumentsNamesToArguments = (argsNames: string[]): Argument[] =>
-  argsNames.map((a) => ({
-    name: a as string,
-    required: a !== optionalDependencySkipKey,
-  }));
+export const argumentsNamesToArguments = (
+  argsNames: (ArgumentsKey | (() => any))[]
+): Argument[] =>
+  argsNames.map((a) =>
+    typeof a === 'function'
+      ? { resolver: a }
+      : {
+          name: a,
+          required: a !== optionalDependencySkipKey,
+        }
+  );
 
 export const utils = {
   preload,

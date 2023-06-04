@@ -1,4 +1,4 @@
-import { ArgumentsKey, IDIContainer } from '../types';
+import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
 
 /**
  * Use for warm up listed or predicated services.
@@ -11,8 +11,8 @@ import { ArgumentsKey, IDIContainer } from '../types';
  * @param keys
  */
 export const preload = <
-  C extends IDIContainer<Record<ArgumentsKey, any>>,
-  S extends C extends IDIContainer<infer Services> ? Services : never,
+  C extends IDIContainer<any>,
+  S extends ContainerServices<C>,
   K extends keyof S
 >(
   container: C,

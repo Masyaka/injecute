@@ -93,14 +93,23 @@ describe('injecute container', () => {
     describe('namespaces', () => {
       it('creates namespace container with added services', () => {
         const feat = 'feature implementation' as const;
-        const container = new DIContainer().namespace(
-          'Domain.Context',
-          (namespace, parent) => {
-            return namespace.addSingleton('feature', () => feat, []);
-          }
-        );
+        const container = new DIContainer()
+          .namespace('Generic', (generic) =>
+            generic
+              .addTransient('cfg', () => ({ value: 1 }), [])
+              .addInstance('value', '23')
+          )
+          .namespace('Domain.Context', (namespace, parent) => {
+            return namespace
+              .addTransient('cfg', parent.getter('Generic.cfg'), [])
+              .addSingleton(
+                'feature',
+                (cfg, value) => feat + cfg.value + value.substring(0, 1),
+                ['cfg', parent.getter('Generic.value')]
+              );
+          });
 
-        const addAliasAndExntendFeature = (
+        const addAliasAndExtendFeature = (
           namespaceContainer: IDIContainer<
             NamespaceServices<typeof container, 'Domain.Context'>
           >
@@ -113,17 +122,21 @@ describe('injecute container', () => {
 
         const extendedNamespaceOwnerContainer = container.namespace(
           'Domain.Context',
-          addAliasAndExntendFeature
+          addAliasAndExtendFeature
         );
-        expect(container.get('Domain.Context.feature')).to.be.eq(feat);
+        expect(container.get('Domain.Context.feature')).to.be.eq(
+          feat + 1 + '2'
+        );
         expect(container.get('Domain.Context')).to.be.instanceOf(DIContainer);
-        expect(container.get('Domain.Context').get('feature')).to.be.eq(feat);
+        expect(container.get('Domain.Context').get('feature')).to.be.eq(
+          feat + 1 + '2'
+        );
         expect(
           extendedNamespaceOwnerContainer.get('Domain.Context.feature alias')
-        ).to.be.eq(feat);
+        ).to.be.eq(feat + 1 + '2');
         expect(
           extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature')
-        ).to.be.eq(feat + ' extended');
+        ).to.be.eq(feat + 1 + '2' + ' extended');
       });
     });
     describe('reset', () => {

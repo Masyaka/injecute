@@ -76,7 +76,7 @@ describe('utils', () => {
           () => {
             singletonCalled = true;
             return {
-              name: 'I am a singleton',
+              name: 'I am singleton',
             };
           },
           []
@@ -86,7 +86,7 @@ describe('utils', () => {
           () => {
             transientCalled = true;
             return {
-              name: 'I am a transient',
+              name: 'I am transient',
             };
           },
           []
@@ -94,11 +94,11 @@ describe('utils', () => {
         .addInstance('instance', () => {
           instanceCalled = true;
           return {
-            name: 'I am a instance',
+            name: 'I am an instance',
           };
         });
 
-      preload(container, (k) => k.startsWith('sing'));
+      preload(container, (k) => typeof k === 'string' && k.startsWith('sing'));
       expect(singletonCalled).to.be.true;
       expect(transientCalled).to.be.false;
       expect(instanceCalled).to.be.false;
