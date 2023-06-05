@@ -26,6 +26,79 @@ export type Factory<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
   : Callable<ValueOf<TServices>[], any>;
 
+/**
+ * Narrows type `O` to keys where values of specific type `T`
+ * @example
+ * ```
+ * type X = ValuesOfType<{ x: 'a', y: 1  }, string>;
+ * // { x: 'a' }
+ * ```
+ */
+export type ValuesOfType<O, T> = {
+  [K in keyof O as O[K] extends T ? K : never]: O[K];
+};
+
+/**
+ * Keys of type `O` where values is the `T`
+ * @example
+ * ```
+ * type X = KeyForValueOfType<{ x: 'a', y: 1, z: string  }, string>;
+ * // 'x' | 'z'
+ * ```
+ */
+export type KeyForValueOfType<O, T> = keyof ValuesOfType<O, T>;
+
+export type ArgumentsTypes<C extends Callable<any[], any>> = C extends Callable<
+  infer D,
+  any
+>
+  ? D
+  : never;
+
+/**
+ * Suitable keys of record for function arguments
+ * @example
+ * ```
+ * type X = Dependencies<(first: number, second: string) => any, { x: 1, y: '2' , z: 'z', s: Symbol}>
+ *   // ['x', 'y' | 'z']
+ * ```
+ */
+export type Dependencies<
+  C extends Callable<any[], any>,
+  TServices extends Record<ArgumentsKey, any>,
+  A extends ArgumentsTypes<C> = ArgumentsTypes<C>
+> = TypesToKeys<A, TServices>;
+
+export type TypesToKeys<
+  Tup extends readonly any[],
+  TServices extends Record<ArgumentsKey, any>
+> = Tup extends readonly [infer H, ...infer R extends readonly any[]]
+  ? [KeyForValueOfType<TServices, H> | (() => H), ...TypesToKeys<R, TServices>]
+  : [];
+
+export type KeysToTypes<
+  Tup extends readonly Item[],
+  TServices extends Record<ArgumentsKey, any>,
+  Item extends (() => any) | OptionalDependencySkipKey | keyof TServices =
+    | (() => any)
+    | OptionalDependencySkipKey
+    | keyof TServices
+> = Tup extends readonly [
+  infer H extends Item,
+  ...infer R extends readonly Item[]
+]
+  ? [
+      H extends () => any
+        ? H
+        : H extends OptionalDependencySkipKey
+        ? any
+        : H extends ArgumentsKey
+        ? TServices[H]
+        : never,
+      ...TypesToKeys<R, TServices>
+    ]
+  : [];
+
 export type GetOptions = { allowUnresolved: boolean };
 
 export type Getter<TServices extends Record<string, any>> =
