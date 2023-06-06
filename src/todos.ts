@@ -21,9 +21,9 @@
  *
  * - todo: Change preload util to await async services and change result type of container
  *
- * - todo: Add services utilization on reset, add dispose option which is callback on reset. Add lifetime option, which will remove singleton instance after time is up.
+ * - todo: Add services utilization on reset, add dispose option which is callback on reset.
  *
- * - todo: Fix `DependenciesTypes` with TS 5.0 const generic
+ * - todo: Add lifetime option, which will remove singleton instance after time is up.
  *
  * - TODO: Support child container first resolving strategy.
  * It can be done by collecting vertical projection of existing instances and factories.
@@ -33,11 +33,15 @@
  * 3) Run factories (f) to get missing instances
  * 4) Instantiate requested service using ready to use instances (i).
  *
- * containers | dep1  | dep2  | dep3  | dep4
- * --------------------------------------
- * root       |       |   f   |       |
- * child1     |   i   |   .   |   f   |
- * child2     |   .   |   .   |   .   |   i
+ * ---------------------------------------------
+ * | containers | dep1  | dep2  | dep3  | dep4 |
+ * -------------|-------|-------|-------|------|
+ * | root       |       |   f   |       |      |
+ * -------------|-------|-------|-------|------|
+ * | child1     |   i   |   .   |   f   |      |
+ * -------------|-------|-------|-------|------|
+ * | child2     |   .   |   .   |   .   |   i  |
+ * -------------|-------|-------|-------|------|
  *
  *
  * - TODO: add external dynamic services config.
