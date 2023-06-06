@@ -24,6 +24,7 @@ import {
   ValueOf,
 } from './types';
 import { argumentsNamesToArguments, firstResult } from './utils';
+import { asNew } from './utils/construct';
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -45,15 +46,8 @@ export class CircularDependencyError extends Error {
 
 const callFactory = <D extends any[]>(
   callable: Callable<D, any>,
-  dependencies: D,
-  isConstructor: boolean
+  dependencies: D
 ) => {
-  if (isConstructor) {
-    const constructor = callable as Constructor<any, any>;
-    return new constructor(
-      ...(dependencies as ConstructorParameters<typeof constructor>)
-    );
-  }
   const func = callable as Func<any, any>;
   return func(...(dependencies as Parameters<typeof func>));
 };
@@ -97,7 +91,6 @@ export class DIContainer<
     [key in keyof TServices]?: {
       callable: Callable<ValueOf<TServices>[], TServices[key]>;
       type: FactoryType;
-      isConstructor: boolean;
       beforeResolving?: (k: key) => void;
       afterResolving?: (k: key, instance: TServices[key]) => void;
       beforeReplaced?: (k: key) => void;
@@ -179,7 +172,6 @@ export class DIContainer<
     return this.addFactory(name, () => instance, {
       [factoryTypeKey]: 'instance',
       replace: options?.replace,
-      isConstructor: false,
       dependencies: [],
     });
   }
@@ -205,7 +197,6 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
-          isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
@@ -237,7 +228,6 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           replace?: boolean;
-          isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
@@ -257,7 +247,6 @@ export class DIContainer<
         !optionsIsArray && options?.afterResolving?.(k as K, instance);
       },
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
-      isConstructor: optionsIsArray ? undefined : options?.isConstructor,
     });
   }
 
@@ -567,7 +556,6 @@ export class DIContainer<
     options?:
       | {
           argumentsKey?: TContainerKey | ArgumentsKey | undefined;
-          isConstructor?: boolean;
           argumentsNames?: [...Keys];
         }
       | [...Keys]
@@ -591,11 +579,7 @@ export class DIContainer<
 
     const dependencies = this.mapAgrsToInstances(args);
 
-    const isConstructor =
-      (!optionsIsArray && options?.isConstructor) ??
-      !!callable.prototype?.constructor;
-
-    return callFactory(callable, dependencies as any, isConstructor);
+    return callFactory(callable, dependencies as any);
   }
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
@@ -617,7 +601,6 @@ export class DIContainer<
         factory.callable as Callable<any, TServices[typeof name]>,
         {
           argumentsKey: name as any,
-          isConstructor: factory.isConstructor,
         }
       );
       factory.afterResolving?.(name, result);
@@ -670,7 +653,6 @@ export class DIContainer<
         container: this as IDIContainer<TServices>,
         replaced: {
           callable: factory.callable,
-          isConstructor: factory.isConstructor,
           type: factory.type,
         },
       });
@@ -715,15 +697,13 @@ export class DIContainer<
 
   private addFactory<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, NewServices>, any>,
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
       | (() => TServices[keyof TServices])
     )[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends Merge<TServices, Record<K, TResult>>
+    TResult extends CallableResult<TCallable>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -731,14 +711,13 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
-          isConstructor?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
-  ): C {
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     const optionsIsArray = Array.isArray(options);
     const replace = !optionsIsArray && !!options?.replace;
     const dependencies = optionsIsArray ? options : options?.dependencies;
@@ -750,17 +729,13 @@ export class DIContainer<
       this.#singletonInstances.delete(name);
     }
     this.resolveAndCacheArguments(factory, name, dependencies);
-    const isConstructor =
-      (!optionsIsArray && options?.isConstructor) ??
-      !!factory.prototype?.constructor;
     this.#factories.set(name, {
       type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
         'transient') as FactoryType,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
-      callable: factory as Callable<ValueOf<TServices>[], any>,
-      isConstructor,
+      callable: factory as Callable<any[], any>,
     });
     this.onAdd(name as any, replace);
     return this as any;

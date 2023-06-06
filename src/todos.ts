@@ -9,8 +9,6 @@
  *
  * - todo: Add description option when services added. (ᅌᴗᅌ* )=Э  Forgot why we need this
  *
- * - todo: Remove implicit constructors support.
- *
  * - todo: Add auto resolvers with typescript parser.
  *
  * - todo: Add reset method for specific singleton and his dependencies.

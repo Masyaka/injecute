@@ -8,9 +8,10 @@ export type Constructor<TParams extends readonly any[], TResult> = {
 export type Func<TParams extends readonly any[], TResult> = (
   ...params: TParams
 ) => TResult;
-export type Callable<TParams extends readonly any[], TResult> =
-  | Constructor<TParams, TResult>
-  | Func<TParams, TResult>;
+export type Callable<TParams extends readonly any[], TResult> = Func<
+  TParams,
+  TResult
+>;
 export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   ? InstanceType<TCallable>
   : TCallable extends Func<any, any>
@@ -156,7 +157,7 @@ export type InjecuteOptions<
   )[]
 > = {
   argumentsKey?: TContainerKey | undefined;
-  isConstructor?: boolean;
+  useNew?: boolean;
   argumentsNames?: [...Keys];
 };
 
@@ -194,7 +195,6 @@ export type Events<C extends IDIContainer<any>> = {
     container: C;
     replaced: {
       callable: Callable<any, any>;
-      isConstructor: boolean;
       type: FactoryType;
     };
   };
@@ -263,7 +263,7 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          isConstructor?: boolean;
+          useNew?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
@@ -293,7 +293,7 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          isConstructor?: boolean;
+          useNew?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;

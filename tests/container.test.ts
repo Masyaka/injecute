@@ -9,6 +9,7 @@ import {
   NamespaceServices,
   optionalDependencySkipKey,
 } from '../src';
+import { asNew } from '../src/utils/construct';
 
 describe('injecute container', () => {
   describe('DI container general', () => {
@@ -249,7 +250,7 @@ describe('injecute container', () => {
 
       const c = new DIContainer().addSingleton(
         's',
-        SrvWithOptionalConstructorArgument,
+        asNew(SrvWithOptionalConstructorArgument),
         ['undefined']
       );
       expect(c.get('s')).to.be.instanceOf(SrvWithOptionalConstructorArgument);
