@@ -77,71 +77,47 @@ export type TypesToKeys<
   : [];
 
 export type KeysToTypes<
-  Tup extends readonly Item[],
-  TServices extends Record<ArgumentsKey, any>,
-  Item extends (() => any) | OptionalDependencySkipKey | keyof TServices =
+  Keys extends readonly (
     | (() => any)
     | OptionalDependencySkipKey
     | keyof TServices
-> = Tup extends readonly [
-  infer H extends Item,
-  ...infer R extends readonly Item[]
+  )[],
+  TServices extends Record<ArgumentsKey, any>
+> = Keys extends readonly [
+  infer Head extends any,
+  ...infer Rest extends readonly any[]
 ]
   ? [
-      H extends () => any
-        ? H
-        : H extends OptionalDependencySkipKey
-        ? any
-        : H extends ArgumentsKey
-        ? TServices[H]
+      Head extends () => any
+        ? ReturnType<Head>
+        : Head extends OptionalDependencySkipKey
+        ? undefined
+        : Head extends ArgumentsKey
+        ? TServices[Head]
         : never,
-      ...TypesToKeys<R, TServices>
+      ...KeysToTypes<Rest, TServices>
     ]
   : [];
 
 export type GetOptions = { allowUnresolved: boolean };
 
-export type Getter<TServices extends Record<string, any>> =
-  () => TServices[keyof TServices];
-
-type DependenciesTypesEntry<
+export type Getter<
   TServices extends Record<string, any>,
-  K extends keyof TServices | Getter<TServices>
-> = K extends OptionalDependencySkipKey
-  ? undefined
-  : K extends keyof TServices
-  ? TServices[K]
-  : K extends () => any
-  ? ReturnType<K>
-  : never;
+  K extends keyof TServices
+> = () => TServices[K];
+
+export type Getters<
+  TServices extends Record<string, any>,
+  Keys extends readonly (keyof TServices)[]
+> = Keys extends [
+  infer Key extends keyof TServices,
+  ...infer Rest extends readonly any[]
+]
+  ? [Getter<TServices, Key>, ...Getters<TServices, Rest>]
+  : [];
+
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
-
-/**
- * Map keys tuple to types tuple
- * @example
- * ```
- * type deps = DependenciesTypes<{ x: 1, y: string  }, ['x', 'y']> // === [number, string]
- * ```
- */
-export type DependenciesTypes<
-  TServices extends Record<string, any>,
-  Keys extends readonly (keyof TServices | Getter<TServices>)[] = readonly (
-    | keyof TServices
-    | Getter<TServices>
-  )[]
-> = [
-  DependenciesTypesEntry<TServices, Keys[0]>,
-  DependenciesTypesEntry<TServices, Keys[1]>,
-  DependenciesTypesEntry<TServices, Keys[2]>,
-  DependenciesTypesEntry<TServices, Keys[3]>,
-  DependenciesTypesEntry<TServices, Keys[4]>,
-  DependenciesTypesEntry<TServices, Keys[5]>,
-  DependenciesTypesEntry<TServices, Keys[6]>,
-  DependenciesTypesEntry<TServices, Keys[7]>,
-  DependenciesTypesEntry<TServices, Keys[8]>,
-  DependenciesTypesEntry<TServices, Keys[9]>
-];
 
 export type ArgumentsKey = string | symbol | number;
 
@@ -176,7 +152,7 @@ export type InjecuteOptions<
   Keys extends readonly (
     | OptionalDependencySkipKey
     | TContainerKey
-    | Getter<any>
+    | Getter<any, any>
   )[]
 > = {
   argumentsKey?: TContainerKey | undefined;
@@ -277,15 +253,9 @@ export interface IDIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | TContainerKey
-      | Getter<TServices>
-    )[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends Merge<TServices, Record<K, TResult>>
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    TResult extends CallableResult<TCallable>
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -300,7 +270,7 @@ export interface IDIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
-  ): C;
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
    * Once created instance will be returned for each service request
@@ -313,11 +283,9 @@ export interface IDIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey | Getter<any>)[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends Merge<TServices, Record<K, TResult>>
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    TResult extends CallableResult<TCallable>
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -332,7 +300,7 @@ export interface IDIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
-  ): C;
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
    * When the service with `name` needed - `aliasTo` service will be given.
@@ -399,7 +367,7 @@ export interface IDIContainer<
     Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
   >(
     keys: [...Keys],
-    callable: Callable<DependenciesTypes<TServices, Keys>, TResult>
+    callable: Callable<KeysToTypes<Keys, TServices>, TResult>
   ): () => TResult;
 
   /**
@@ -418,6 +386,10 @@ export interface IDIContainer<
    * @param key
    */
   getter<K extends TContainerKey>(key: K): () => TServices[K];
+
+  getters<const Keys extends TContainerKey[]>(
+    keys: [...Keys]
+  ): Getters<TServices, Keys>;
 
   /**
    * Creates child container.
@@ -511,11 +483,11 @@ export interface IDIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices>
+      | Getter<TServices, keyof TServices>
     )[]
   >(
     callable: TCallable,

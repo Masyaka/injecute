@@ -6,15 +6,16 @@ import {
   CallableResult,
   Constructor,
   ContainerServices,
-  DependenciesTypes,
   Empty,
   Events,
   FactoryType,
   Func,
   GetOptions,
   Getter,
+  Getters,
   IDIContainer,
   IDIContainerExtension,
+  KeysToTypes,
   MapOf,
   Merge,
   optionalDependencySkipKey,
@@ -194,15 +195,9 @@ export class DIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | TContainerKey
-      | Getter<TServices>
-    )[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends Merge<TServices, Record<K, TResult>>
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    TResult extends CallableResult<TCallable>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -217,7 +212,7 @@ export class DIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
-  ): C {
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     return this.addFactory(name, factory, options);
   }
 
@@ -232,11 +227,9 @@ export class DIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey | Getter<any>)[],
-    C extends IDIContainer<NewServices>,
-    TResult extends CallableResult<TCallable>,
-    NewServices extends Merge<TServices, Record<K, TResult>>
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
+    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    TResult extends CallableResult<TCallable>
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -251,7 +244,7 @@ export class DIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys]
-  ): C {
+  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
       [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
@@ -377,11 +370,11 @@ export class DIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices>
+      | Getter<TServices, keyof TServices>
     )[]
   >(
     keys: [...Keys],
-    callable: Callable<DependenciesTypes<TServices, Keys>, TResult>
+    callable: Callable<KeysToTypes<Keys, TServices>, TResult>
   ): () => TResult {
     return () => this.injecute(callable, { argumentsNames: keys });
   }
@@ -401,8 +394,14 @@ export class DIContainer<
    * ```
    * @param key
    */
-  getter<K extends TContainerKey>(key: K): () => TServices[K] {
+  getter<K extends TContainerKey>(key: K): Getter<TServices, K> {
     return this.get.bind(this, key) as () => TServices[K];
+  }
+
+  getters<const Keys extends TContainerKey[]>(
+    keys: [...Keys]
+  ): Getters<TServices, Keys> {
+    return keys.map((k) => this.getter(k)) as Getters<TServices, Keys>;
   }
 
   /**
@@ -557,11 +556,11 @@ export class DIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<DependenciesTypes<TServices, Keys>, TResult>,
+    TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices>
+      | Getter<TServices, keyof TServices>
     )[]
   >(
     callable: TCallable,
@@ -590,16 +589,13 @@ export class DIContainer<
       );
     }
 
-    const dependencies = this.mapAgrsToInstances(args) as DependenciesTypes<
-      TServices,
-      Keys
-    >;
+    const dependencies = this.mapAgrsToInstances(args);
 
     const isConstructor =
       (!optionsIsArray && options?.isConstructor) ??
       !!callable.prototype?.constructor;
 
-    return callFactory(callable, dependencies, isConstructor);
+    return callFactory(callable, dependencies as any, isConstructor);
   }
 
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
@@ -719,7 +715,7 @@ export class DIContainer<
 
   private addFactory<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesTypes<NewServices, Keys>, any>,
+    TCallable extends Callable<KeysToTypes<Keys, NewServices>, any>,
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
@@ -763,7 +759,7 @@ export class DIContainer<
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
-      callable: factory,
+      callable: factory as Callable<ValueOf<TServices>[], any>,
       isConstructor,
     });
     this.onAdd(name as any, replace);

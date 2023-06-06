@@ -100,25 +100,31 @@ describe('injecute container', () => {
               .addInstance('value', '23')
           )
           .namespace('Domain.Context', (namespace, parent) => {
+            const getValue = parent.getter('Generic.value');
             return namespace
               .addTransient('cfg', parent.getter('Generic.cfg'), [])
               .addSingleton(
                 'feature',
                 (cfg, value) => feat + cfg.value + value.substring(0, 1),
-                ['cfg', parent.getter('Generic.value')]
+                ['cfg', getValue]
               );
           });
 
         const addAliasAndExtendFeature = (
           namespaceContainer: IDIContainer<
             NamespaceServices<typeof container, 'Domain.Context'>
-          >
-        ) =>
-          namespaceContainer
+          >,
+          parent: typeof container
+        ) => {
+          const [getCfg] = parent.getters(['Generic.cfg']);
+          return namespaceContainer
             .addAlias('feature alias', 'feature')
-            .addTransient('extendedFeature', (f) => `${f} extended` as const, [
-              'feature',
-            ]);
+            .addTransient(
+              'extendedFeature',
+              (f, cfg) => `${f} extended ${cfg.value}` as const,
+              ['feature', getCfg]
+            );
+        };
 
         const extendedNamespaceOwnerContainer = container.namespace(
           'Domain.Context',
@@ -136,7 +142,7 @@ describe('injecute container', () => {
         ).to.be.eq(feat + 1 + '2');
         expect(
           extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature')
-        ).to.be.eq(feat + 1 + '2' + ' extended');
+        ).to.be.eq(feat + 1 + '2' + ' extended 1');
       });
     });
     describe('reset', () => {
@@ -229,7 +235,7 @@ describe('injecute container', () => {
           ['y']
         );
       const c = new DIContainer()
-        .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as any)
+        .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as [any])
         .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
 
       expect(() => c.extend(addZ)).to.throw(CircularDependencyError);
@@ -277,6 +283,7 @@ describe('injecute container', () => {
     it('will restrict adding to container without explicit keys providing', () => {
       const c = new DIContainer();
       expect(() =>
+        // @ts-expect-error
         c.addTransient('d', (arg: any) => {
           console.log(arg);
         })
