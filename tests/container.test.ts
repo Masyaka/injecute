@@ -98,7 +98,7 @@ describe('injecute container', () => {
           .namespace('Generic', (generic) =>
             generic
               .addTransient('cfg', () => ({ value: 1 }), [])
-              .addInstance('value', '23')
+              .addInstance('value', '23'),
           )
           .namespace('Domain.Context', (namespace, parent) => {
             const getValue = parent.getter('Generic.value');
@@ -107,7 +107,7 @@ describe('injecute container', () => {
               .addSingleton(
                 'feature',
                 (cfg, value) => feat + cfg.value + value.substring(0, 1),
-                ['cfg', getValue]
+                ['cfg', getValue],
               );
           });
 
@@ -115,7 +115,7 @@ describe('injecute container', () => {
           namespaceContainer: IDIContainer<
             NamespaceServices<typeof container, 'Domain.Context'>
           >,
-          parent: typeof container
+          parent: typeof container,
         ) => {
           const [getCfg] = parent.getters(['Generic.cfg']);
           return namespaceContainer
@@ -123,26 +123,26 @@ describe('injecute container', () => {
             .addTransient(
               'extendedFeature',
               (f, cfg) => `${f} extended ${cfg.value}` as const,
-              ['feature', getCfg]
+              ['feature', getCfg],
             );
         };
 
         const extendedNamespaceOwnerContainer = container.namespace(
           'Domain.Context',
-          addAliasAndExtendFeature
+          addAliasAndExtendFeature,
         );
         expect(container.get('Domain.Context.feature')).to.be.eq(
-          feat + 1 + '2'
+          feat + 1 + '2',
         );
         expect(container.get('Domain.Context')).to.be.instanceOf(DIContainer);
         expect(container.get('Domain.Context').get('feature')).to.be.eq(
-          feat + 1 + '2'
+          feat + 1 + '2',
         );
         expect(
-          extendedNamespaceOwnerContainer.get('Domain.Context.feature alias')
+          extendedNamespaceOwnerContainer.get('Domain.Context.feature alias'),
         ).to.be.eq(feat + 1 + '2');
         expect(
-          extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature')
+          extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature'),
         ).to.be.eq(feat + 1 + '2' + ' extended 1');
       });
     });
@@ -157,7 +157,7 @@ describe('injecute container', () => {
               depFactoryRuns++;
               return 'dep';
             },
-            []
+            [],
           )
           .addSingleton(
             'singleton',
@@ -168,7 +168,7 @@ describe('injecute container', () => {
                 name: 'singleton',
               };
             },
-            ['dependency']
+            ['dependency'],
           );
 
         container.get('singleton');
@@ -194,7 +194,7 @@ describe('injecute container', () => {
                 name: 'singleton',
               };
             },
-            []
+            [],
           )
           .fork();
 
@@ -219,7 +219,7 @@ describe('injecute container', () => {
             const s = parent.get('s');
             return { ...s, y: 2 };
           },
-          []
+          [],
         );
       });
       expect(child.get('s')).to.be.eql({ x: 1, y: 2 });
@@ -233,7 +233,7 @@ describe('injecute container', () => {
             ...y,
             z: 1,
           }),
-          ['y']
+          ['y'],
         );
       const c = new DIContainer()
         .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as [any])
@@ -251,7 +251,7 @@ describe('injecute container', () => {
       const c = new DIContainer().addSingleton(
         's',
         asNew(SrvWithOptionalConstructorArgument),
-        ['undefined']
+        ['undefined'],
       );
       expect(c.get('s')).to.be.instanceOf(SrvWithOptionalConstructorArgument);
     });
@@ -261,14 +261,14 @@ describe('injecute container', () => {
         new DIContainer().addSingleton(
           optionalDependencySkipKey as any,
           () => optionalDependencySkipKey,
-          []
+          [],
         );
       expect(addSingletonUndefinedKey).to.throw;
 
       const addInstanceUndefinedKey = () =>
         new DIContainer().addInstance(
           optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey
+          () => optionalDependencySkipKey,
         );
       expect(addInstanceUndefinedKey).to.throw;
 
@@ -276,7 +276,7 @@ describe('injecute container', () => {
         new DIContainer().addTransient(
           optionalDependencySkipKey as any,
           () => optionalDependencySkipKey,
-          []
+          [],
         );
       expect(addTransientUndefinedKey).to.throw;
     });
@@ -287,7 +287,7 @@ describe('injecute container', () => {
         // @ts-expect-error
         c.addTransient('d', (arg: any) => {
           console.log(arg);
-        })
+        }),
       ).to.throw;
     });
     it('will add service with explicit keys provided', () => {

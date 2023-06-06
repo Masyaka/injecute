@@ -13,10 +13,10 @@ import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
 export const preload = <
   C extends IDIContainer<any>,
   S extends ContainerServices<C>,
-  K extends keyof S
+  K extends keyof S,
 >(
   container: C,
-  keys?: K[] | ((k: K) => boolean)
+  keys?: K[] | ((k: K) => boolean),
 ) => {
   let toPreload: ArgumentsKey[];
   if (keys === undefined) {

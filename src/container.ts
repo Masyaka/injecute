@@ -28,11 +28,11 @@ import { asNew } from './utils/construct';
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
-  Key extends keyof TServices = keyof TServices
+  Key extends keyof TServices = keyof TServices,
 > = (
   this: DIContainer<TServices>,
   name: Key,
-  next: Resolver<TServices>
+  next: Resolver<TServices>,
 ) => Resolver<TServices>;
 
 export class CircularDependencyError extends Error {
@@ -46,14 +46,14 @@ export class CircularDependencyError extends Error {
 
 const callFactory = <D extends any[]>(
   callable: Callable<D, any>,
-  dependencies: D
+  dependencies: D,
 ) => {
   const func = callable as Func<any, any>;
   return func(...(dependencies as Parameters<typeof func>));
 };
 
 export type DIContainerConstructorArguments<
-  TParentServices extends Record<ArgumentsKey, any> = Empty
+  TParentServices extends Record<ArgumentsKey, any> = Empty,
 > = {
   parentContainer?: IDIContainer<TParentServices>;
 };
@@ -67,7 +67,7 @@ export class DIContainer<
   TParentServices extends Record<ArgumentsKey, any> = Empty,
   TServices extends TParentServices &
     Record<ArgumentsKey, any> = TParentServices & Empty,
-  TContainerKey extends keyof TServices = keyof TServices
+  TContainerKey extends keyof TServices = keyof TServices,
 > implements IDIContainer<TServices, TContainerKey>
 {
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
@@ -112,14 +112,14 @@ export class DIContainer<
   static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
     this,
     _,
-    argumentsKey
+    argumentsKey,
   ) {
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
 
   addEventListener<E extends keyof Events<IDIContainer<TServices>>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
   ) {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].add(handler);
@@ -130,7 +130,7 @@ export class DIContainer<
 
   removeEventListener<E extends keyof Events<IDIContainer<TServices>>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
   ) {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].delete(handler);
@@ -167,7 +167,7 @@ export class DIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
-    }
+    },
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     return this.addFactory(name, () => instance, {
       [factoryTypeKey]: 'instance',
@@ -189,7 +189,7 @@ export class DIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -202,7 +202,7 @@ export class DIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys]
+      | [...Keys],
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     return this.addFactory(name, factory, options);
   }
@@ -220,7 +220,7 @@ export class DIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -233,7 +233,7 @@ export class DIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys]
+      | [...Keys],
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
@@ -264,10 +264,10 @@ export class DIContainer<
   addAlias<
     T extends TServices[A],
     K extends ArgumentsKey,
-    A extends TContainerKey
+    A extends TContainerKey,
   >(
     name: Exclude<K, OptionalDependencySkipKey & A>,
-    aliasTo: A
+    aliasTo: A,
   ): IDIContainer<Merge<TServices, { [k in K]: T }>> {
     return this.addFactory(name, () => this.get(aliasTo), {
       dependencies: [],
@@ -276,7 +276,7 @@ export class DIContainer<
   }
 
   use(
-    middleware: Middleware<any>
+    middleware: Middleware<any>,
   ): DIContainer<TParentServices, TServices, TContainerKey> {
     this.#middlewares.push(middleware);
     this.rebuildMiddlewareStack();
@@ -302,10 +302,10 @@ export class DIContainer<
   get<
     Key extends TContainerKey,
     O extends GetOptions,
-    T extends any = TServices[Key]
+    T extends any = TServices[Key],
   >(
     serviceName: Key,
-    options?: O
+    options?: O,
   ): O['allowUnresolved'] extends true ? T | undefined : T {
     const instance = this.#middlewareStack(serviceName);
 
@@ -324,7 +324,7 @@ export class DIContainer<
 
   //  ArgumentsResolver
   public addArgumentsResolver(
-    ar: ArgumentsResolver
+    ar: ArgumentsResolver,
   ): DIContainer<TParentServices, TServices> {
     this.#argumentsResolvers.push(ar);
     return this;
@@ -335,7 +335,7 @@ export class DIContainer<
       const args = argumentsResolver.call(
         this as IDIContainer<TServices>,
         fn,
-        argumentsKey
+        argumentsKey,
       );
       if (args) return args;
     }
@@ -360,10 +360,10 @@ export class DIContainer<
       | OptionalDependencySkipKey
       | TContainerKey
       | Getter<TServices, keyof TServices>
-    )[]
+    )[],
   >(
     keys: [...Keys],
-    callable: Callable<KeysToTypes<Keys, TServices>, TResult>
+    callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
   ): () => TResult {
     return () => this.injecute(callable, { argumentsNames: keys });
   }
@@ -388,7 +388,7 @@ export class DIContainer<
   }
 
   getters<const Keys extends TContainerKey[]>(
-    keys: [...Keys]
+    keys: [...Keys],
   ): Getters<TServices, Keys> {
     return keys.map((k) => this.getter(k)) as Getters<TServices, Keys>;
   }
@@ -442,12 +442,12 @@ export class DIContainer<
       namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
         ? IDIContainer<NS>
         : IDIContainer<{}>,
-      parentNamespaceContainer: IDIContainer<TServices>
+      parentNamespaceContainer: IDIContainer<TServices>,
     ) => IDIContainer<any>,
-    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>
+    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
-    extension: TExtension
+    extension: TExtension,
   ): IDIContainer<
     TServices &
       Record<TNamespace, IDIContainer<TNamespaceServices>> & {
@@ -461,7 +461,7 @@ export class DIContainer<
       typeof instance === 'object' && (instance as any) instanceof DIContainer;
     if (instance && !isContainer) {
       throw new Error(
-        `Namespace key "${namespace}" already used with non container entry.`
+        `Namespace key "${namespace}" already used with non container entry.`,
       );
     }
     const namespaceContainer =
@@ -474,7 +474,7 @@ export class DIContainer<
             {
               dependencies: [],
               [factoryTypeKey]: 'namespace-passthrough',
-            }
+            },
           );
         }
       });
@@ -505,9 +505,9 @@ export class DIContainer<
   extend<
     In extends TServices,
     Added extends Record<ArgumentsKey, any>,
-    Out extends In & Added
+    Out extends In & Added,
   >(
-    extensionFunction: IDIContainerExtension<In, Added, Out>
+    extensionFunction: IDIContainerExtension<In, Added, Out>,
   ): IDIContainer<Out> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);
@@ -550,7 +550,7 @@ export class DIContainer<
       | OptionalDependencySkipKey
       | TContainerKey
       | Getter<TServices, keyof TServices>
-    )[]
+    )[],
   >(
     callable: TCallable,
     options?:
@@ -558,7 +558,7 @@ export class DIContainer<
           argumentsKey?: TContainerKey | ArgumentsKey | undefined;
           argumentsNames?: [...Keys];
         }
-      | [...Keys]
+      | [...Keys],
   ): CallableResult<TCallable> {
     const optionsIsArray = Array.isArray(options);
     const argumentsNames = optionsIsArray ? options : options?.argumentsNames;
@@ -566,14 +566,14 @@ export class DIContainer<
     const args = this.resolveAndCacheArguments(
       callable,
       argumentsKey,
-      argumentsNames
+      argumentsNames,
     );
 
     if (!args) {
       throw new Error(
         `Not resolved arguments for ${String(argumentsKey)} "${callable
           .toString()
-          .substring(0, 50)}"`
+          .substring(0, 50)}"`,
       );
     }
 
@@ -585,7 +585,7 @@ export class DIContainer<
   protected assertNotRegistered(name: TContainerKey | ArgumentsKey) {
     if (this.has(name, false)) {
       throw new Error(
-        `Factory or instance with name "${String(name)}" already registered`
+        `Factory or instance with name "${String(name)}" already registered`,
       );
     }
   }
@@ -601,7 +601,7 @@ export class DIContainer<
         factory.callable as Callable<any, TServices[typeof name]>,
         {
           argumentsKey: name as any,
-        }
+        },
       );
       factory.afterResolving?.(name, result);
       return result;
@@ -622,23 +622,23 @@ export class DIContainer<
 
   protected assertFactoryIsAcceptable(
     factory: any,
-    name: TContainerKey | ArgumentsKey
+    name: TContainerKey | ArgumentsKey,
   ) {
     if (typeof factory !== 'function') {
       throw new Error(
         `Non function factory or class constructor added for "${String(
-          name
-        )}" key`
+          name,
+        )}" key`,
       );
     }
   }
 
   protected assertKeyIsValid(
-    k: unknown
+    k: unknown,
   ): asserts k is Exclude<any, OptionalDependencySkipKey> {
     if (k === optionalDependencySkipKey) {
       throw new Error(
-        `"${optionalDependencySkipKey}" key is not allowed as key for service.`
+        `"${optionalDependencySkipKey}" key is not allowed as key for service.`,
       );
     }
   }
@@ -703,7 +703,7 @@ export class DIContainer<
       | TContainerKey
       | (() => TServices[keyof TServices])
     )[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
     factory: TCallable,
@@ -716,7 +716,7 @@ export class DIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys]
+      | [...Keys],
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     const optionsIsArray = Array.isArray(options);
     const replace = !optionsIsArray && !!options?.replace;
@@ -744,7 +744,7 @@ export class DIContainer<
   private rebuildMiddlewareStack() {
     this.#middlewareStack = [this.resolve, ...this.#middlewares].reduce(
       (next, current) => (message) =>
-        current.apply(this, [message, next as Resolver<TServices>])
+        current.apply(this, [message, next as Resolver<TServices>]),
     ) as Resolver<TServices>;
   }
 
@@ -755,13 +755,13 @@ export class DIContainer<
       | OptionalDependencySkipKey
       | TContainerKey
       | (() => TServices[keyof TServices])
-    )[]
+    )[],
   ) {
     const args: Argument[] | undefined = argumentsNames
       ? argumentsNamesToArguments(argumentsNames)
       : (this as IDIContainer<TServices>).resolveArguments(
           fn as Callable<any, any>,
-          argumentsKey
+          argumentsKey,
         );
 
     if (args && argumentsKey && !this.#arguments.get(argumentsKey)) {
@@ -777,13 +777,13 @@ export class DIContainer<
         ? arg.getter()
         : this.get(arg.name as TContainerKey, {
             allowUnresolved: !arg.required,
-          })
+          }),
     );
   }
 
   private ensureNoCirculars(
     key: ArgumentsKey,
-    stack: ArgumentsKey[] = []
+    stack: ArgumentsKey[] = [],
   ): ArgumentsKey[][] {
     const args = this.#arguments.get(key);
     if (!args) return [stack];
@@ -801,7 +801,7 @@ export class DIContainer<
 
   private cacheArguments(
     args: Argument[],
-    argumentsKey: TContainerKey | ArgumentsKey
+    argumentsKey: TContainerKey | ArgumentsKey,
   ) {
     this.#arguments.set(argumentsKey, args);
     this.ensureNoCirculars(argumentsKey);
@@ -811,7 +811,7 @@ export class DIContainer<
   private validateAdd(
     name: Exclude<ArgumentsKey, OptionalDependencySkipKey>,
     factory: Callable<any, any>,
-    replace?: boolean
+    replace?: boolean,
   ) {
     this.assertKeyIsValid(name);
     this.assertFactoryIsAcceptable(factory, name);

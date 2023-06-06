@@ -7,7 +7,7 @@ const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
 export const firstResult =
   <TArgs extends any[], TResult extends any>(
     fns: ((...args: TArgs) => TResult)[],
-    predicate: (r: TResult) => boolean = firstResultDefaultPredicate
+    predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
   ) =>
   (...args: TArgs): TResult | undefined => {
     for (const f of fns) {
@@ -17,7 +17,7 @@ export const firstResult =
   };
 
 export const argumentsNamesToArguments = (
-  argsNames: (ArgumentsKey | (() => any))[]
+  argsNames: (ArgumentsKey | (() => any))[],
 ): Argument[] =>
   argsNames.map((a) =>
     typeof a === 'function'
@@ -25,7 +25,7 @@ export const argumentsNamesToArguments = (
       : {
           name: a,
           required: a !== optionalDependencySkipKey,
-        }
+        },
   );
 
 export const utils = {

@@ -21,7 +21,7 @@ export type Argument =
   | { name: ArgumentsKey; required: boolean }
   | { getter: () => any };
 export type Resolver<TServices> = <Key extends keyof TServices>(
-  name: Key
+  name: Key,
 ) => TServices[Key] | undefined;
 export type Factory<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
@@ -67,12 +67,12 @@ export type ArgumentsTypes<C extends Callable<any[], any>> = C extends Callable<
 export type Dependencies<
   C extends Callable<any[], any>,
   TServices extends Record<ArgumentsKey, any>,
-  A extends ArgumentsTypes<C> = ArgumentsTypes<C>
+  A extends ArgumentsTypes<C> = ArgumentsTypes<C>,
 > = TypesToKeys<A, TServices>;
 
 export type TypesToKeys<
   Tup extends readonly any[],
-  TServices extends Record<ArgumentsKey, any>
+  TServices extends Record<ArgumentsKey, any>,
 > = Tup extends readonly [infer H, ...infer R extends readonly any[]]
   ? [KeyForValueOfType<TServices, H> | (() => H), ...TypesToKeys<R, TServices>]
   : [];
@@ -83,10 +83,10 @@ export type KeysToTypes<
     | OptionalDependencySkipKey
     | keyof TServices
   )[],
-  TServices extends Record<ArgumentsKey, any>
+  TServices extends Record<ArgumentsKey, any>,
 > = Keys extends readonly [
   infer Head extends any,
-  ...infer Rest extends readonly any[]
+  ...infer Rest extends readonly any[],
 ]
   ? [
       Head extends () => any
@@ -96,7 +96,7 @@ export type KeysToTypes<
         : Head extends ArgumentsKey
         ? TServices[Head]
         : never,
-      ...KeysToTypes<Rest, TServices>
+      ...KeysToTypes<Rest, TServices>,
     ]
   : [];
 
@@ -104,15 +104,15 @@ export type GetOptions = { allowUnresolved: boolean };
 
 export type Getter<
   TServices extends Record<string, any>,
-  K extends keyof TServices
+  K extends keyof TServices,
 > = () => TServices[K];
 
 export type Getters<
   TServices extends Record<string, any>,
-  Keys extends readonly (keyof TServices)[]
+  Keys extends readonly (keyof TServices)[],
 > = Keys extends [
   infer Key extends keyof TServices,
-  ...infer Rest extends readonly any[]
+  ...infer Rest extends readonly any[],
 ]
   ? [Getter<TServices, Key>, ...Getters<TServices, Rest>]
   : [];
@@ -125,17 +125,17 @@ export type ArgumentsKey = string | symbol | number;
 export type ArgumentsResolver = <
   TServices extends Record<ArgumentsKey, any>,
   TContainerKey extends keyof TServices,
-  C extends IDIContainer<TServices, TContainerKey>
+  C extends IDIContainer<TServices, TContainerKey>,
 >(
   this: C,
   fn: Callable<any, any>,
-  argumentsKey?: ArgumentsKey
+  argumentsKey?: ArgumentsKey,
 ) => Argument[] | undefined;
 
 export type IDIContainerExtension<
   In extends Record<string, any>,
   Added extends Record<string, any>,
-  Out extends In & Added = In & Added
+  Out extends In & Added = In & Added,
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
 export type ContainerServices<C extends IDIContainer<any>> =
@@ -143,7 +143,7 @@ export type ContainerServices<C extends IDIContainer<any>> =
 
 export type NamespaceServices<
   C extends IDIContainer<any>,
-  N extends keyof ContainerServices<C>
+  N extends keyof ContainerServices<C>,
 > = ContainerServices<C>[N] extends IDIContainer<any>
   ? ContainerServices<ContainerServices<C>[N]>
   : `${N extends string ? N : ''} is not a namespace container`;
@@ -154,7 +154,7 @@ export type InjecuteOptions<
     | OptionalDependencySkipKey
     | TContainerKey
     | Getter<any, any>
-  )[]
+  )[],
 > = {
   argumentsKey?: TContainerKey | undefined;
   useNew?: boolean;
@@ -172,7 +172,7 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
 
 export type Merge<
   T1 extends Record<string, unknown>,
-  T2 extends Record<string, unknown>
+  T2 extends Record<string, unknown>,
 > = {
   [K in keyof (T1 & T2)]: K extends keyof T2
     ? T2[K]
@@ -204,18 +204,18 @@ export type Events<C extends IDIContainer<any>> = {
 
 export interface IDIContainer<
   TServices extends Record<ArgumentsKey, any>,
-  TContainerKey extends keyof TServices = keyof TServices
+  TContainerKey extends keyof TServices = keyof TServices,
 > {
   readonly resolveArguments: ArgumentsResolver;
 
   addEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
   ): this;
 
   removeEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void
+    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
   ): this;
 
   getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
@@ -239,7 +239,7 @@ export interface IDIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
-    }
+    },
   ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
@@ -255,7 +255,7 @@ export interface IDIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -269,7 +269,7 @@ export interface IDIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys]
+      | [...Keys],
   ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
@@ -285,7 +285,7 @@ export interface IDIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
     name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
@@ -299,7 +299,7 @@ export interface IDIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys]
+      | [...Keys],
   ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
 
   /**
@@ -316,10 +316,10 @@ export interface IDIContainer<
   addAlias<
     T extends TServices[A],
     K extends ArgumentsKey,
-    A extends TContainerKey
+    A extends TContainerKey,
   >(
     name: Exclude<K, OptionalDependencySkipKey & A>,
-    aliasTo: A
+    aliasTo: A,
   ): IDIContainer<Merge<TServices, Record<K, T>>>;
 
   /**
@@ -343,10 +343,10 @@ export interface IDIContainer<
   get<
     Key extends TContainerKey,
     O extends GetOptions,
-    T extends any = TServices[Key]
+    T extends any = TServices[Key],
   >(
     serviceName: Key,
-    options?: O
+    options?: O,
   ): O['allowUnresolved'] extends true ? T | undefined : T;
 
   /**
@@ -364,10 +364,10 @@ export interface IDIContainer<
    */
   bind<
     TResult extends any,
-    Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[]
+    Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[],
   >(
     keys: [...Keys],
-    callable: Callable<KeysToTypes<Keys, TServices>, TResult>
+    callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
   ): () => TResult;
 
   /**
@@ -388,7 +388,7 @@ export interface IDIContainer<
   getter<K extends TContainerKey>(key: K): () => TServices[K];
 
   getters<const Keys extends TContainerKey[]>(
-    keys: [...Keys]
+    keys: [...Keys],
   ): Getters<TServices, Keys>;
 
   /**
@@ -425,12 +425,12 @@ export interface IDIContainer<
       namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
         ? IDIContainer<NS>
         : IDIContainer<{}>,
-      parentNamespaceContainer: IDIContainer<TServices>
+      parentNamespaceContainer: IDIContainer<TServices>,
     ) => IDIContainer<any>,
-    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>
+    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
-    extension: TExtension
+    extension: TExtension,
   ): IDIContainer<
     TServices &
       Record<TNamespace, IDIContainer<TNamespaceServices>> & {
@@ -453,9 +453,9 @@ export interface IDIContainer<
   extend<
     Added extends Record<ArgumentsKey, any>,
     In extends TServices = TServices,
-    Out extends Merge<In, Added> = Merge<In, Added>
+    Out extends Merge<In, Added> = Merge<In, Added>,
   >(
-    extensionFunction: IDIContainerExtension<In, Added, Out>
+    extensionFunction: IDIContainerExtension<In, Added, Out>,
   ): IDIContainer<Out>;
 
   /**
@@ -488,9 +488,9 @@ export interface IDIContainer<
       | OptionalDependencySkipKey
       | TContainerKey
       | Getter<TServices, keyof TServices>
-    )[]
+    )[],
   >(
     callable: TCallable,
-    options?: InjecuteOptions<TContainerKey, Keys> | [...Keys]
+    options?: InjecuteOptions<TContainerKey, Keys> | [...Keys],
   ): CallableResult<TCallable>;
 }

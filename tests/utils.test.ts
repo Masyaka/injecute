@@ -12,7 +12,7 @@ describe('utils', () => {
         .addInstance('listener', 'Listener')
         .addSingleton('sing', (listener) => `I'm singing for ${listener}`, [
           'listener',
-        ])
+        ]),
     );
 
     it('reads values', () => {
@@ -23,7 +23,7 @@ describe('utils', () => {
     it('throws on write attempt', () => {
       // @ts-expect-error testing
       expect(() => (accessor.listener = '')).to.throw(
-        'Set through proxy is not supported'
+        'Set through proxy is not supported',
       );
     });
   });
@@ -41,7 +41,7 @@ describe('utils', () => {
               name: 'I am a singleton',
             };
           },
-          []
+          [],
         )
         .addTransient(
           'transient',
@@ -51,7 +51,7 @@ describe('utils', () => {
               name: 'I am a transient',
             };
           },
-          []
+          [],
         )
         .addInstance('instance', () => {
           instanceCalled = true;
@@ -79,7 +79,7 @@ describe('utils', () => {
               name: 'I am singleton',
             };
           },
-          []
+          [],
         )
         .addTransient(
           'transient',
@@ -89,7 +89,7 @@ describe('utils', () => {
               name: 'I am transient',
             };
           },
-          []
+          [],
         )
         .addInstance('instance', () => {
           instanceCalled = true;
@@ -117,7 +117,7 @@ describe('utils', () => {
               name: 'I am a singleton',
             };
           },
-          []
+          [],
         )
         .addTransient(
           'transient',
@@ -127,7 +127,7 @@ describe('utils', () => {
               name: 'I am a transient',
             };
           },
-          []
+          [],
         )
         .addInstance('instance', () => {
           instanceCalled = true;
@@ -147,7 +147,7 @@ describe('utils', () => {
     class ClassWithConstructor {
       constructor(
         public readonly field1: number,
-        public readonly field2: string
+        public readonly field2: string,
       ) {}
     }
 
