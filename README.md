@@ -51,7 +51,7 @@ const container = new DIContainer()
     }),
     [],
   )
-  .addTransient('notBasicService', asNew(NotBasicService), [
+  .addTransient('notBasicService', construct(NotBasicService), [
     'myService',
     'logger',
   ]);
@@ -105,7 +105,7 @@ const container = new DIContainer()
     'logger',
     config.useProductionLogger ? 'productionLogger' : 'console',
   )
-  .addTransient('service', asNew(LoggerUsingService), ['logger']);
+  .addTransient('service', construct(LoggerUsingService), ['logger']);
 
 // service will use as logger `productionLogger` or `console` based on config.;
 
@@ -211,7 +211,7 @@ export const createRequestContainerWrapper = <
 
 const rootContainer = new DIContainer().addSingleton(
   'userResolvingService',
-  asNew(UserResolvingService),
+  construct(UserResolvingService),
   ['db', 'etc...'],
 );
 
@@ -293,7 +293,7 @@ class MyBusinessService {
 // root app container
 const c = new DIContainer()
   .addInstance('logger', console)
-  .addSingleton('businessService', asNew(MyBusinessService), ['logger']);
+  .addSingleton('businessService', construct(MyBusinessService), ['logger']);
 
 // handler creator bounded to your app container
 const useServices = useContainerServices(c);

@@ -1,7 +1,8 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import { DIContainer } from '../src';
-import { asNew } from '../src/utils/construct';
+import { defer } from '../src/utils/defer';
+import { construct } from '../src/utils/construct';
 import { preload } from '../src/utils/preload';
 import { createProxyAccessor } from '../src/utils/proxy';
 
@@ -143,7 +144,7 @@ describe('utils', () => {
     });
   });
 
-  describe('asNew', () => {
+  describe('cobstruct', () => {
     class ClassWithConstructor {
       constructor(
         public readonly field1: number,
@@ -152,8 +153,8 @@ describe('utils', () => {
     }
 
     it('creates instantiation function', () => {
-      const construct = asNew(ClassWithConstructor);
-      const instance = construct(1, '2');
+      const create = construct(ClassWithConstructor);
+      const instance = create(1, '2');
       expect(instance).to.be.instanceOf(ClassWithConstructor);
       expect(instance.field1).to.be.a('number');
       expect(instance.field2).to.be.a('string');
@@ -163,9 +164,43 @@ describe('utils', () => {
       const container = new DIContainer()
         .addTransient('number', () => 1, [])
         .addInstance('string', '2')
-        .addTransient('x', asNew(ClassWithConstructor), ['number', 'string']);
+        .addTransient('x', construct(ClassWithConstructor), [
+          'number',
+          'string',
+        ]);
 
       const instance = container.get('x');
+      expect(instance).to.be.instanceOf(ClassWithConstructor);
+      expect(instance.field1).to.be.a('number');
+      expect(instance.field2).to.be.a('string');
+    });
+  });
+
+  describe('defer', () => {
+    class ClassWithConstructor {
+      constructor(
+        public readonly field1: number,
+        public readonly field2: string,
+      ) {}
+    }
+
+    it('creates deferred function', async () => {
+      const syncFunction = (n: number, s: string) => n + s;
+      const deferred = defer(syncFunction);
+      const result = await deferred(1, Promise.resolve('2'));
+      expect(result).to.be.eq('12');
+    });
+
+    it('allows to add constructor with promised arguments', async () => {
+      const container = new DIContainer()
+        .addTransient('number', () => Promise.resolve(1), [])
+        .addInstance('string', '2')
+        .addTransient('x', defer(construct(ClassWithConstructor)), [
+          'number',
+          'string',
+        ]);
+
+      const instance = await container.get('x');
       expect(instance).to.be.instanceOf(ClassWithConstructor);
       expect(instance.field1).to.be.a('number');
       expect(instance.field2).to.be.a('string');

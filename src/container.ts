@@ -24,7 +24,7 @@ import {
   ValueOf,
 } from './types';
 import { argumentsNamesToArguments, firstResult } from './utils';
-import { asNew } from './utils/construct';
+import { construct } from './utils/construct';
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -378,7 +378,7 @@ export class DIContainer<
    *   (namespace, parent) => namespace
    *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
    *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
-   *     .addSingleton('namespaceService', asNew(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
+   *     .addSingleton('namespaceService', construct(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
    * )
    * ```
    * @param key
@@ -387,6 +387,10 @@ export class DIContainer<
     return this.get.bind(this, key) as () => TServices[K];
   }
 
+  /**
+   * Create multiple getters
+   * @param keys
+   */
   getters<const Keys extends TContainerKey[]>(
     keys: [...Keys],
   ): Getters<TServices, Keys> {
@@ -473,7 +477,7 @@ export class DIContainer<
             () => container.get(name),
             {
               dependencies: [],
-              [factoryTypeKey]: 'namespace-passthrough',
+              [factoryTypeKey]: 'namespace-pass-through',
             },
           );
         }

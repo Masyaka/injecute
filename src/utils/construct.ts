@@ -2,7 +2,7 @@
  * Wraps constructor to function to allow instantiation without `new` keyword.
  * @param C class constructor
  */
-export const asNew =
+export const construct =
   <
     Constructor extends { new (...args: any[]): any },
     Instance extends Constructor extends {

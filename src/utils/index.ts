@@ -1,5 +1,6 @@
 import { Argument, ArgumentsKey, optionalDependencySkipKey } from '../types';
-import { asNew } from './construct';
+import { construct } from './construct';
+import { defer } from './defer';
 import { preload } from './preload';
 import { createProxyAccessor } from './proxy';
 
@@ -30,6 +31,7 @@ export const argumentsNamesToArguments = (
 
 export const utils = {
   preload,
-  asNew,
+  construct,
+  defer,
   createProxyAccessor,
 };

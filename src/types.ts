@@ -186,7 +186,7 @@ export type FactoryType =
   | 'transient'
   | 'instance'
   | 'alias'
-  | 'namespace-passthrough';
+  | 'namespace-pass-through';
 
 export type Events<C extends IDIContainer<any>> = {
   add: { name: ArgumentsKey; replace: boolean; container: C };
@@ -380,13 +380,17 @@ export interface IDIContainer<
    *   (namespace, parent) => namespace
    *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
    *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
-   *     .addSingleton('namespaceService', asNew(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
+   *     .addSingleton('namespaceService', construct(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
    * )
    * ```
    * @param key
    */
   getter<K extends TContainerKey>(key: K): () => TServices[K];
 
+  /**
+   * Create multiple getters
+   * @param keys
+   */
   getters<const Keys extends TContainerKey[]>(
     keys: [...Keys],
   ): Getters<TServices, Keys>;

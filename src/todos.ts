@@ -9,6 +9,10 @@
  *
  * - todo: Add description option when services added. (ᅌᴗᅌ* )=Э  Forgot why we need this
  *
+ * - todo: Manage Promise and async dependencies:
+ *     If some of dependencies is registered as promise, result of current registering service will be async,
+ *     but factory can be sync or constructor
+ *
  * - todo: Add auto resolvers with typescript parser.
  *
  * - todo: Add reset method for specific singleton and his dependencies.
@@ -23,23 +27,25 @@
  *
  * - todo: Add lifetime option, which will remove singleton instance after time is up.
  *
+ * - todo: Update readme
+ *
  * - TODO: Support child container first resolving strategy.
+ *
  * It can be done by collecting vertical projection of existing instances and factories.
  * Steps:
- * 1) Collect all needed dependencies. Instances (i) and factories (f) independent.
- * 2) Resolve each dependency independently starting from current container and moving to parent if not resolved in current.
- * 3) Run factories (f) to get missing instances
- * 4) Instantiate requested service using ready to use instances (i).
+ *   - 1) Collect all needed dependencies. Instances (i) and factories (f) independent.
+ *   - 2) Resolve each dependency independently starting from current container and moving to parent if not resolved in current.
+ *   - 3) Run factories (f) to get missing instances
+ *   - 4) Instantiate requested service using ready to use instances (i).
  *
- * ---------------------------------------------
- * | containers | dep1  | dep2  | dep3  | dep4 |
- * -------------|-------|-------|-------|------|
- * | root       |       |   f   |       |      |
- * -------------|-------|-------|-------|------|
- * | child1     |   i   |   .   |   f   |      |
- * -------------|-------|-------|-------|------|
- * | child2     |   .   |   .   |   .   |   i  |
- * -------------|-------|-------|-------|------|
+ * | containers | dep1  | dep2  | dep3  | dep4  |
+ * -------------|:-----:|:-----:|:-----:|:-----:|
+ * | root       |       |   f   |       |       |
+ * -------------|:-----:|:-----:|:-----:|:-----:|
+ * | child1     |   i   |   .   |   f   |       |
+ * -------------|:-----:|:-----:|:-----:|:-----:|
+ * | child2     |   .   |   .   |   .   |   i   |
+ * -------------|:-----:|:-----:|:-----:|:-----:|
  *
  *
  * - TODO: add external dynamic services config.
@@ -54,3 +60,4 @@
  * }
  * ```
  */
+type Todos = string;
