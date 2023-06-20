@@ -369,8 +369,9 @@ export class DIContainer<
   }
 
   /**
-   * Create getter for specified key
-   * Useful for providing dependencies to namespace
+   * Create getter for specified key.
+   *
+   * Useful for providing dependencies to namespace.
    * @example
    * ```typescript
    * container.namespace(

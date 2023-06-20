@@ -3,23 +3,23 @@
  *
  * - todo: Add lazy wrapper for function. Wrapped function should not execute any code or retrieve services from container before function call.
  *
- * - todo: Add memoize option to transient services which will return new instance if dependencies is changed
+ * - todo: Add memoize option to transient services which will return new instance if dependencies is changed. Memoization should not lead to checks of every dependency on get, but if dependency changed - use some mark or callback for instances invalidation
  *
  * - todo: Add dedicated utils for list services and see their dependencies
  *
  * - todo: Add description option when services added. (ᅌᴗᅌ* )=Э  Forgot why we need this
  *
- * - todo: Manage Promise and async dependencies:
+ * - todo: ~~Manage Promise and async dependencies:
  *     If some of dependencies is registered as promise, result of current registering service will be async,
- *     but factory can be sync or constructor
+ *     but factory can be sync or constructor~~
  *
  * - todo: Add auto resolvers with typescript parser.
  *
- * - todo: Add reset method for specific singleton and his dependencies.
+ * - todo: Add reset method for specific singleton and his dependants.
  *
- * - todo: Update typescript to 5.x and add decorators support. Decorators should be retrieved from the container.
+ * - todo: Add typescript to 5.x decorators support. Decorators should be retrieved from the container.
  *
- * - todo: Add arguments names param truly optional or required.
+ * - todo: Add arguments names param truly optional or required. Can be done with types.
  *
  * - todo: Change preload util to await async services and change result type of container
  *

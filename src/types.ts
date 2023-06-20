@@ -181,6 +181,9 @@ export type Merge<
     : never;
 };
 
+/**
+ * How factory was added
+ */
 export type FactoryType =
   | 'singleton'
   | 'transient'
