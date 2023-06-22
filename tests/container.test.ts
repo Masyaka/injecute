@@ -16,8 +16,8 @@ describe('injecute container', () => {
     describe('events', () => {
       it('emit add event', () => {
         let added: ArgumentsKey = '';
-        const handler: any = ({ name }: { name: ArgumentsKey }) => {
-          added = name;
+        const handler: any = ({ key }: { key: ArgumentsKey }) => {
+          added = key;
         };
         const container = new DIContainer().addEventListener('add', handler);
         container.addInstance('instance', 'instance value');
@@ -45,13 +45,13 @@ describe('injecute container', () => {
         let requested: ArgumentsKey = '';
         let gotValue: any;
         const handler: any = ({
-          name,
+          key,
           value,
         }: {
-          name: ArgumentsKey;
+          key: ArgumentsKey;
           value: any;
         }) => {
-          requested = name;
+          requested = key;
           gotValue = value;
         };
         const container = new DIContainer()
@@ -92,15 +92,44 @@ describe('injecute container', () => {
     });
 
     describe('namespaces', () => {
+      it('Allows to add another container as the namespace', () => {
+        const createNamespaceContainer = (
+          getDependency: () => {
+            name: string;
+          },
+        ) =>
+          new DIContainer().addSingleton(
+            'namespaceService',
+            () => {
+              const dep = getDependency();
+              return {
+                name: 'namespace uses ' + dep.name,
+              };
+            },
+            [],
+          );
+
+        const parentContainer = new DIContainer()
+          .addInstance('parentService', {
+            name: 'service from parent container',
+          })
+          .namespace('Namespace', (p) =>
+            createNamespaceContainer(p.parent.getter('parentService')),
+          );
+
+        expect(parentContainer.get('Namespace.namespaceService'))
+          .to.have.property('name')
+          .eq('namespace uses service from parent container');
+      });
       it('creates namespace container with added services', () => {
         const feat = 'feature implementation' as const;
         const container = new DIContainer()
-          .namespace('Generic', (generic) =>
+          .namespace('Generic', ({ namespace: generic }) =>
             generic
               .addTransient('cfg', () => ({ value: 1 }), [])
               .addInstance('value', '23'),
           )
-          .namespace('Domain.Context', (namespace, parent) => {
+          .namespace('Domain.Context', ({ parent, namespace }) => {
             const getValue = parent.getter('Generic.value');
             return namespace
               .addTransient('cfg', parent.getter('Generic.cfg'), [])
@@ -111,14 +140,17 @@ describe('injecute container', () => {
               );
           });
 
-        const addAliasAndExtendFeature = (
-          namespaceContainer: IDIContainer<
+        const addAliasAndExtendFeature = ({
+          parent,
+          namespace,
+        }: {
+          parent: typeof container;
+          namespace: IDIContainer<
             NamespaceServices<typeof container, 'Domain.Context'>
-          >,
-          parent: typeof container,
-        ) => {
+          >;
+        }) => {
           const [getCfg] = parent.getters(['Generic.cfg']);
-          return namespaceContainer
+          return namespace
             .addAlias('feature alias', 'feature')
             .addTransient(
               'extendedFeature',
@@ -236,6 +268,7 @@ describe('injecute container', () => {
           ['y'],
         );
       const c = new DIContainer()
+        // @ts-expect-error
         .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as [any])
         .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
 

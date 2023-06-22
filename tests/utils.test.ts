@@ -144,7 +144,7 @@ describe('utils', () => {
     });
   });
 
-  describe('cobstruct', () => {
+  describe('construct', () => {
     class ClassWithConstructor {
       constructor(
         public readonly field1: number,

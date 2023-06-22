@@ -192,9 +192,9 @@ export type FactoryType =
   | 'namespace-pass-through';
 
 export type Events<C extends IDIContainer<any>> = {
-  add: { name: ArgumentsKey; replace: boolean; container: C };
+  add: { key: ArgumentsKey; replace: boolean; container: C };
   replace: {
-    name: ArgumentsKey;
+    key: ArgumentsKey;
     container: C;
     replaced: {
       callable: Callable<any, any>;
@@ -202,7 +202,7 @@ export type Events<C extends IDIContainer<any>> = {
     };
   };
   reset: { resetParent: boolean; container: C };
-  get: { name: ArgumentsKey; value: any; container: C };
+  get: { key: ArgumentsKey; value: any; container: C };
 };
 
 export interface IDIContainer<
@@ -238,7 +238,7 @@ export interface IDIContainer<
    * @param options {{ replace: boolean }}
    */
   addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, OptionalDependencySkipKey>,
     instance: TResult,
     options?: {
       replace: boolean;
@@ -261,7 +261,7 @@ export interface IDIContainer<
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
-    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
     options?:
       | {
@@ -291,7 +291,7 @@ export interface IDIContainer<
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
-    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
     options?:
       | {
@@ -321,7 +321,7 @@ export interface IDIContainer<
     K extends ArgumentsKey,
     A extends TContainerKey,
   >(
-    name: Exclude<K, OptionalDependencySkipKey & A>,
+    name: Exclude<K, OptionalDependencySkipKey | A>,
     aliasTo: A,
   ): IDIContainer<Merge<TServices, Record<K, T>>>;
 
@@ -423,17 +423,17 @@ export interface IDIContainer<
   namespace<
     TNamespace extends Exclude<
       string,
-      OptionalDependencySkipKey &
-        (TServices[TContainerKey] extends IDIContainer<any>
+      | OptionalDependencySkipKey
+      | (TServices[TContainerKey] extends IDIContainer<any>
           ? never
           : TContainerKey)
     >,
-    TExtension extends (
-      namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
+    TExtension extends (p: {
+      parent: IDIContainer<TServices>;
+      namespace: TServices[TNamespace] extends IDIContainer<infer NS>
         ? IDIContainer<NS>
-        : IDIContainer<{}>,
-      parentNamespaceContainer: IDIContainer<TServices>,
-    ) => IDIContainer<any>,
+        : IDIContainer<{}>;
+    }) => IDIContainer<any>,
     TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,

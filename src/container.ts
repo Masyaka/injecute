@@ -4,7 +4,6 @@ import {
   ArgumentsResolver,
   Callable,
   CallableResult,
-  Constructor,
   ContainerServices,
   Empty,
   Events,
@@ -24,7 +23,6 @@ import {
   ValueOf,
 } from './types';
 import { argumentsNamesToArguments, firstResult } from './utils';
-import { construct } from './utils/construct';
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -43,6 +41,9 @@ export class CircularDependencyError extends Error {
     super(`Circular dependency detected ${circularStackDescription}.`);
   }
 }
+
+const stringOrNumber = (i: any): i is string | number =>
+  ['string', 'number'].includes(typeof i);
 
 const callFactory = <D extends any[]>(
   callable: Callable<D, any>,
@@ -163,7 +164,7 @@ export class DIContainer<
    * @param options {{ replace: boolean }}
    */
   addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: Exclude<K, OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, OptionalDependencySkipKey>,
     instance: TResult,
     options?: {
       replace: boolean;
@@ -191,7 +192,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
-    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
     options?:
       | {
@@ -222,7 +223,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
-    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
     options?:
       | {
@@ -266,13 +267,17 @@ export class DIContainer<
     K extends ArgumentsKey,
     A extends TContainerKey,
   >(
-    name: Exclude<K, OptionalDependencySkipKey & A>,
+    name: Exclude<K, OptionalDependencySkipKey | A>,
     aliasTo: A,
   ): IDIContainer<Merge<TServices, { [k in K]: T }>> {
-    return this.addFactory(name, () => this.get(aliasTo), {
-      dependencies: [],
-      [factoryTypeKey]: 'alias',
-    });
+    return this.addFactory(
+      name as Exclude<K, OptionalDependencySkipKey>,
+      () => this.get(aliasTo),
+      {
+        dependencies: [],
+        [factoryTypeKey]: 'alias',
+      },
+    );
   }
 
   use(
@@ -438,17 +443,20 @@ export class DIContainer<
   namespace<
     TNamespace extends Exclude<
       string,
-      OptionalDependencySkipKey &
-        (TServices[TContainerKey] extends IDIContainer<any>
+      | OptionalDependencySkipKey
+      | (TServices[TContainerKey] extends IDIContainer<any>
           ? never
           : TContainerKey)
     >,
-    TExtension extends (
-      namespaceContainer: TServices[TNamespace] extends IDIContainer<infer NS>
-        ? IDIContainer<NS>
-        : IDIContainer<{}>,
-      parentNamespaceContainer: IDIContainer<TServices>,
-    ) => IDIContainer<any>,
+    TTargetContainer extends TServices[TNamespace] extends IDIContainer<
+      infer NS
+    >
+      ? IDIContainer<NS>
+      : IDIContainer<{}>,
+    TExtension extends (p: {
+      parent: IDIContainer<TServices>;
+      namespace: TTargetContainer;
+    }) => IDIContainer<any>,
     TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
@@ -462,31 +470,29 @@ export class DIContainer<
       }
   > {
     const instance = this.get(namespace as any, { allowUnresolved: true });
-    const isContainer =
-      typeof instance === 'object' && (instance as any) instanceof DIContainer;
-    if (instance && !isContainer) {
+    const namespaceContainerExists =
+      typeof instance === 'object' && 'injecute' in instance;
+    if (instance && !namespaceContainerExists) {
       throw new Error(
         `Namespace key "${namespace}" already used with non container entry.`,
       );
     }
-    const namespaceContainer =
-      instance ||
-      new DIContainer<any>().addEventListener('add', ({ name, container }) => {
-        if (['string', 'number'].includes(typeof name)) {
-          this.addFactory(
-            `${namespace}.${name as string}`,
-            () => container.get(name),
-            {
-              dependencies: [],
-              [factoryTypeKey]: 'namespace-pass-through',
-            },
-          );
-        }
-      });
-    if (!instance) {
-      this.addInstance(namespace as any, namespaceContainer);
+    const extensionTargetContainer = instance || new DIContainer();
+    const namespaceContainer = extension({
+      parent: this as any,
+      namespace: extensionTargetContainer as TTargetContainer,
+    });
+    if (namespaceContainerExists && instance !== namespaceContainer) {
+      throw new Error(
+        'Namespace was already defined you can not replace it, only extend.',
+      );
     }
-    extension(namespaceContainer as any, this as any);
+    if (!namespaceContainerExists) {
+      this.adoptNamespaceContainer(
+        namespace as Exclude<string, OptionalDependencySkipKey | TContainerKey>,
+        namespaceContainer,
+      );
+    }
     return this as IDIContainer<
       TServices & {
         [k in TNamespace]: IDIContainer<TNamespaceServices>;
@@ -613,9 +619,6 @@ export class DIContainer<
     }
   };
 
-  // TODO: change signature to accept ArgumentsResolverCreator <T>(this: DIContainer<TServices>):
-  //  DIContainer<TServices & T> =>
-
   protected resolveFromParent: Resolver<TServices> = (name) =>
     this.#parentContainer?.get(name, { allowUnresolved: true });
 
@@ -654,7 +657,7 @@ export class DIContainer<
     factory.beforeReplaced?.(name);
     for (const handler of this.eventHandlers.replace) {
       handler({
-        name,
+        key: name,
         container: this as IDIContainer<TServices>,
         replaced: {
           callable: factory.callable,
@@ -667,7 +670,7 @@ export class DIContainer<
   protected onAdd(name: TContainerKey, replace: boolean) {
     for (const handler of this.eventHandlers.add) {
       handler({
-        name,
+        key: name,
         replace,
         container: this as IDIContainer<TServices>,
       });
@@ -686,11 +689,43 @@ export class DIContainer<
   protected onGet(name: ArgumentsKey, value: any) {
     for (const handler of this.eventHandlers.get) {
       handler({
-        name,
+        key: name,
         value,
         container: this as IDIContainer<TServices>,
       });
     }
+  }
+
+  private linkNamespaceService<N extends string, C extends IDIContainer<any>>(
+    container: C,
+    key: string | number,
+    namespace: N,
+  ) {
+    const namespaceKey = `${namespace}.${key}` as Exclude<
+      string,
+      OptionalDependencySkipKey | TContainerKey
+    >;
+    this.addFactory(namespaceKey, () => container.get(key), {
+      dependencies: [],
+      [factoryTypeKey]: 'namespace-pass-through',
+    });
+  }
+
+  private adoptNamespaceContainer<
+    N extends Exclude<string, OptionalDependencySkipKey | TContainerKey>,
+    C extends IDIContainer<any>,
+  >(namespace: N, container: C) {
+    this.addInstance(namespace as any, container);
+
+    for (const key of container.keys.filter(stringOrNumber)) {
+      this.linkNamespaceService(container, key, namespace);
+    }
+
+    container.addEventListener('add', ({ key, container }) => {
+      if (stringOrNumber(key)) {
+        this.linkNamespaceService(container, key, namespace);
+      }
+    });
   }
 
   private eventNotSupported(e: string) {
@@ -710,7 +745,7 @@ export class DIContainer<
     )[],
     TResult extends CallableResult<TCallable>,
   >(
-    name: Exclude<K, Keys[number] & OptionalDependencySkipKey & TContainerKey>,
+    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
     options?:
       | {
