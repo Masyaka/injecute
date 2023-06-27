@@ -19,7 +19,7 @@
  *
  * - todo: Add typescript to 5.x decorators support. Decorators should be retrieved from the container.
  *
- * - todo: Add arguments names param truly optional or required. Can be done with types.
+ * - todo: ~~Add arguments names param truly optional or required. Can be done with types.~~
  *
  * - todo: Change preload util to await async services and change result type of container
  *
@@ -30,6 +30,10 @@
  * - todo: Update readme
  *
  * - TODO: Support child container first resolving strategy.
+ *
+ * - todo: Proxy util can be changed to util which creates object and container.keys -> Object.defineProperty; onAdd -> defineProperty. it will allow to list specific keys to be accessible or with aliases.
+ *
+ * - todo: Add possibility to override some of dependencies for specific service
  *
  * It can be done by collecting vertical projection of existing instances and factories.
  * Steps:

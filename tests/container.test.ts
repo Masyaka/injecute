@@ -276,6 +276,20 @@ describe('injecute container', () => {
     });
   });
   describe('explicit keys providing container', () => {
+    it('will allow to omit third argument for factory with 0 arguments', () => {
+      const container = new DIContainer().addSingleton('x', () => ({
+        name: 'I am the X.',
+      }));
+      expect(container.get('x')).to.have.property('name').eq('I am the X.');
+    });
+    it('will lead to compilation error if third argument not provided for when actually needed', () => {
+      const container = new DIContainer()
+        // @ts-expect-error expected function with 0 arguments.
+        .addSingleton('x', (name: string) => ({
+          name,
+        }));
+      expect(container.get('x')).to.have.property('name').undefined;
+    });
     it('will allow to not provide optional dependency key', () => {
       class SrvWithOptionalConstructorArgument {
         constructor(public readonly val: string | undefined = undefined) {}

@@ -194,7 +194,7 @@ export class DIContainer<
   >(
     name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
-    options?:
+    options:
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
@@ -203,7 +203,7 @@ export class DIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys],
+      | [...Keys] = [] as any,
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     return this.addFactory(name, factory, options);
   }
@@ -225,7 +225,7 @@ export class DIContainer<
   >(
     name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
     factory: TCallable,
-    options?:
+    options:
       | {
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           replace?: boolean;
@@ -234,7 +234,7 @@ export class DIContainer<
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (k: K) => void;
         }
-      | [...Keys],
+      | [...Keys] = [] as any,
   ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
