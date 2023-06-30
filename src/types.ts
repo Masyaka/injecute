@@ -421,8 +421,8 @@ export interface IDIContainer<
     TNamespace extends string,
     TExtension extends (p: {
       parent: IDIContainer<TServices>;
-      namespace: TServices[TNamespace] extends IDIContainer<infer NS>
-        ? IDIContainer<NS>
+      namespace: TServices[TNamespace] extends IDIContainer<any>
+        ? TServices[TNamespace]
         : IDIContainer<{}>;
     }) => IDIContainer<any>,
     TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
