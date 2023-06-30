@@ -102,10 +102,7 @@ export type KeysToTypes<
 
 export type GetOptions = { allowUnresolved: boolean };
 
-export type Getter<
-  TServices extends Record<string, any>,
-  K extends keyof TServices,
-> = () => TServices[K];
+export type Getter<T> = () => T;
 
 export type Getters<
   TServices extends Record<string, any>,
@@ -114,7 +111,7 @@ export type Getters<
   infer Key extends keyof TServices,
   ...infer Rest extends readonly any[],
 ]
-  ? [Getter<TServices, Key>, ...Getters<TServices, Rest>]
+  ? [Getter<TServices[Key]>, ...Getters<TServices, Rest>]
   : [];
 
 export const optionalDependencySkipKey = 'undefined' as const;
@@ -153,7 +150,7 @@ export type InjecuteOptions<
   Keys extends readonly (
     | OptionalDependencySkipKey
     | TContainerKey
-    | Getter<any, any>
+    | Getter<any>
   )[],
 > = {
   argumentsKey?: TContainerKey | undefined;
@@ -494,7 +491,7 @@ export interface IDIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices, keyof TServices>
+      | Getter<TServices[keyof TServices]>
     )[],
   >(
     callable: TCallable,

@@ -364,7 +364,7 @@ export class DIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices, keyof TServices>
+      | Getter<TServices[keyof TServices]>
     )[],
   >(
     keys: [...Keys],
@@ -389,7 +389,7 @@ export class DIContainer<
    * ```
    * @param key
    */
-  getter<K extends TContainerKey>(key: K): Getter<TServices, K> {
+  getter<K extends TContainerKey>(key: K): Getter<TServices[K]> {
     return this.get.bind(this, key) as () => TServices[K];
   }
 
@@ -560,7 +560,7 @@ export class DIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices, keyof TServices>
+      | Getter<TServices[keyof TServices]>
     )[],
   >(
     callable: TCallable,
