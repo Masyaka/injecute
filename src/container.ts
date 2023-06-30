@@ -441,21 +441,12 @@ export class DIContainer<
    * @param extension
    */
   namespace<
-    TNamespace extends Exclude<
-      string,
-      | OptionalDependencySkipKey
-      | (TServices[TContainerKey] extends IDIContainer<any>
-          ? never
-          : TContainerKey)
-    >,
-    TTargetContainer extends TServices[TNamespace] extends IDIContainer<
-      infer NS
-    >
-      ? IDIContainer<NS>
-      : IDIContainer<{}>,
+    TNamespace extends string,
     TExtension extends (p: {
       parent: IDIContainer<TServices>;
-      namespace: TTargetContainer;
+      namespace: TServices[TNamespace] extends IDIContainer<infer NS>
+        ? IDIContainer<NS>
+        : IDIContainer<{}>;
     }) => IDIContainer<any>,
     TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
@@ -480,7 +471,7 @@ export class DIContainer<
     const extensionTargetContainer = instance || new DIContainer();
     const namespaceContainer = extension({
       parent: this as any,
-      namespace: extensionTargetContainer as TTargetContainer,
+      namespace: extensionTargetContainer as any,
     });
     if (namespaceContainerExists && instance !== namespaceContainer) {
       throw new Error(
@@ -488,18 +479,15 @@ export class DIContainer<
       );
     }
     if (!namespaceContainerExists) {
-      this.adoptNamespaceContainer(
-        namespace as Exclude<string, OptionalDependencySkipKey | TContainerKey>,
-        namespaceContainer,
-      );
+      this.adoptNamespaceContainer(namespace, namespaceContainer);
     }
     return this as IDIContainer<
-      TServices & {
-        [k in TNamespace]: IDIContainer<TNamespaceServices>;
-      } & {
-        [K in `${TNamespace}.${(string | number) &
-          keyof TNamespaceServices}`]: TNamespaceServices[K];
-      }
+      TServices &
+        Record<TNamespace, IDIContainer<TNamespaceServices>> & {
+          [K in keyof TNamespaceServices as K extends string
+            ? `${TNamespace}.${K}`
+            : never]: TNamespaceServices[K];
+        }
     >;
   }
 
@@ -712,7 +700,7 @@ export class DIContainer<
   }
 
   private adoptNamespaceContainer<
-    N extends Exclude<string, OptionalDependencySkipKey | TContainerKey>,
+    N extends string,
     C extends IDIContainer<any>,
   >(namespace: N, container: C) {
     this.addInstance(namespace as any, container);

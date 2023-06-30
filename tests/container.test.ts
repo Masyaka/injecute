@@ -97,7 +97,9 @@ describe('injecute container', () => {
           getDependency: () => {
             name: string;
           },
-        ) =>
+        ): IDIContainer<{
+          namespaceService: { name: string };
+        }> =>
           new DIContainer().addSingleton(
             'namespaceService',
             () => {
@@ -115,8 +117,12 @@ describe('injecute container', () => {
           })
           .namespace('Namespace', (p) =>
             createNamespaceContainer(p.parent.getter('parentService')),
+          )
+          .namespace('Namespace', ({ namespace }) =>
+            namespace.addInstance('x', 'x'),
           );
 
+        expect(parentContainer.get('Namespace.x')).to.be.eq('x');
         expect(parentContainer.get('Namespace.namespaceService'))
           .to.have.property('name')
           .eq('namespace uses service from parent container');

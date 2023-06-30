@@ -418,13 +418,7 @@ export interface IDIContainer<
    * @param extension
    */
   namespace<
-    TNamespace extends Exclude<
-      string,
-      | OptionalDependencySkipKey
-      | (TServices[TContainerKey] extends IDIContainer<any>
-          ? never
-          : TContainerKey)
-    >,
+    TNamespace extends string,
     TExtension extends (p: {
       parent: IDIContainer<TServices>;
       namespace: TServices[TNamespace] extends IDIContainer<infer NS>
