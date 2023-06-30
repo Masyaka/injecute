@@ -116,7 +116,7 @@ describe('injecute container', () => {
             name: 'service from parent container',
           })
           .namespace('Namespace', (p) =>
-            createNamespaceContainer(p.parent.getter('parentService')),
+            createNamespaceContainer(p.parent.createResolver('parentService')),
           )
           .namespace('Namespace', ({ namespace }) =>
             namespace.addInstance('x', 'x'),
@@ -136,9 +136,9 @@ describe('injecute container', () => {
               .addInstance('value', '23'),
           )
           .namespace('Domain.Context', ({ parent, namespace }) => {
-            const getValue = parent.getter('Generic.value');
+            const getValue = parent.createResolver('Generic.value');
             return namespace
-              .addTransient('cfg', parent.getter('Generic.cfg'), [])
+              .addTransient('cfg', parent.createResolver('Generic.cfg'), [])
               .addSingleton(
                 'feature',
                 (cfg, value) => feat + cfg.value + value.substring(0, 1),
@@ -155,7 +155,7 @@ describe('injecute container', () => {
             NamespaceServices<typeof container, 'Domain.Context'>
           >;
         }) => {
-          const [getCfg] = parent.getters(['Generic.cfg']);
+          const getCfg = parent.createResolver('Generic.cfg');
           return namespace
             .addAlias('feature alias', 'feature')
             .addTransient(

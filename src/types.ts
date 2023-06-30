@@ -20,9 +20,6 @@ export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
 export type Argument =
   | { name: ArgumentsKey; required: boolean }
   | { getter: () => any };
-export type Resolver<TServices> = <Key extends keyof TServices>(
-  name: Key,
-) => TServices[Key] | undefined;
 export type Factory<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
   : Callable<ValueOf<TServices>[], any>;
@@ -102,17 +99,11 @@ export type KeysToTypes<
 
 export type GetOptions = { allowUnresolved: boolean };
 
-export type Getter<T> = () => T;
+export type Resolve<T> = () => T;
 
-export type Getters<
-  TServices extends Record<string, any>,
-  Keys extends readonly (keyof TServices)[],
-> = Keys extends [
-  infer Key extends keyof TServices,
-  ...infer Rest extends readonly any[],
-]
-  ? [Getter<TServices[Key]>, ...Getters<TServices, Rest>]
-  : [];
+export type Resolver<TServices> = <Key extends keyof TServices>(
+  name: Key,
+) => TServices[Key] | undefined;
 
 export const optionalDependencySkipKey = 'undefined' as const;
 export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
@@ -150,7 +141,7 @@ export type InjecuteOptions<
   Keys extends readonly (
     | OptionalDependencySkipKey
     | TContainerKey
-    | Getter<any>
+    | Resolve<any>
   )[],
 > = {
   argumentsKey?: TContainerKey | undefined;
@@ -385,15 +376,7 @@ export interface IDIContainer<
    * ```
    * @param key
    */
-  getter<K extends TContainerKey>(key: K): () => TServices[K];
-
-  /**
-   * Create multiple getters
-   * @param keys
-   */
-  getters<const Keys extends TContainerKey[]>(
-    keys: [...Keys],
-  ): Getters<TServices, Keys>;
+  createResolver<K extends TContainerKey>(key: K): () => TServices[K];
 
   /**
    * Creates child container.
@@ -485,7 +468,7 @@ export interface IDIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices[keyof TServices]>
+      | Resolve<TServices[keyof TServices]>
     )[],
   >(
     callable: TCallable,

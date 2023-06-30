@@ -1,6 +1,10 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { DIContainer } from '../src';
+import {
+  createNamedResolvers,
+  createResolversTuple,
+  DIContainer,
+} from '../src';
 import { defer } from '../src/utils/defer';
 import { construct } from '../src/utils/construct';
 import { preload } from '../src/utils/preload';
@@ -204,6 +208,41 @@ describe('utils', () => {
       expect(instance).to.be.instanceOf(ClassWithConstructor);
       expect(instance.field1).to.be.a('number');
       expect(instance.field2).to.be.a('string');
+    });
+  });
+
+  describe('resolvers', () => {
+    it('creates resolvers tuple', () => {
+      const container = new DIContainer()
+        .addInstance('x', 'x')
+        .addInstance('y', 'y')
+        .addInstance('z', 'z');
+
+      const [getX, getY, getZ] = createResolversTuple(container, [
+        'x',
+        'y',
+        'z',
+      ]);
+      expect(getX()).eq('x');
+      expect(getY()).eq('y');
+      expect(getZ()).eq('z');
+    });
+
+    it('creates named resolvers', () => {
+      const container = new DIContainer()
+        .addInstance('x', 'x')
+        .addInstance('y', 'y')
+        .addInstance('z', 'z');
+
+      const zSymbol = Symbol('z');
+      const resolvers = createNamedResolvers(container, [
+        'x',
+        ['y', 'aliasForY'],
+        ['z', zSymbol],
+      ]);
+      expect(resolvers.x()).eq('x');
+      expect(resolvers.aliasForY()).eq('y');
+      expect(resolvers[zSymbol]()).eq('z');
     });
   });
 });

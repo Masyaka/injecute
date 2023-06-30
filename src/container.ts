@@ -10,8 +10,7 @@ import {
   FactoryType,
   Func,
   GetOptions,
-  Getter,
-  Getters,
+  Resolve,
   IDIContainer,
   IDIContainerExtension,
   KeysToTypes,
@@ -22,7 +21,31 @@ import {
   Resolver,
   ValueOf,
 } from './types';
-import { argumentsNamesToArguments, firstResult } from './utils';
+
+const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
+export const firstResult =
+  <TArgs extends any[], TResult extends any>(
+    fns: ((...args: TArgs) => TResult)[],
+    predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
+  ) =>
+  (...args: TArgs): TResult | undefined => {
+    for (const f of fns) {
+      const result = f(...args);
+      if (predicate(result)) return result;
+    }
+  };
+
+export const argumentsNamesToArguments = (
+  argsNames: (ArgumentsKey | (() => any))[],
+): Argument[] =>
+  argsNames.map((a) =>
+    typeof a === 'function'
+      ? { getter: a }
+      : {
+          name: a,
+          required: a !== optionalDependencySkipKey,
+        },
+  );
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -364,7 +387,7 @@ export class DIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices[keyof TServices]>
+      | Resolve<TServices[keyof TServices]>
     )[],
   >(
     keys: [...Keys],
@@ -389,18 +412,8 @@ export class DIContainer<
    * ```
    * @param key
    */
-  getter<K extends TContainerKey>(key: K): Getter<TServices[K]> {
+  createResolver<K extends TContainerKey>(key: K): Resolve<TServices[K]> {
     return this.get.bind(this, key) as () => TServices[K];
-  }
-
-  /**
-   * Create multiple getters
-   * @param keys
-   */
-  getters<const Keys extends TContainerKey[]>(
-    keys: [...Keys],
-  ): Getters<TServices, Keys> {
-    return keys.map((k) => this.getter(k)) as Getters<TServices, Keys>;
   }
 
   /**
@@ -548,7 +561,7 @@ export class DIContainer<
     Keys extends (
       | OptionalDependencySkipKey
       | TContainerKey
-      | Getter<TServices[keyof TServices]>
+      | Resolve<TServices[keyof TServices]>
     )[],
   >(
     callable: TCallable,
