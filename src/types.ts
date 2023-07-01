@@ -197,8 +197,6 @@ export interface IDIContainer<
   TServices extends Record<ArgumentsKey, any>,
   TContainerKey extends keyof TServices = keyof TServices,
 > {
-  readonly resolveArguments: ArgumentsResolver;
-
   addEventListener<E extends keyof Events<this>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void,

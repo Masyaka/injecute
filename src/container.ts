@@ -800,7 +800,7 @@ export class DIContainer<
   ) {
     const args: Argument[] | undefined = argumentsNames
       ? argumentsNamesToArguments(argumentsNames)
-      : (this as IDIContainer<TServices>).resolveArguments(
+      : this.resolveArguments<TServices, TContainerKey, typeof this>(
           fn as Callable<any, any>,
           argumentsKey,
         );

@@ -9,7 +9,7 @@ import {
   NamespaceServices,
   optionalDependencySkipKey,
 } from '../src';
-import { construct } from '../src/utils/construct';
+import { construct } from '../src';
 
 describe('injecute container', () => {
   describe('DI container general', () => {

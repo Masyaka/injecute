@@ -1,14 +1,14 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import {
+  defer,
+  construct,
+  preload,
+  createProxyAccessor,
   createNamedResolvers,
   createResolversTuple,
   DIContainer,
 } from '../src';
-import { defer } from '../src/utils/defer';
-import { construct } from '../src/utils/construct';
-import { preload } from '../src/utils/preload';
-import { createProxyAccessor } from '../src/utils/proxy';
 
 describe('utils', () => {
   describe('proxy', () => {
