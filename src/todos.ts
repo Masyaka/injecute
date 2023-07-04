@@ -1,39 +1,43 @@
 /**
  * - TODO: Fix ObjectKeyOfType<TServices, T> to constraint allowed aliases for type in addAlias method. (ᅌᴗᅌ* )=Э  Forgot why we need this
  *
- * - todo: Add lazy wrapper for function. Wrapped function should not execute any code or retrieve services from container before function call.
+ * - TODO: Add lazy wrapper for function. Wrapped function should not execute any code or retrieve services from container before function call.
  *
- * - todo: Add memoize option to transient services which will return new instance if dependencies is changed. Memoization should not lead to checks of every dependency on get, but if dependency changed - use some mark or callback for instances invalidation
+ * - TODO: Add memoize option to transient services which will return new instance if dependencies is changed. Memoization should not lead to checks of every dependency on get, but if dependency changed - use some mark or callback for instances invalidation
  *
- * - todo: Add dedicated utils for list services and see their dependencies
+ * - TODO: Add dedicated utils for list services and see their dependencies
  *
- * - todo: Add description option when services added. (ᅌᴗᅌ* )=Э  Forgot why we need this
+ * - TODO: Add description option when services added. (ᅌᴗᅌ* )=Э  Forgot why we need this
  *
- * - todo: ~~Manage Promise and async dependencies:
+ * - TODO: ~~Manage Promise and async dependencies:
  *     If some of dependencies is registered as promise, result of current registering service will be async,
  *     but factory can be sync or constructor~~
  *
- * - todo: Add auto resolvers with typescript parser.
+ * - TODO: Add auto resolvers with typescript parser.
  *
- * - todo: Add reset method for specific singleton and his dependants.
+ * - TODO: Add reset method for specific singleton and his dependants.
  *
- * - todo: Add typescript to 5.x decorators support. Decorators should be retrieved from the container.
+ * - TODO: Add typescript to 5.x decorators support. Decorators should be retrieved from the container.
  *
- * - todo: ~~Add arguments names param truly optional or required. Can be done with types.~~
+ * - TODO: ~~Add arguments names param truly optional or required. Can be done with types.~~
  *
- * - todo: Change preload util to await async services and change result type of container
+ * - TODO: Change preload util to await async services and change result type of container
  *
- * - todo: Add services utilization on reset, add dispose option which is callback on reset.
+ * - TODO: Add services utilization on reset, add dispose option which is callback on reset.
  *
- * - todo: Add lifetime option, which will remove singleton instance after time is up.
+ * - TODO: Add lifetime option, which will remove singleton instance after time is up.
  *
- * - todo: Update readme
+ * - TODO: Update readme
  *
  * - TODO: Support child container first resolving strategy.
+ * 
+ * - TODO: Get rid of TContainerKey type parameter
  *
- * - todo: Proxy util can be changed to util which creates object and container.keys -> Object.defineProperty; onAdd -> defineProperty. it will allow to list specific keys to be accessible or with aliases.
+ * - TODO: Proxy util can be changed to util which creates object and container.keys -> Object.defineProperty; onAdd -> defineProperty. it will allow to list specific keys to be accessible or with aliases.
+ * 
+ * - TODO: Split container interface to "adding" part and "utitilies" it should help to keep container details out of typechecks.
  *
- * - todo: Add possibility to override some of dependencies for specific service
+ * - TODO: Add possibility to override some of dependencies for specific service
  *
  * It can be done by collecting vertical projection of existing instances and factories.
  * Steps:
