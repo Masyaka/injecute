@@ -112,8 +112,7 @@ export type ArgumentsKey = string | symbol | number;
 
 export type ArgumentsResolver = <
   TServices extends Record<ArgumentsKey, any>,
-  TContainerKey extends keyof TServices,
-  C extends IDIContainer<TServices, TContainerKey>,
+  C extends IDIContainer<TServices>,
 >(
   this: C,
   fn: Callable<any, any>,
@@ -195,7 +194,6 @@ export type Events<C extends IDIContainer<any>> = {
 
 export interface IDIContainer<
   TServices extends Record<ArgumentsKey, any>,
-  TContainerKey extends keyof TServices = keyof TServices,
 > {
   addEventListener<E extends keyof Events<this>>(
     e: E,
@@ -213,9 +211,9 @@ export interface IDIContainer<
    * true if services with such key is registered, false otherwise
    * @param name
    */
-  has(name: TContainerKey | string): boolean;
+  has(name: (keyof TServices) | string): boolean;
 
-  get keys(): TContainerKey[];
+  get keys(): (keyof TServices)[];
 
   /**
    * Adds existing instance to collection
@@ -243,7 +241,7 @@ export interface IDIContainer<
   addTransient<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    Keys extends (OptionalDependencySkipKey | (keyof TServices) | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -273,7 +271,7 @@ export interface IDIContainer<
   addSingleton<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | TContainerKey | (() => any))[],
+    Keys extends (OptionalDependencySkipKey | (keyof TServices) | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -305,7 +303,7 @@ export interface IDIContainer<
   addAlias<
     T extends TServices[A],
     K extends ArgumentsKey,
-    A extends TContainerKey,
+    A extends (keyof TServices),
   >(
     name: Exclude<K, OptionalDependencySkipKey | A>,
     aliasTo: A,
@@ -330,7 +328,7 @@ export interface IDIContainer<
    * @param options {GetOptions}
    */
   get<
-    Key extends TContainerKey,
+    Key extends (keyof TServices),
     O extends GetOptions,
     T extends any = TServices[Key],
   >(
@@ -353,7 +351,7 @@ export interface IDIContainer<
    */
   bind<
     TResult extends any,
-    Keys extends readonly (OptionalDependencySkipKey | TContainerKey)[],
+    Keys extends readonly (OptionalDependencySkipKey | (keyof TServices))[],
   >(
     keys: [...Keys],
     callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
@@ -374,7 +372,7 @@ export interface IDIContainer<
    * ```
    * @param key
    */
-  createResolver<K extends TContainerKey>(key: K): () => TServices[K];
+  createResolver<K extends (keyof TServices)>(key: K): () => TServices[K];
 
   /**
    * Creates child container.
@@ -465,11 +463,11 @@ export interface IDIContainer<
     TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
     Keys extends (
       | OptionalDependencySkipKey
-      | TContainerKey
+      | (keyof TServices)
       | Resolve<TServices[keyof TServices]>
     )[],
   >(
     callable: TCallable,
-    options?: InjecuteOptions<TContainerKey, Keys> | [...Keys],
+    options?: InjecuteOptions<(keyof TServices), Keys> | [...Keys],
   ): CallableResult<TCallable>;
 }
