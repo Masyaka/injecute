@@ -206,7 +206,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    */
   has(name: keyof TServices | string): boolean;
 
-  get keys(): (keyof TServices)[];
+  get keys(): ArgumentsKey[];
 
   /**
    * Adds existing instance to collection
