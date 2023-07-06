@@ -30,8 +30,6 @@
  * - TODO: Update readme
  *
  * - TODO: Support child container first resolving strategy.
- * 
- * - TODO: Get rid of TContainerKey type parameter
  *
  * - TODO: Proxy util can be changed to util which creates object and container.keys -> Object.defineProperty; onAdd -> defineProperty. it will allow to list specific keys to be accessible or with aliases.
  * 
