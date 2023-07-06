@@ -220,7 +220,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    * @param options {{ replace: boolean }}
    */
   addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: Exclude<K, OptionalDependencySkipKey>,
+    name: K,
     instance: TResult,
     options?: {
       replace: boolean;
@@ -243,7 +243,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
-    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
+    name: K,
     factory: TCallable,
     options?:
       | {
@@ -273,7 +273,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
-    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
+    name: K,
     factory: TCallable,
     options?:
       | {
@@ -303,7 +303,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     K extends ArgumentsKey,
     A extends keyof TServices,
   >(
-    name: Exclude<K, OptionalDependencySkipKey | A>,
+    name: K,
     aliasTo: A,
   ): IDIContainer<Merge<TServices, Record<K, T>>>;
 

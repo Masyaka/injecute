@@ -274,7 +274,6 @@ describe('injecute container', () => {
           ['y'],
         );
       const c = new DIContainer()
-        // @ts-expect-error
         .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as [any])
         .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
 

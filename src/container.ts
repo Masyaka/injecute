@@ -12,7 +12,6 @@ import {
   GetOptions,
   Resolve,
   IDIContainer,
-  IDIContainerExtension,
   KeysToTypes,
   MapOf,
   Merge,
@@ -191,7 +190,7 @@ export class DIContainer<
    * @param options {{ replace: boolean }}
    */
   addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: Exclude<K, OptionalDependencySkipKey>,
+    name: K,
     instance: TResult,
     options?: {
       replace: boolean;
@@ -219,7 +218,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
     TResult extends CallableResult<TCallable>
   >(
-    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
+    name: K,
     factory: TCallable,
     options:
       | {
@@ -250,7 +249,7 @@ export class DIContainer<
     Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
     TResult extends CallableResult<TCallable>
   >(
-    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
+    name: K,
     factory: TCallable,
     options:
       | {
@@ -293,10 +292,7 @@ export class DIContainer<
     T extends TServices[A],
     K extends ArgumentsKey,
     A extends keyof TServices
-  >(
-    name: Exclude<K, OptionalDependencySkipKey | A>,
-    aliasTo: A,
-  ): IDIContainer<Merge<TServices, { [k in K]: T }>> {
+  >(name: K, aliasTo: A): IDIContainer<Merge<TServices, { [k in K]: T }>> {
     return this.addFactory(
       name as Exclude<K, OptionalDependencySkipKey>,
       () => this.get(aliasTo),
@@ -746,7 +742,7 @@ export class DIContainer<
     )[],
     TResult extends CallableResult<TCallable>
   >(
-    name: Exclude<K, Keys[number] | OptionalDependencySkipKey>,
+    name: K,
     factory: TCallable,
     options?:
       | {
