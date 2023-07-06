@@ -77,3 +77,21 @@ export const createNamedResolvers = <
     return r;
   }, {});
 };
+
+export type NamedResolvers<T extends Record<ArgumentsKey, any>> = {
+  [K in keyof T]: Resolve<T[K]>;
+};
+
+export const addNamedResolvers =
+  <
+    R extends NamedResolvers<any>,
+    S extends R extends NamedResolvers<infer Values> ? Values : never,
+  >(
+    resolvers: R,
+  ) =>
+  <T extends Record<ArgumentsKey, any>>(c: IDIContainer<T>) => {
+    Object.entries(resolvers).forEach(([k, r]) => {
+      c.addTransient(k as any, r);
+    });
+    return c as IDIContainer<T & S>;
+  };

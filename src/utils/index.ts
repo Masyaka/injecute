@@ -1,11 +1,19 @@
 import { construct } from './construct';
-import { createNamedResolvers, createResolversTuple } from './create-resolvers';
+import {
+  createNamedResolvers,
+  createResolversTuple,
+  addNamedResolvers,
+} from './resolvers';
 import { defer } from './defer';
 import { preload } from './preload';
 import { createProxyAccessor } from './proxy';
 
 export { construct } from './construct';
-export { createNamedResolvers, createResolversTuple } from './create-resolvers';
+export {
+  createNamedResolvers,
+  createResolversTuple,
+  addNamedResolvers,
+} from './resolvers';
 export { defer } from './defer';
 export { preload } from './preload';
 export { createProxyAccessor } from './proxy';
@@ -17,4 +25,5 @@ export const utils = {
   createProxyAccessor,
   createNamedResolvers,
   createResolversTuple,
+  addNamedResolvers,
 };

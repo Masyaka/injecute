@@ -7,6 +7,7 @@ import {
   createProxyAccessor,
   createNamedResolvers,
   createResolversTuple,
+  addNamedResolvers,
   DIContainer,
 } from '../src';
 
@@ -212,6 +213,20 @@ describe('utils', () => {
   });
 
   describe('resolvers', () => {
+    it('adds named resolvers', () => {
+      const provider = new DIContainer()
+        .addInstance('x', 'x')
+        .addInstance('number', 1);
+
+      const namedResolvers = createNamedResolvers(provider, ['number', ['x', 'string']])
+
+      const consumer = new DIContainer()
+        .extend(addNamedResolvers(namedResolvers));
+
+      expect(consumer.get('number')).to.be.eq(1)
+      expect(consumer.get('string')).to.be.eq('x')
+    })
+
     it('creates resolvers tuple', () => {
       const container = new DIContainer()
         .addInstance('x', 'x')
