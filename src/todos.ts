@@ -32,7 +32,7 @@
  * - TODO: Support child container first resolving strategy.
  *
  * - TODO: Proxy util can be changed to util which creates object and container.keys -> Object.defineProperty; onAdd -> defineProperty. it will allow to list specific keys to be accessible or with aliases.
- * 
+ *
  * - TODO: Split container interface to "adding" part and "utitilies" it should help to keep container details out of typechecks.
  *
  * - TODO: Add possibility to override some of dependencies for specific service
