@@ -157,11 +157,10 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
   set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
 }
 
-export type Merge<
-  T1 extends Record<string, unknown>,
-  T2 extends Record<string, unknown>,
-  M extends { v: T1 & T2 } = { v: T1 & T2 },
-> = Readonly<M['v']>;
+export type Merge<T1, T2> = Flatten<T1 & T2>;
+export type Flatten<T> = T extends Record<ArgumentsKey, any>
+  ? { [k in keyof T]: T[k] }
+  : never;
 
 /**
  * How factory was added
@@ -402,12 +401,14 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TServices &
-      Record<TNamespace, IDIContainer<TNamespaceServices>> & {
-        [K in keyof TNamespaceServices as K extends string
-          ? `${TNamespace}.${K}`
-          : never]: TNamespaceServices[K];
-      }
+    Flatten<
+      TServices &
+        Record<TNamespace, IDIContainer<TNamespaceServices>> & {
+          [K in keyof TNamespaceServices as K extends string
+            ? `${TNamespace}.${K}`
+            : never]: TNamespaceServices[K];
+        }
+    >
   >;
 
   /**
@@ -422,7 +423,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    */
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (container: IDIContainer<S>) => IDIContainer<T>,
-  ): ReturnType<typeof extensionFunction>;
+  ): IDIContainer<Flatten<TServices & T>>;
 
   /**
    * Clear singletons instances cache.

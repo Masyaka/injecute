@@ -19,6 +19,7 @@ import {
   OptionalDependencySkipKey,
   Resolver,
   ValueOf,
+  Flatten,
 } from './types';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
@@ -464,13 +465,15 @@ export class DIContainer<
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TServices &
-      Record<TNamespace, IDIContainer<TNamespaceServices>> &
-      {
-        [K in keyof TNamespaceServices as K extends string
-          ? `${TNamespace}.${K}`
-          : never]: TNamespaceServices[K];
-      }
+    Flatten<
+      TServices &
+        Record<TNamespace, IDIContainer<TNamespaceServices>> &
+        {
+          [K in keyof TNamespaceServices as K extends string
+            ? `${TNamespace}.${K}`
+            : never]: TNamespaceServices[K];
+        }
+    >
   > {
     const instance = this.get(namespace as any, { allowUnresolved: true });
     const namespaceContainerExists =
@@ -493,15 +496,9 @@ export class DIContainer<
     if (!namespaceContainerExists) {
       this.adoptNamespaceContainer(namespace, namespaceContainer);
     }
-    return this as IDIContainer<
-      TServices &
-        Record<TNamespace, IDIContainer<TNamespaceServices>> &
-        {
-          [K in keyof TNamespaceServices as K extends string
-            ? `${TNamespace}.${K}`
-            : never]: TNamespaceServices[K];
-        }
-    >;
+
+    // @ts-expect-error TServices already modified
+    return this;
   }
 
   /**
@@ -516,9 +513,11 @@ export class DIContainer<
    */
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (container: IDIContainer<S>) => IDIContainer<T>,
-  ): ReturnType<typeof extensionFunction> {
+  ): IDIContainer<Flatten<TServices & T>> {
     const c = this as IDIContainer<TServices>;
-    return extensionFunction.apply(c, [c]);
+    return extensionFunction.apply(c, [c]) as IDIContainer<
+      Flatten<TServices & T>
+    >;
   }
 
   /**
