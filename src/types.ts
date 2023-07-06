@@ -160,13 +160,8 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
 export type Merge<
   T1 extends Record<string, unknown>,
   T2 extends Record<string, unknown>,
-> = {
-  [K in keyof (T1 & T2)]: K extends keyof T2
-    ? T2[K]
-    : K extends keyof T1
-    ? T1[K]
-    : never;
-};
+  M extends { v: T1 & T2 } = { v: T1 & T2 },
+> = Readonly<M['v']>;
 
 /**
  * How factory was added
