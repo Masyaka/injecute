@@ -32,6 +32,20 @@ describe('utils', () => {
         'Set through proxy is not supported',
       );
     });
+
+    it('allows to narrow and override keys', () => {
+      const narrowContainer = new DIContainer()
+        .addSingleton('x', () => 'singleton x to expose')
+        .addSingleton('y', () => 'singleton y to hide')
+        .addSingleton('z', () => 'singleton z to rename');
+      const narrowProxy = createProxyAccessor(narrowContainer, { keys: ['x', ['z', 'renamedZ']] });
+      expect(narrowProxy.x).to.be.eq('singleton x to expose');
+      // @ts-expect-error 
+      expect(narrowProxy.y).to.be.undefined;
+      // @ts-expect-error 
+      expect(narrowProxy.z).to.be.undefined;
+      expect(narrowProxy.renamedZ).to.be.eq('singleton z to rename');
+    });
   });
   describe('preload', () => {
     it('works without second argument', () => {
@@ -218,14 +232,18 @@ describe('utils', () => {
         .addInstance('x', 'x')
         .addInstance('number', 1);
 
-      const namedResolvers = createNamedResolvers(provider, ['number', ['x', 'string']])
+      const namedResolvers = createNamedResolvers(provider, [
+        'number',
+        ['x', 'string'],
+      ]);
 
-      const consumer = new DIContainer()
-        .extend(addNamedResolvers(namedResolvers));
+      const consumer = new DIContainer().extend(
+        addNamedResolvers(namedResolvers),
+      );
 
-      expect(consumer.get('number')).to.be.eq(1)
-      expect(consumer.get('string')).to.be.eq('x')
-    })
+      expect(consumer.get('number')).to.be.eq(1);
+      expect(consumer.get('string')).to.be.eq('x');
+    });
 
     it('creates resolvers tuple', () => {
       const container = new DIContainer()
