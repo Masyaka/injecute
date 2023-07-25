@@ -493,6 +493,11 @@ export class DIContainer<
         'Namespace was already defined you can not replace it, only extend.',
       );
     }
+    if (namespaceContainer == this) {
+      throw new Error(
+        'Namespace result can not be the same container. Use parent.fork(), provided namespace container or new container as result.',
+      );
+    }
     if (!namespaceContainerExists) {
       this.adoptNamespaceContainer(namespace, namespaceContainer);
     }
