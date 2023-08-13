@@ -101,6 +101,28 @@ export type GetOptions = { allowUnresolved: boolean };
 
 export type Resolve<T> = () => T;
 
+export type ResolversMapKeys<
+  Keys extends readonly (
+    | readonly [ArgumentsKey, ArgumentsKey]
+    | ArgumentsKey
+  )[],
+> = Keys extends [
+  infer Key,
+  ...infer Rest extends readonly (
+    | [ArgumentsKey, ArgumentsKey]
+    | ArgumentsKey
+  )[],
+]
+  ? [
+      Key extends ArgumentsKey
+        ? [Key, Key]
+        : Key extends [ArgumentsKey, ArgumentsKey]
+        ? Key
+        : never,
+      ...ResolversMapKeys<Rest>,
+    ]
+  : [];
+
 export type Resolver<TServices> = <Key extends keyof TServices>(
   name: Key,
 ) => TServices[Key] | undefined;

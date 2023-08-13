@@ -3,6 +3,7 @@ import {
   ContainerServices,
   IDIContainer,
   Resolve,
+  ResolversMapKeys,
 } from '../types';
 
 export type ResolversTuple<
@@ -27,28 +28,6 @@ export const createResolversTuple = <
     Keys
   >;
 };
-
-export type ResolversMapKeys<
-  Keys extends readonly (
-    | readonly [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
-  )[],
-> = Keys extends [
-  infer Key,
-  ...infer Rest extends readonly (
-    | [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
-  )[],
-]
-  ? [
-      Key extends ArgumentsKey
-        ? [Key, Key]
-        : Key extends [ArgumentsKey, ArgumentsKey]
-        ? Key
-        : never,
-      ...ResolversMapKeys<Rest>,
-    ]
-  : [];
 
 export const createNamedResolvers = <
   C extends IDIContainer<any>,
