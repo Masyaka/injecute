@@ -38,11 +38,13 @@ describe('utils', () => {
         .addSingleton('x', () => 'singleton x to expose')
         .addSingleton('y', () => 'singleton y to hide')
         .addSingleton('z', () => 'singleton z to rename');
-      const narrowProxy = createProxyAccessor(narrowContainer, { keys: ['x', ['z', 'renamedZ']] });
+      const narrowProxy = createProxyAccessor(narrowContainer, {
+        keys: ['x', ['z', 'renamedZ']],
+      });
       expect(narrowProxy.x).to.be.eq('singleton x to expose');
-      // @ts-expect-error 
+      // @ts-expect-error
       expect(narrowProxy.y).to.be.undefined;
-      // @ts-expect-error 
+      // @ts-expect-error
       expect(narrowProxy.z).to.be.undefined;
       expect(narrowProxy.renamedZ).to.be.eq('singleton z to rename');
     });

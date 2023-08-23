@@ -451,9 +451,13 @@ export class DIContainer<
     return child as IDIContainer<T>;
   }
 
-  flatten(onKeyIntersection?: <K extends keyof TServices>(k: K) => Resolve<TServices[K]>) {
+  flatten(
+    onKeyIntersection?: <K extends keyof TServices>(
+      k: K,
+    ) => Resolve<TServices[K]>,
+  ) {
     let current: DIContainer<any> = this;
-    
+
     while (true) {
       const parent = current.getParent();
       if (parent instanceof DIContainer) {
@@ -466,27 +470,29 @@ export class DIContainer<
         if (this.has(k)) {
           if (onKeyIntersection) {
             const factory = onKeyIntersection(k);
-            this.addFactory(k, factory, { replace: true })
+            this.addFactory(k, factory, { replace: true });
           } else {
-            throw new Error(`Keys intersection occurred on key: "${k.toString()}". Use onKeyIntersection recovery mechanism.`);
+            throw new Error(
+              `Keys intersection occurred on key: "${k.toString()}". Use onKeyIntersection recovery mechanism.`,
+            );
           }
         }
         const factoryFromParent = current!.getFactory(k);
         this.#factories.set(k, factoryFromParent);
-      })
+      });
     }
 
-    return this
+    return this;
   }
 
   /**
    * Creates isolated container inside current container.
    * Current container will have access to namespace services, but not vice versa.
    * For cases when you want to avoid keys intersection conflict.
-   * 
-   * TODO: Make namespace less independent and isolated, 
+   *
+   * TODO: Make namespace less independent and isolated,
    *    move actual factories to main container to make `flatten` method more comprehensive
-   * 
+   *
    * @param namespace
    * @param extension
    */
@@ -531,7 +537,7 @@ export class DIContainer<
         'Namespace was already defined you can not replace it, only extend.',
       );
     }
-    if (namespaceContainer == this as any) {
+    if (namespaceContainer == (this as any)) {
       throw new Error(
         'Namespace result can not be the same container. Use parent.fork(), provided namespace container or new container as result.',
       );
@@ -555,7 +561,9 @@ export class DIContainer<
    * ```
    */
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
-    extensionFunction: (container: IDIContainer<S>) => IDIContainer<Flatten<TServices & T>>,
+    extensionFunction: (
+      container: IDIContainer<S>,
+    ) => IDIContainer<Flatten<TServices & T>>,
   ): IDIContainer<Flatten<TServices & T>> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);

@@ -179,7 +179,7 @@ Or you can not mutate the `req` by adding the `getContainer` function and use "f
 ```typescript
 export const createRequestContainerWrapper = <
   RootServices extends Record<ArgumentsKey, any>,
-  RequestServices extends Record<ArgumentsKey, any>,
+  RequestServices extends Record<ArgumentsKey, any>
 >(
   container: IDIContainer<RootServices>,
   extension: IDIContainerExtension<
@@ -188,25 +188,24 @@ export const createRequestContainerWrapper = <
   >,
 ) => {
   return <
-      Keys extends readonly (keyof RequestServices)[],
-      RequiredServices extends DependenciesTypes<RequestServices, Keys>,
-    >(
-      servicesNames: [...Keys],
-      handlerCreator: Callable<RequiredServices, Handler>,
-    ): Handler =>
-    (req, res, next) => {
-      const targetHandler = container
-        // make nested service
-        .fork()
-        // add request to container
-        .addInstance('req', req)
-        // apply extension which will register services related to request context
-        .extend(extension)
-        // create handler using required services from container
-        .injecute<Handler, any, any>(handlerCreator, servicesNames);
+    Keys extends readonly (keyof RequestServices)[],
+    RequiredServices extends DependenciesTypes<RequestServices, Keys>
+  >(
+    servicesNames: [...Keys],
+    handlerCreator: Callable<RequiredServices, Handler>,
+  ): Handler => (req, res, next) => {
+    const targetHandler = container
+      // make nested service
+      .fork()
+      // add request to container
+      .addInstance('req', req)
+      // apply extension which will register services related to request context
+      .extend(extension)
+      // create handler using required services from container
+      .injecute<Handler, any, any>(handlerCreator, servicesNames);
 
-      targetHandler(req, res, next);
-    };
+    targetHandler(req, res, next);
+  };
 };
 
 const rootContainer = new DIContainer().addSingleton(
@@ -264,21 +263,21 @@ import {
 } from 'injecute';
 
 // helper that helps to pull services from container
-export const useContainerServices =
-  <S extends Record<ArgumentsKey, any>>(container: IDIContainer<S>) =>
-  <
-    Keys extends readonly (keyof S)[],
-    RequiredServices extends DependenciesTypes<S, Keys>,
-    H extends Func<RequiredServices, Handler>,
-  >(
-    servicesNames: [...Keys],
-    handlerCreator: H,
-  ): Handler => {
-    return container.injecute<() => Handler, any, any>(
-      handlerCreator,
-      servicesNames,
-    );
-  };
+export const useContainerServices = <S extends Record<ArgumentsKey, any>>(
+  container: IDIContainer<S>,
+) => <
+  Keys extends readonly (keyof S)[],
+  RequiredServices extends DependenciesTypes<S, Keys>,
+  H extends Func<RequiredServices, Handler>
+>(
+  servicesNames: [...Keys],
+  handlerCreator: H,
+): Handler => {
+  return container.injecute<() => Handler, any, any>(
+    handlerCreator,
+    servicesNames,
+  );
+};
 
 // business stuff service
 class MyBusinessService {

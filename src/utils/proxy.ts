@@ -4,7 +4,7 @@ import { ResolversMapKeys } from './resolvers';
 export type ProxyAccessorOptions<
   Services extends Record<ArgumentsKey, any>,
   NewKey extends ArgumentsKey,
-  Keys extends readonly (keyof Services | [keyof Services, NewKey])[],
+  Keys extends readonly (keyof Services | [keyof Services, NewKey])[]
 > = {
   allowUnresolved?: boolean;
   keys?: [...Keys];
@@ -13,7 +13,7 @@ export type ProxyAccessorOptions<
 type KeysOverride<
   TServices extends Record<ArgumentsKey, any>,
   Keys extends (keyof TServices | [keyof TServices, ArgumentsKey])[],
-  KeysPairs extends ResolversMapKeys<Keys> = ResolversMapKeys<Keys>,
+  KeysPairs extends ResolversMapKeys<Keys> = ResolversMapKeys<Keys>
 > = {
   [K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, string]
     ? KeysPairs[K][1]
@@ -30,7 +30,7 @@ type KeysOverride<
  * Creates proxy object, that allows to get container entries by properties getters.
  * Allows to represent your container as service with different methods and properties,
  * but internally it can be implemented with independent functions combined in container by composition.
- * 
+ *
  * With options.keys you can explicitly define accessible keys or rewrite some of them.
  * if this option omitted - all keys from container will be accessible.
  * @example
@@ -62,7 +62,7 @@ export const createProxyAccessor = <
   Services extends ContainerServices<C>,
   NewKey extends ArgumentsKey,
   K extends readonly (keyof Services | [keyof Services, NewKey])[],
-  O extends ProxyAccessorOptions<ContainerServices<C>, NewKey, K>,
+  O extends ProxyAccessorOptions<ContainerServices<C>, NewKey, K>
 >(
   c: C,
   options?: O,
