@@ -404,6 +404,16 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   }): IDIContainer<T>;
 
   /**
+   * Moves all factories, but not caches from parent containers to current level.
+   * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
+   */
+  flatten(
+    onKeyIntersection?: <K extends keyof TServices>(
+      k: K,
+    ) => Resolve<TServices[K]>,
+  ): IDIContainer<TServices>;
+
+  /**
    * Creates isolated container inside current container.
    * Current container will have access to namespace services, but not vice versa.
    * For cases when you want to avoid keys intersection conflict.
@@ -444,7 +454,9 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    * ```
    */
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
-    extensionFunction: (container: IDIContainer<S>) => IDIContainer<T>,
+    extensionFunction: (
+      container: IDIContainer<S>,
+    ) => IDIContainer<Flatten<TServices & T>>,
   ): IDIContainer<Flatten<TServices & T>>;
 
   /**
