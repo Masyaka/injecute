@@ -407,11 +407,12 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    * Moves all factories, but not caches from parent containers to current level.
    * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
    */
-  flatten(
+  flatten(options?: {
+    fork?: boolean;
     onKeyIntersection?: <K extends keyof TServices>(
       k: K,
-    ) => Resolve<TServices[K]>,
-  ): IDIContainer<TServices>;
+    ) => Resolve<TServices[K]>;
+  }): IDIContainer<TServices>;
 
   /**
    * Creates isolated container inside current container.

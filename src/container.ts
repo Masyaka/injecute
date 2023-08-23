@@ -450,12 +450,20 @@ export class DIContainer<
 
     return child as IDIContainer<T>;
   }
-
+  
+  /**
+   * Moves all factories, but not caches from parent containers to current level.
+   * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
+   */
   flatten(
-    onKeyIntersection?: <K extends keyof TServices>(
-      k: K,
-    ) => Resolve<TServices[K]>,
+    options: {
+      fork?: boolean;
+      onKeyIntersection?: <K extends keyof TServices>(
+        k: K,
+      ) => Resolve<TServices[K]>;
+    } = { fork: true }
   ) {
+    const resultContainer = (options.fork ? this.fork() : this) as DIContainer<TServices>;
     let current: DIContainer<any> = this;
 
     while (true) {
@@ -467,10 +475,10 @@ export class DIContainer<
       }
 
       current.keys.forEach((k: keyof TServices) => {
-        if (this.has(k)) {
-          if (onKeyIntersection) {
-            const factory = onKeyIntersection(k);
-            this.addFactory(k, factory, { replace: true });
+        if (resultContainer.has(k)) {
+          if (options.onKeyIntersection) {
+            const factory = options.onKeyIntersection(k);
+            resultContainer.addFactory(k, factory, { replace: true });
           } else {
             throw new Error(
               `Keys intersection occurred on key: "${k.toString()}". Use onKeyIntersection recovery mechanism.`,
@@ -478,11 +486,11 @@ export class DIContainer<
           }
         }
         const factoryFromParent = current!.getFactory(k);
-        this.#factories.set(k, factoryFromParent);
+        resultContainer.#factories.set(k, factoryFromParent);
       });
     }
 
-    return this;
+    return resultContainer;
   }
 
   /**
