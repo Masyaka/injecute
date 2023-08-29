@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "noEmit": false,
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "NodeNext",

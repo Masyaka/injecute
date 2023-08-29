@@ -1,10 +1,14 @@
-import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
-import { ResolversMapKeys } from './resolvers';
+import {
+  ArgumentsKey,
+  ContainerServices,
+  IDIContainer,
+  ResolversMapKeys,
+} from '../types';
 
 export type ProxyAccessorOptions<
   Services extends Record<ArgumentsKey, any>,
   NewKey extends ArgumentsKey,
-  Keys extends readonly (keyof Services | [keyof Services, NewKey])[]
+  Keys extends readonly (keyof Services | [keyof Services, NewKey])[],
 > = {
   allowUnresolved?: boolean;
   keys?: [...Keys];
@@ -13,7 +17,7 @@ export type ProxyAccessorOptions<
 type KeysOverride<
   TServices extends Record<ArgumentsKey, any>,
   Keys extends (keyof TServices | [keyof TServices, ArgumentsKey])[],
-  KeysPairs extends ResolversMapKeys<Keys> = ResolversMapKeys<Keys>
+  KeysPairs extends ResolversMapKeys<Keys> = ResolversMapKeys<Keys>,
 > = {
   [K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, string]
     ? KeysPairs[K][1]
@@ -62,7 +66,7 @@ export const createProxyAccessor = <
   Services extends ContainerServices<C>,
   NewKey extends ArgumentsKey,
   K extends readonly (keyof Services | [keyof Services, NewKey])[],
-  O extends ProxyAccessorOptions<ContainerServices<C>, NewKey, K>
+  O extends ProxyAccessorOptions<ContainerServices<C>, NewKey, K>,
 >(
   c: C,
   options?: O,

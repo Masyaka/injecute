@@ -1,6 +1,6 @@
 {
   "name": "injecute",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "Lightweight extendable typesafe dependency injection container",
   "repository": {
     "url": "https://github.com/Masyaka/injecute"
@@ -12,6 +12,7 @@
     "build:esm": "tsc -p ./tsconfig.esm.json && mv ./lib/esm/index.js ./lib/esm/index.mjs",
     "build:cjs": "tsc -p ./tsconfig.cjs.json",
     "prepack": "npm run build",
+    "format": "npx prettier ./src -w",
     "test": "mocha -r ts-node/register --exit './tests/**/*.test.ts'"
   },
   "types": "./lib/cjs/types/index.d.ts",

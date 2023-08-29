@@ -14,24 +14,24 @@ import {
   IDIContainer,
   KeysToTypes,
   MapOf,
-  Merge,
   optionalDependencySkipKey,
   OptionalDependencySkipKey,
   Resolver,
   ValueOf,
-  Flatten,
 } from './types';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
-export const firstResult = <TArgs extends any[], TResult extends any>(
-  fns: ((...args: TArgs) => TResult)[],
-  predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
-) => (...args: TArgs): TResult | undefined => {
-  for (const f of fns) {
-    const result = f(...args);
-    if (predicate(result)) return result;
-  }
-};
+export const firstResult =
+  <TArgs extends any[], TResult extends any>(
+    fns: ((...args: TArgs) => TResult)[],
+    predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
+  ) =>
+  (...args: TArgs): TResult | undefined => {
+    for (const f of fns) {
+      const result = f(...args);
+      if (predicate(result)) return result;
+    }
+  };
 
 export const argumentsNamesToArguments = (
   argsNames: (ArgumentsKey | (() => any))[],
@@ -47,7 +47,7 @@ export const argumentsNamesToArguments = (
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
-  Key extends keyof TServices = keyof TServices
+  Key extends keyof TServices = keyof TServices,
 > = (
   this: DIContainer<TServices>,
   name: Key,
@@ -75,7 +75,7 @@ const callFactory = <D extends any[]>(
 };
 
 export type DIContainerConstructorArguments<
-  TParentServices extends Record<ArgumentsKey, any> = Empty
+  TParentServices extends Record<ArgumentsKey, any> = Empty,
 > = {
   parentContainer?: IDIContainer<TParentServices>;
 };
@@ -88,8 +88,9 @@ const factoryTypeKey = Symbol('TransientType');
 export class DIContainer<
   TParentServices extends Record<ArgumentsKey, any> = Empty,
   TServices extends TParentServices &
-    Record<ArgumentsKey, any> = TParentServices & Empty
-> implements IDIContainer<TServices> {
+    Record<ArgumentsKey, any> = TParentServices & Empty,
+> implements IDIContainer<TServices>
+{
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
     this.#parentContainer = p?.parentContainer;
     this.addArgumentsResolver(DIContainer.resolveArgumentsFromCache);
@@ -110,28 +111,23 @@ export class DIContainer<
   protected getParent() {
     return this.#parentContainer;
   }
-  readonly #factories: MapOf<
-    {
-      [key in keyof TServices]?: {
-        callable: Callable<ValueOf<TServices>[], TServices[key]>;
-        type: FactoryType;
-        beforeResolving?: (k: key) => void;
-        afterResolving?: (k: key, instance: TServices[key]) => void;
-        beforeReplaced?: (k: key) => void;
-      };
-    }
-  > = new Map();
+  readonly #factories: MapOf<{
+    [key in keyof TServices]?: {
+      callable: Callable<ValueOf<TServices>[], TServices[key]>;
+      type: FactoryType;
+      beforeResolving?: (k: key) => void;
+      afterResolving?: (k: key, instance: TServices[key]) => void;
+      beforeReplaced?: (k: key) => void;
+    };
+  }> = new Map();
   protected getFactory<K extends keyof TServices>(k: K) {
     return this.#factories.get(k);
   }
-  readonly #singletonInstances: MapOf<
-    {
-      [key in keyof TServices]?: TServices[key];
-    }
-  > = new Map();
-  readonly #arguments: MapOf<
-    { [key in keyof TServices]?: Argument[] }
-  > = new Map();
+  readonly #singletonInstances: MapOf<{
+    [key in keyof TServices]?: TServices[key];
+  }> = new Map();
+  readonly #arguments: MapOf<{ [key in keyof TServices]?: Argument[] }> =
+    new Map();
   readonly #argumentsResolvers: ArgumentsResolver[] = [];
   readonly #middlewares: Middleware<TServices>[] = [];
   #middlewareStack!: Resolver<TServices>;
@@ -202,7 +198,7 @@ export class DIContainer<
     options?: {
       replace: boolean;
     },
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
+  ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, () => instance, {
       [factoryTypeKey]: 'instance',
       replace: options?.replace,
@@ -223,7 +219,7 @@ export class DIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: K,
     factory: TCallable,
@@ -237,7 +233,7 @@ export class DIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys] = [] as any,
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
+  ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, factory, options);
   }
 
@@ -254,7 +250,7 @@ export class DIContainer<
     K extends ArgumentsKey,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
     Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: K,
     factory: TCallable,
@@ -268,7 +264,7 @@ export class DIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys] = [] as any,
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
+  ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
       [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
@@ -298,8 +294,8 @@ export class DIContainer<
   addAlias<
     T extends TServices[A],
     K extends ArgumentsKey,
-    A extends keyof TServices
-  >(name: K, aliasTo: A): IDIContainer<Merge<TServices, { [k in K]: T }>> {
+    A extends keyof TServices,
+  >(name: K, aliasTo: A): IDIContainer<TServices & { [k in K]: T }> {
     return this.addFactory(
       name as Exclude<K, OptionalDependencySkipKey>,
       () => this.get(aliasTo),
@@ -335,7 +331,7 @@ export class DIContainer<
   get<
     Key extends keyof TServices,
     O extends GetOptions,
-    T extends any = TServices[Key]
+    T extends any = TServices[Key],
   >(
     serviceName: Key,
     options?: O,
@@ -393,7 +389,7 @@ export class DIContainer<
       | OptionalDependencySkipKey
       | keyof TServices
       | Resolve<TServices[keyof TServices]>
-    )[]
+    )[],
   >(
     keys: [...Keys],
     callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
@@ -450,7 +446,7 @@ export class DIContainer<
 
     return child as IDIContainer<T>;
   }
-  
+
   /**
    * Moves all factories, but not caches from parent containers to current level.
    * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
@@ -461,9 +457,12 @@ export class DIContainer<
       onKeyIntersection?: <K extends keyof TServices>(
         k: K,
       ) => Resolve<TServices[K]>;
-    } = { fork: true }
+    } = { fork: true },
   ) {
-    const resultContainer = (options.fork ? this.fork() : this) as DIContainer<TServices>;
+    // todo: Add tests
+    const resultContainer = (
+      options.fork ? this.fork() : this
+    ) as DIContainer<TServices>;
     let current: DIContainer<any> = this;
 
     while (true) {
@@ -512,20 +511,16 @@ export class DIContainer<
         ? TServices[TNamespace]
         : IDIContainer<{}>;
     }) => IDIContainer<any>,
-    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>
+    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    Flatten<
-      TServices &
-        Record<TNamespace, IDIContainer<TNamespaceServices>> &
-        {
-          [K in keyof TNamespaceServices as K extends string
-            ? `${TNamespace}.${K}`
-            : never]: TNamespaceServices[K];
-        }
-    >
+    TServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
+      [K in keyof TNamespaceServices as K extends string
+        ? `${TNamespace}.${K}`
+        : never]: TNamespaceServices[K];
+    }
   > {
     const instance = this.get(namespace as any, { allowUnresolved: true });
     const namespaceContainerExists =
@@ -554,8 +549,7 @@ export class DIContainer<
       this.adoptNamespaceContainer(namespace, namespaceContainer);
     }
 
-    // @ts-expect-error TServices already modified
-    return this;
+    return this as any;
   }
 
   /**
@@ -571,8 +565,8 @@ export class DIContainer<
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (
       container: IDIContainer<S>,
-    ) => IDIContainer<Flatten<TServices & T>>,
-  ): IDIContainer<Flatten<TServices & T>> {
+    ) => IDIContainer<TServices & T>,
+  ): IDIContainer<TServices & T> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);
   }
@@ -614,7 +608,7 @@ export class DIContainer<
       | OptionalDependencySkipKey
       | keyof TServices
       | Resolve<TServices[keyof TServices]>
-    )[]
+    )[],
   >(
     callable: TCallable,
     options?:
@@ -635,9 +629,9 @@ export class DIContainer<
 
     if (!args) {
       throw new Error(
-        `Not resolved arguments for ${String(
-          argumentsKey,
-        )} "${callable.toString().substring(0, 50)}"`,
+        `Not resolved arguments for ${String(argumentsKey)} "${callable
+          .toString()
+          .substring(0, 50)}"`,
       );
     }
 
@@ -766,7 +760,7 @@ export class DIContainer<
 
   private adoptNamespaceContainer<
     N extends string,
-    C extends IDIContainer<any>
+    C extends IDIContainer<any>,
   >(namespace: N, container: C) {
     this.addInstance(namespace as any, container);
 
@@ -796,7 +790,7 @@ export class DIContainer<
       | keyof TServices
       | (() => TServices[keyof TServices])
     )[],
-    TResult extends CallableResult<TCallable>
+    TResult extends CallableResult<TCallable>,
   >(
     name: K,
     factory: TCallable,
@@ -810,7 +804,7 @@ export class DIContainer<
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys],
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>> {
+  ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     const replace = !optionsIsArray && !!options?.replace;
     const dependencies = optionsIsArray ? options : options?.dependencies;
@@ -835,11 +829,9 @@ export class DIContainer<
   }
 
   private rebuildMiddlewareStack() {
-    this.#middlewareStack = [
-      this.resolve,
-      ...this.#middlewares,
-    ].reduce((next, current) => (message) =>
-      current.apply(this, [message, next as Resolver<TServices>]),
+    this.#middlewareStack = [this.resolve, ...this.#middlewares].reduce(
+      (next, current) => (message) =>
+        current.apply(this, [message, next as Resolver<TServices>]),
     ) as Resolver<TServices>;
   }
 

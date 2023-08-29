@@ -11,7 +11,7 @@
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "Node",
-    "outDir": "./dist"
+    "noEmit": true
   },
   "files": ["./src/index.ts"]
 }

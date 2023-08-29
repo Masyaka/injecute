@@ -180,9 +180,7 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
 }
 
 export type Merge<T1, T2> = Flatten<T1 & T2>;
-export type Flatten<T> = T extends Record<ArgumentsKey, any>
-  ? { [k in keyof T]: T[k] }
-  : never;
+export type Flatten<T> = {} & { [k in keyof T]: T[k] };
 
 /**
  * How factory was added
@@ -241,7 +239,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     options?: {
       replace: boolean;
     },
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
+  ): IDIContainer<TServices & { [k in K]: TResult }>;
 
   /**
    * Each time requested transient service - factory will be executed and returned new instance.
@@ -271,7 +269,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys],
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
+  ): IDIContainer<TServices & { [k in K]: TResult }>;
 
   /**
    * Once created instance will be returned for each service request
@@ -301,7 +299,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys],
-  ): IDIContainer<Merge<TServices, Record<K, TResult>>>;
+  ): IDIContainer<TServices & { [k in K]: TResult }>;
 
   /**
    * When the service with `name` needed - `aliasTo` service will be given.
@@ -315,13 +313,13 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    * @param aliasTo
    */
   addAlias<
-    T extends TServices[A],
+    TResult extends TServices[A],
     K extends ArgumentsKey,
     A extends keyof TServices,
   >(
     name: K,
     aliasTo: A,
-  ): IDIContainer<Merge<TServices, Record<K, T>>>;
+  ): IDIContainer<TServices & { [k in K]: TResult }>;
 
   /**
    * Get registered service from container
@@ -434,14 +432,11 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    Flatten<
-      TServices &
-        Record<TNamespace, IDIContainer<TNamespaceServices>> & {
-          [K in keyof TNamespaceServices as K extends string
-            ? `${TNamespace}.${K}`
-            : never]: TNamespaceServices[K];
-        }
-    >
+    TServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
+      [K in keyof TNamespaceServices as K extends string
+        ? `${TNamespace}.${K}`
+        : never]: TNamespaceServices[K];
+    }
   >;
 
   /**
@@ -457,8 +452,8 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (
       container: IDIContainer<S>,
-    ) => IDIContainer<Flatten<TServices & T>>,
-  ): IDIContainer<Flatten<TServices & T>>;
+    ) => IDIContainer<TServices & T>,
+  ): IDIContainer<TServices & T>;
 
   /**
    * Clear singletons instances cache.
