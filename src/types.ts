@@ -452,7 +452,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (
       container: IDIContainer<S>,
-    ) => IDIContainer<TServices & T>,
+    ) => IDIContainer<T>,
   ): IDIContainer<TServices & T>;
 
   /**

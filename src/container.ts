@@ -565,7 +565,7 @@ export class DIContainer<
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (
       container: IDIContainer<S>,
-    ) => IDIContainer<TServices & T>,
+    ) => IDIContainer<T>,
   ): IDIContainer<TServices & T> {
     const c = this as IDIContainer<TServices>;
     return extensionFunction.apply(c, [c]);
