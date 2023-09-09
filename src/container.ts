@@ -66,14 +66,6 @@ export class CircularDependencyError extends Error {
 const stringOrNumber = (i: any): i is string | number =>
   ['string', 'number'].includes(typeof i);
 
-const callFactory = <D extends any[]>(
-  callable: Callable<D, any>,
-  dependencies: D,
-) => {
-  const func = callable as Func<any, any>;
-  return func(...(dependencies as Parameters<typeof func>));
-};
-
 export type DIContainerConstructorArguments<
   TParentServices extends Record<ArgumentsKey, any> = Empty,
 > = {
@@ -397,6 +389,14 @@ export class DIContainer<
     return () => this.injecute(callable, { argumentsNames: keys });
   }
 
+  protected callFactory<D extends any[], C extends Callable<D, any>>(
+    callable: C,
+    dependencies: D,
+  ) {
+    const func = callable as Func<any, any>;
+    return func(...(dependencies as Parameters<typeof func>));
+  }
+
   /**
    * Create getter for specified key.
    *
@@ -637,7 +637,7 @@ export class DIContainer<
 
     const dependencies = this.mapAgrsToInstances(args);
 
-    return callFactory(callable, dependencies as any);
+    return this.callFactory(callable, dependencies as any);
   }
 
   protected assertNotRegistered(name: keyof TServices | ArgumentsKey) {
