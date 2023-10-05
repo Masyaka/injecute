@@ -4,7 +4,7 @@
     "noEmit": false,
     "target": "ES2022",
     "module": "ESNext",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "Bundler",
     "outDir": "./lib/esm",
     "declarationDir": "./lib/esm/types"
   }
