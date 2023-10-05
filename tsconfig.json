@@ -10,8 +10,7 @@
     "declaration": true,
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "Node",
-    "noEmit": true
+    "moduleResolution": "Node"
   },
   "files": ["./src/index.ts"]
 }

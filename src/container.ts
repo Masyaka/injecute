@@ -4,7 +4,6 @@ import {
   ArgumentsResolver,
   Callable,
   CallableResult,
-  ContainerServices,
   Empty,
   Events,
   FactoryType,
@@ -18,6 +17,9 @@ import {
   OptionalDependencySkipKey,
   Resolver,
   ValueOf,
+  ContainerOwnServices,
+  KeyForValueOfType,
+  ArgumentsTypes,
 } from './types';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
@@ -72,16 +74,27 @@ export type DIContainerConstructorArguments<
   parentContainer?: IDIContainer<TParentServices>;
 };
 
+const getContainersChain = (c: IDIContainer<any>) => {
+  const result = [];
+  let current: IDIContainer<any> | undefined = c;
+  do {
+    result.push(c);
+    current = current.getParent();
+  } while (current);
+  return result;
+};
+
 const factoryTypeKey = Symbol('TransientType');
 
 /**
  * Dependency Injection container
  */
 export class DIContainer<
+  TOwnServices extends Record<ArgumentsKey, any> = Empty,
   TParentServices extends Record<ArgumentsKey, any> = Empty,
-  TServices extends TParentServices &
-    Record<ArgumentsKey, any> = TParentServices & Empty,
-> implements IDIContainer<TServices>
+  TServices extends TParentServices & TOwnServices = TParentServices &
+    TOwnServices,
+> implements IDIContainer<TParentServices, TServices>
 {
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
     this.#parentContainer = p?.parentContainer;
@@ -90,8 +103,8 @@ export class DIContainer<
   }
 
   protected readonly eventHandlers: {
-    [E in keyof Events<IDIContainer<TServices>>]: Set<
-      (e: Events<IDIContainer<TServices>>[E]) => void
+    [E in keyof Events<IDIContainer<TOwnServices, TParentServices>>]: Set<
+      (e: Events<IDIContainer<TOwnServices, TParentServices>>[E]) => void
     >;
   } = {
     replace: new Set(),
@@ -100,7 +113,7 @@ export class DIContainer<
     get: new Set(),
   };
   readonly #parentContainer: IDIContainer<TParentServices> | undefined;
-  protected getParent() {
+  getParent() {
     return this.#parentContainer;
   }
   readonly #factories: MapOf<{
@@ -125,6 +138,15 @@ export class DIContainer<
   #middlewareStack!: Resolver<TServices>;
 
   get keys(): (keyof TServices)[] {
+    const keys = this.ownKeys;
+    const parent = this.getParent();
+    if (parent) {
+      keys.push(...parent.keys);
+    }
+    return keys;
+  }
+
+  get ownKeys(): (keyof TServices)[] {
     return Array.from(this.#factories.keys()) as (keyof TServices)[];
   }
 
@@ -136,9 +158,13 @@ export class DIContainer<
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
 
-  addEventListener<E extends keyof Events<IDIContainer<TServices>>>(
+  addEventListener<
+    E extends keyof Events<IDIContainer<TOwnServices, TParentServices>>,
+  >(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
+    handler: (
+      e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
+    ) => void,
   ) {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].add(handler);
@@ -147,9 +173,13 @@ export class DIContainer<
     throw this.eventNotSupported(e);
   }
 
-  removeEventListener<E extends keyof Events<IDIContainer<TServices>>>(
+  removeEventListener<
+    E extends keyof Events<IDIContainer<TOwnServices, TParentServices>>,
+  >(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
+    handler: (
+      e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
+    ) => void,
   ) {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].delete(handler);
@@ -354,7 +384,7 @@ export class DIContainer<
   readonly resolveArguments: ArgumentsResolver = (fn, argumentsKey) => {
     for (const argumentsResolver of this.#argumentsResolvers) {
       const args = argumentsResolver.call(
-        this as IDIContainer<TServices>,
+        this as IDIContainer<TOwnServices, TParentServices>,
         fn,
         argumentsKey,
       );
@@ -399,18 +429,6 @@ export class DIContainer<
 
   /**
    * Create getter for specified key.
-   *
-   * Useful for providing dependencies to namespace.
-   * @example
-   * ```typescript
-   * container.namespace(
-   *   'Domain.Context',
-   *   (namespace, parent) => namespace
-   *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
-   *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
-   *     .addSingleton('namespaceService', construct(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
-   * )
-   * ```
    * @param key
    */
   createResolver<K extends keyof TServices>(key: K): Resolve<TServices[K]> {
@@ -430,9 +448,9 @@ export class DIContainer<
   fork<T extends TServices = TServices>(options?: {
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
-  }): IDIContainer<T> {
+  }): IDIContainer<{}, T> {
     const child = new DIContainer<T>({
-      parentContainer: this as IDIContainer<TServices>,
+      parentContainer: this as IDIContainer<TOwnServices, TParentServices>,
     });
 
     if (!options?.skipMiddlewares) {
@@ -493,62 +511,41 @@ export class DIContainer<
   }
 
   /**
-   * Creates isolated container inside current container.
-   * Current container will have access to namespace services, but not vice versa.
+   * Adopts callback result container services.
+   * Provided fork of current container can be used or new created container.
+   * Current container will have access to namespace services with namespace prefix.
    * For cases when you want to avoid keys intersection conflict.
-   *
-   * TODO: Make namespace less independent and isolated,
-   *    move actual factories to main container to make `flatten` method more comprehensive
    *
    * @param namespace
    * @param extension
    */
   namespace<
     TNamespace extends string,
-    TExtension extends (p: {
-      parent: IDIContainer<TServices>;
-      namespace: TServices[TNamespace] extends IDIContainer<any>
-        ? TServices[TNamespace]
-        : IDIContainer<{}>;
-    }) => IDIContainer<any>,
-    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
+    TExtension extends (
+      c: IDIContainer<{}, TServices>,
+    ) => IDIContainer<any, any>,
+    TNamespaceServices extends ContainerOwnServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
+    TOwnServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
       [K in keyof TNamespaceServices as K extends string
         ? `${TNamespace}.${K}`
         : never]: TNamespaceServices[K];
-    }
+    },
+    TParentServices
   > {
-    const instance = this.get(namespace as any, { allowUnresolved: true });
-    const namespaceContainerExists =
-      typeof instance === 'object' && 'injecute' in instance;
-    if (instance && !namespaceContainerExists) {
-      throw new Error(
-        `Namespace key "${namespace}" already used with non container entry.`,
-      );
+    if (this.has(namespace)) {
+      throw new Error(`Namespace key "${namespace}" already in use.`);
     }
-    const extensionTargetContainer = instance || new DIContainer();
-    const namespaceContainer = extension({
-      parent: this as any,
-      namespace: extensionTargetContainer as any,
-    });
-    if (namespaceContainerExists && instance !== namespaceContainer) {
-      throw new Error(
-        'Namespace was already defined you can not replace it, only extend.',
-      );
-    }
+    const namespaceContainer = extension(this.fork() as any);
     if (namespaceContainer == (this as any)) {
       throw new Error(
         'Namespace result can not be the same container. Use parent.fork(), provided namespace container or new container as result.',
       );
     }
-    if (!namespaceContainerExists) {
-      this.adoptNamespaceContainer(namespace, namespaceContainer);
-    }
-
+    this.adoptNamespaceContainer(namespace, namespaceContainer);
     return this as any;
   }
 
@@ -563,12 +560,16 @@ export class DIContainer<
    * ```
    */
   extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
-    extensionFunction: (
-      container: IDIContainer<S>,
-    ) => IDIContainer<T>,
+    extensionFunction: (container: IDIContainer<S>) => IDIContainer<T>,
   ): IDIContainer<TServices & T> {
-    const c = this as IDIContainer<TServices>;
-    return extensionFunction.apply(c, [c]);
+    const c = this as IDIContainer<TOwnServices, TParentServices>;
+    const result = extensionFunction.apply(c, [c]);
+    if (getContainersChain(result).some((c) => c === this)) {
+      return result;
+    }
+    throw new Error(
+      'Extension result container not the same container or its child.',
+    );
   }
 
   /**
@@ -578,13 +579,37 @@ export class DIContainer<
    *
    * @param resetParent false by default.
    */
-  reset(resetParent = false): IDIContainer<TServices> {
+  reset(resetParent = false): IDIContainer<TOwnServices, TParentServices> {
     this.#singletonInstances.clear();
     if (resetParent) {
       this.#parentContainer?.reset(resetParent);
     }
     this.onReset(resetParent);
-    return this as IDIContainer<TServices>;
+    return this as IDIContainer<TOwnServices, TParentServices>;
+  }
+
+  /**
+   * If entry under the key is function it will be called with params and optional `this`.
+   * @param key
+   * @param params
+   * @param targetThis
+   * @returns
+   */
+  call<
+    FnKey extends KeyForValueOfType<TServices, (...p: any[]) => any>,
+    Fn extends TServices[FnKey],
+  >(
+    key: FnKey,
+    params: ArgumentsTypes<Fn>,
+    targetThis: any = null,
+  ): ReturnType<Fn> {
+    const value = this.get(key);
+    if (typeof value !== 'function') {
+      throw new Error(
+        `Entry "${String(key)}" is not a function and can not be invoked`,
+      );
+    }
+    return value.apply(targetThis, params);
   }
 
   /**
@@ -705,7 +730,7 @@ export class DIContainer<
     for (const handler of this.eventHandlers.replace) {
       handler({
         key: name,
-        container: this as IDIContainer<TServices>,
+        container: this as IDIContainer<TOwnServices, TParentServices>,
         replaced: {
           callable: factory.callable,
           type: factory.type,
@@ -719,7 +744,7 @@ export class DIContainer<
       handler({
         key: name,
         replace,
-        container: this as IDIContainer<TServices>,
+        container: this as IDIContainer<TOwnServices, TParentServices>,
       });
     }
   }
@@ -728,7 +753,7 @@ export class DIContainer<
     for (const handler of this.eventHandlers.reset) {
       handler({
         resetParent,
-        container: this as IDIContainer<TServices>,
+        container: this as IDIContainer<TOwnServices, TParentServices>,
       });
     }
   }
@@ -738,7 +763,7 @@ export class DIContainer<
       handler({
         key: name,
         value,
-        container: this as IDIContainer<TServices>,
+        container: this as IDIContainer<TOwnServices, TParentServices>,
       });
     }
   }
@@ -761,18 +786,27 @@ export class DIContainer<
   private adoptNamespaceContainer<
     N extends string,
     C extends IDIContainer<any>,
-  >(namespace: N, container: C) {
-    this.addInstance(namespace as any, container);
+  >(namespace: N, namespaceContainer: C) {
+    this.addInstance(namespace as any, namespaceContainer);
 
-    for (const key of container.keys.filter(stringOrNumber)) {
-      this.linkNamespaceService(container, key, namespace);
-    }
-
-    container.addEventListener('add', ({ key, container }) => {
-      if (stringOrNumber(key)) {
-        this.linkNamespaceService(container, key, namespace);
+    let adoptee;
+    while (true) {
+      adoptee = !adoptee ? namespaceContainer : adoptee.getParent();
+      if (!adoptee || adoptee === this) {
+        break;
       }
-    });
+      // 1. can't concatenate symbol. 2. symbols are for private services
+      for (const key of adoptee.ownKeys.filter(stringOrNumber)) {
+        this.linkNamespaceService(adoptee, key, namespace);
+      }
+
+      // If for, some reason, something added to namespace after adoption - it should be added as well.
+      adoptee.addEventListener('add', ({ key, container }) => {
+        if (stringOrNumber(key)) {
+          this.linkNamespaceService(container, key, namespace);
+        }
+      });
+    }
   }
 
   private eventNotSupported(e: string) {

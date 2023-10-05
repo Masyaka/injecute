@@ -12,6 +12,11 @@ export type Callable<TParams extends readonly any[], TResult> = Func<
   TParams,
   TResult
 >;
+
+export type PromisedProperties<T extends Record<ArgumentsKey, any>> = {
+  [K in keyof T]: T[K] extends Promise<any> ? T[K] : Promise<T[K]>;
+};
+
 export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   ? InstanceType<TCallable>
   : TCallable extends Func<any, any>
@@ -147,8 +152,14 @@ export type IDIContainerExtension<
   Out extends In & Added = In & Added,
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
-export type ContainerServices<C extends IDIContainer<any>> =
-  C extends IDIContainer<infer S> ? S : never;
+export type ContainerServices<C extends IDIContainer<any, any, any>> =
+  C extends IDIContainer<any, any, infer S> ? S : never;
+
+export type ContainerParentServices<C extends IDIContainer<any, any, any>> =
+  C extends IDIContainer<any, infer P, any> ? P : never;
+
+export type ContainerOwnServices<C extends IDIContainer<any, any>> =
+  C extends IDIContainer<infer O, any> ? O : never;
 
 export type NamespaceServices<
   C extends IDIContainer<any>,
@@ -206,7 +217,12 @@ export type Events<C extends IDIContainer<any>> = {
   get: { key: ArgumentsKey; value: any; container: C };
 };
 
-export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
+export interface IDIContainer<
+  TOwnServices extends Record<ArgumentsKey, any>,
+  TParentServices extends Record<ArgumentsKey, any> = Empty,
+  TServices extends TParentServices & TOwnServices = TParentServices &
+    TOwnServices,
+> {
   addEventListener<E extends keyof Events<this>>(
     e: E,
     handler: (e: Events<IDIContainer<TServices>>[E]) => void,
@@ -225,7 +241,17 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    */
   has(name: keyof TServices | string): boolean;
 
+  getParent(): IDIContainer<TParentServices> | undefined;
+
+  /**
+   * keys of current container with parent keys if exists
+   */
   get keys(): ArgumentsKey[];
+
+  /**
+   * keys of current container without parent keys
+   */
+  get ownKeys(): ArgumentsKey[];
 
   /**
    * Adds existing instance to collection
@@ -239,7 +265,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
     options?: {
       replace: boolean;
     },
-  ): IDIContainer<TServices & { [k in K]: TResult }>;
+  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
   /**
    * Each time requested transient service - factory will be executed and returned new instance.
@@ -269,7 +295,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys],
-  ): IDIContainer<TServices & { [k in K]: TResult }>;
+  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
   /**
    * Once created instance will be returned for each service request
@@ -299,7 +325,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
           beforeReplaced?: (k: K) => void;
         }
       | [...Keys],
-  ): IDIContainer<TServices & { [k in K]: TResult }>;
+  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
   /**
    * When the service with `name` needed - `aliasTo` service will be given.
@@ -319,7 +345,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   >(
     name: K,
     aliasTo: A,
-  ): IDIContainer<TServices & { [k in K]: TResult }>;
+  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
   /**
    * Get registered service from container
@@ -371,17 +397,6 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
 
   /**
    * Create getter for specified key
-   * Useful for providing dependencies to namespace
-   * @example
-   * ```typescript
-   * container.namespace(
-   *   'Domain.Context',
-   *   (namespace, parent) => namespace
-   *     .addTransient('namespaceRequirement1', parent.getter('parentService1'), [])
-   *     .addTransient('namespaceRequirement2', parent.getter('parentService2'), [])
-   *     .addSingleton('namespaceService', construct(NamespaceServiceClass), ['namespaceRequirement1', 'namespaceRequirement2'])
-   * )
-   * ```
    * @param key
    */
   createResolver<K extends keyof TServices>(key: K): () => TServices[K];
@@ -399,7 +414,7 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   fork<T extends TServices = TServices>(options?: {
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
-  }): IDIContainer<T>;
+  }): IDIContainer<{}, T>;
 
   /**
    * Moves all factories, but not caches from parent containers to current level.
@@ -413,30 +428,32 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
   }): IDIContainer<TServices>;
 
   /**
-   * Creates isolated container inside current container.
-   * Current container will have access to namespace services, but not vice versa.
+   * Adopts callback result container services.
+   * Provided fork of current container can be used or new created container.
+   * Current container will have access to namespace services with namespace prefix.
    * For cases when you want to avoid keys intersection conflict.
+   *
    * @param namespace
    * @param extension
    */
   namespace<
+    TNamespaceServices extends ContainerOwnServices<ReturnType<TExtension>>,
+    TExtension extends (
+      c: IDIContainer<{}, TServices>,
+    ) => IDIContainer<any, TServices>,
     TNamespace extends string,
-    TExtension extends (p: {
-      parent: IDIContainer<TServices>;
-      namespace: TServices[TNamespace] extends IDIContainer<any>
-        ? TServices[TNamespace]
-        : IDIContainer<{}>;
-    }) => IDIContainer<any>,
-    TNamespaceServices extends ContainerServices<ReturnType<TExtension>>,
   >(
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
+    TOwnServices & {
+      [K in TNamespace]: IDIContainer<TNamespaceServices, TServices>;
+    } & {
       [K in keyof TNamespaceServices as K extends string
         ? `${TNamespace}.${K}`
         : never]: TNamespaceServices[K];
-    }
+    },
+    TParentServices
   >;
 
   /**
@@ -449,11 +466,11 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    * container.get('srv1') // Srv
    * ```
    */
-  extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
+  extend<S extends TOwnServices, T extends Record<ArgumentsKey, any>>(
     extensionFunction: (
-      container: IDIContainer<S>,
-    ) => IDIContainer<T>,
-  ): IDIContainer<TServices & T>;
+      container: IDIContainer<S, TParentServices>,
+    ) => IDIContainer<T, TParentServices>,
+  ): IDIContainer<TOwnServices & T, TParentServices>;
 
   /**
    * Clear singletons instances cache.
@@ -462,7 +479,15 @@ export interface IDIContainer<TServices extends Record<ArgumentsKey, any>> {
    *
    * @param resetParent false by default.
    */
-  reset(resetParent?: boolean): IDIContainer<TServices>;
+  reset(resetParent?: boolean): IDIContainer<TOwnServices, TParentServices>;
+
+  call<
+    FnKey extends KeyForValueOfType<TServices, (...p: any[]) => any>,
+    Fn extends TServices[FnKey],
+  >(
+    key: FnKey,
+    params: ArgumentsTypes<Fn>,
+  ): ReturnType<Fn>;
 
   /**
    * Executes function or constructor using container dependencies without adding it to container.

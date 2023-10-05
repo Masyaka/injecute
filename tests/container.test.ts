@@ -115,73 +115,49 @@ describe('injecute container', () => {
           .addInstance('parentService', {
             name: 'service from parent container',
           })
-          .namespace('Namespace', (p) =>
-            createNamespaceContainer(p.parent.createResolver('parentService')),
-          )
-          .namespace('Namespace', ({ namespace }) =>
-            namespace.addInstance('x', 'x'),
+          .namespace('Namespace', (c) =>
+            createNamespaceContainer(c.createResolver('parentService')),
           );
 
-        expect(parentContainer.get('Namespace.x')).to.be.eq('x');
         expect(parentContainer.get('Namespace.namespaceService'))
           .to.have.property('name')
           .eq('namespace uses service from parent container');
       });
       it('creates namespace container with added services', () => {
-        const feat = 'feature implementation' as const;
         const container = new DIContainer()
-          .namespace('Generic', ({ namespace: generic }) =>
+          .addInstance('cfg', { configVar: 1 })
+          .namespace('Generic', (generic) =>
             generic
-              .addTransient('cfg', () => ({ value: 1 }), [])
+              .addTransient('cfg', () => ({ configVar: 1 }), [])
               .addInstance('value', '23'),
           )
-          .namespace('Domain.Context', ({ parent, namespace }) => {
-            const getValue = parent.createResolver('Generic.value');
-            return namespace
-              .addTransient('cfg', parent.createResolver('Generic.cfg'), [])
-              .addSingleton(
-                'feature',
-                (cfg, value) => feat + cfg.value + value.substring(0, 1),
-                ['cfg', getValue],
-              );
+          .addInstance('x', 'x')
+          .namespace('Domain.Context', (c) => {
+            const domainContextNamespaceContainer = c.addSingleton(
+              'domainFeatureService',
+              (cfg) => ({
+                businessMethod: (n: number) => cfg.configVar + n,
+              }),
+              ['Generic.cfg'],
+            );
+            return domainContextNamespaceContainer;
           });
 
-        const addAliasAndExtendFeature = ({
-          parent,
-          namespace,
-        }: {
-          parent: typeof container;
-          namespace: IDIContainer<
-            NamespaceServices<typeof container, 'Domain.Context'>
-          >;
-        }) => {
-          const getCfg = parent.createResolver('Generic.cfg');
-          return namespace
-            .addAlias('feature alias', 'feature')
-            .addTransient(
-              'extendedFeature',
-              (f, cfg) => `${f} extended ${cfg.value}` as const,
-              ['feature', getCfg],
-            );
-        };
-
-        const extendedNamespaceOwnerContainer = container.namespace(
-          'Domain.Context',
-          addAliasAndExtendFeature,
-        );
-        expect(container.get('Domain.Context.feature')).to.be.eq(
-          feat + 1 + '2',
-        );
+        expect(
+          container
+            .get('Domain.Context.domainFeatureService')
+            .businessMethod(41),
+        ).to.be.eq(42);
         expect(container.get('Domain.Context')).to.be.instanceOf(DIContainer);
-        expect(container.get('Domain.Context').get('feature')).to.be.eq(
-          feat + 1 + '2',
+        expect(
+          container
+            .get('Domain.Context')
+            .get('domainFeatureService')
+            .businessMethod(41),
+        ).to.be.eq(42);
+        expect(container.get('Domain.Context').get('Generic.value')).to.be.eq(
+          '23',
         );
-        expect(
-          extendedNamespaceOwnerContainer.get('Domain.Context.feature alias'),
-        ).to.be.eq(feat + 1 + '2');
-        expect(
-          extendedNamespaceOwnerContainer.get('Domain.Context.extendedFeature'),
-        ).to.be.eq(feat + 1 + '2' + ' extended 1');
       });
     });
     describe('reset', () => {
@@ -245,6 +221,33 @@ describe('injecute container', () => {
         container.get('singleton');
 
         expect(singletonFactoryRuns).to.be.eq(2);
+      });
+    });
+
+    describe('call', () => {
+      it('calls functor entry', () => {
+        const container = new DIContainer()
+          .addInstance('dep', () => {
+            return 41;
+          })
+          .addSingleton(
+            'functor',
+            (dep) => (n: number) => `functorResult=${n + dep()}`,
+            ['dep'],
+          );
+
+        expect(container.call('functor', [1])).to.be.eq('functorResult=42');
+      });
+
+      it('throws when non functor entry called', () => {
+        const container = new DIContainer()
+          .addInstance('dep', () => {
+            return 41;
+          })
+          .addSingleton('nonFunctor', (dep) => dep() + 1, ['dep']);
+
+        // @ts-expect-error call for non function type entries not allowed
+        expect(() => container.call('nonFunctor', [1])).to.throw('Entry "nonFunctor" is not a function and can not be invoked');
       });
     });
 

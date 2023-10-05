@@ -1,4 +1,6 @@
 node_modules
+playground
 lib
 .idea
+.vscode
 .DS_Store
