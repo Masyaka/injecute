@@ -778,6 +778,7 @@ export class DIContainer<
       OptionalDependencySkipKey | keyof TServices
     >;
     this.addFactory(namespaceKey, () => container.get(key), {
+      // TODO: use beforeReplaced to replace in namespace as well.
       dependencies: [],
       [factoryTypeKey]: 'namespace-pass-through',
     });
