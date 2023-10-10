@@ -153,7 +153,7 @@ export type IDIContainerExtension<
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
 export type ContainerServices<C extends IDIContainer<any, any, any>> =
-  C extends IDIContainer<any, any, infer S> ? S : never;
+  C extends IDIContainer<any, any, infer S> ? Flatten<S> : never;
 
 export type ContainerParentServices<C extends IDIContainer<any, any, any>> =
   C extends IDIContainer<any, infer P, any> ? P : never;
@@ -191,7 +191,7 @@ export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
 }
 
 export type Merge<T1, T2> = Flatten<T1 & T2>;
-export type Flatten<T> = {} & { [k in keyof T]: T[k] };
+export type Flatten<T> = { [k in keyof T]: T[k] } & {};
 
 /**
  * How factory was added

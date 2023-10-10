@@ -1,6 +1,7 @@
 import {
   ArgumentsKey,
   ContainerServices,
+  Flatten,
   IDIContainer,
   ResolversMapKeys,
 } from '../types';
@@ -71,7 +72,7 @@ export const createProxyAccessor = <
   c: C,
   options?: O,
 ): O['keys'] extends Array<any>
-  ? KeysOverride<ContainerServices<C>, O['keys']>
+  ? Flatten<KeysOverride<ContainerServices<C>, O['keys']>>
   : Readonly<ContainerServices<C>> => {
   let getContainerKey: (k: ArgumentsKey) => ArgumentsKey | undefined;
   if (options?.keys) {
