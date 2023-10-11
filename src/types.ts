@@ -181,6 +181,18 @@ export type InjecuteOptions<
   argumentsNames?: [...Keys];
 };
 
+export type WithNamespace<
+  TNamespace extends string,
+  TNamespaceServices extends Record<ArgumentsKey, any>,
+  TServices extends Record<ArgumentsKey, any>,
+> = {
+  [K in TNamespace]: IDIContainer<TNamespaceServices, TServices>;
+} & {
+  [K in keyof TNamespaceServices as K extends string
+    ? `${TNamespace}.${K}`
+    : never]: TNamespaceServices[K];
+};
+
 /**
  * Actually the Map but...
  */
@@ -437,7 +449,7 @@ export interface IDIContainer<
    * @param extension
    */
   namespace<
-    TNamespaceServices extends ContainerOwnServices<ReturnType<TExtension>>,
+    TNamespaceServices extends Flatten<ContainerOwnServices<ReturnType<TExtension>>>,
     TExtension extends (
       c: IDIContainer<{}, TServices>,
     ) => IDIContainer<any, TServices>,
@@ -446,13 +458,7 @@ export interface IDIContainer<
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TOwnServices & {
-      [K in TNamespace]: IDIContainer<TNamespaceServices, TServices>;
-    } & {
-      [K in keyof TNamespaceServices as K extends string
-        ? `${TNamespace}.${K}`
-        : never]: TNamespaceServices[K];
-    },
+    TOwnServices & WithNamespace<TNamespace, TNamespaceServices, TServices>,
     TParentServices
   >;
 
