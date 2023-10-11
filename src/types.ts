@@ -152,11 +152,11 @@ export type IDIContainerExtension<
   Out extends In & Added = In & Added,
 > = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
 
-export type ContainerServices<C extends IDIContainer<any, any, any>> =
-  C extends IDIContainer<any, any, infer S> ? Flatten<S> : never;
+export type ContainerServices<C extends IDIContainer<any, any>> =
+  C extends IDIContainer<infer O, infer P> ? Flatten<O & P> : never;
 
-export type ContainerParentServices<C extends IDIContainer<any, any, any>> =
-  C extends IDIContainer<any, infer P, any> ? P : never;
+export type ContainerParentServices<C extends IDIContainer<any, any>> =
+  C extends IDIContainer<any, infer P> ? P : never;
 
 export type ContainerOwnServices<C extends IDIContainer<any, any>> =
   C extends IDIContainer<infer O, any> ? O : never;
@@ -184,9 +184,8 @@ export type InjecuteOptions<
 export type WithNamespace<
   TNamespace extends string,
   TNamespaceServices extends Record<ArgumentsKey, any>,
-  TServices extends Record<ArgumentsKey, any>,
 > = {
-  [K in TNamespace]: IDIContainer<TNamespaceServices, TServices>;
+  [K in TNamespace]: IDIContainer<TNamespaceServices>;
 } & {
   [K in keyof TNamespaceServices as K extends string
     ? `${TNamespace}.${K}`
@@ -232,17 +231,15 @@ export type Events<C extends IDIContainer<any>> = {
 export interface IDIContainer<
   TOwnServices extends Record<ArgumentsKey, any>,
   TParentServices extends Record<ArgumentsKey, any> = Empty,
-  TServices extends TParentServices & TOwnServices = TParentServices &
-    TOwnServices,
 > {
   addEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
+    handler: (e: Events<IDIContainer<TOwnServices & TParentServices>>[E]) => void,
   ): this;
 
   removeEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TServices>>[E]) => void,
+    handler: (e: Events<IDIContainer<TOwnServices & TParentServices>>[E]) => void,
   ): this;
 
   getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
@@ -251,7 +248,7 @@ export interface IDIContainer<
    * true if services with such key is registered, false otherwise
    * @param name
    */
-  has(name: keyof TServices | string): boolean;
+  has(name: keyof (TOwnServices & TParentServices) | string): boolean;
 
   getParent(): IDIContainer<TParentServices> | undefined;
 
@@ -290,8 +287,8 @@ export interface IDIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
+    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, any>,
+    Keys extends (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices) | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -320,8 +317,8 @@ export interface IDIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
+    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, any>,
+    Keys extends (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices) | (() => any))[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -351,9 +348,9 @@ export interface IDIContainer<
    * @param aliasTo
    */
   addAlias<
-    TResult extends TServices[A],
+    TResult extends (TOwnServices & TParentServices)[A],
     K extends ArgumentsKey,
-    A extends keyof TServices,
+    A extends keyof (TOwnServices & TParentServices),
   >(
     name: K,
     aliasTo: A,
@@ -378,9 +375,9 @@ export interface IDIContainer<
    * @param options {GetOptions}
    */
   get<
-    Key extends keyof TServices,
+    Key extends keyof (TOwnServices & TParentServices),
     O extends GetOptions,
-    T extends any = TServices[Key],
+    T extends any = (TOwnServices & TParentServices)[Key],
   >(
     serviceName: Key,
     options?: O,
@@ -401,17 +398,17 @@ export interface IDIContainer<
    */
   bind<
     TResult extends any,
-    Keys extends readonly (OptionalDependencySkipKey | keyof TServices)[],
+    Keys extends readonly (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices))[],
   >(
     keys: [...Keys],
-    callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
+    callable: Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, TResult>,
   ): () => TResult;
 
   /**
    * Create getter for specified key
    * @param key
    */
-  createResolver<K extends keyof TServices>(key: K): () => TServices[K];
+  createResolver<K extends keyof (TOwnServices & TParentServices)>(key: K): () => (TOwnServices & TParentServices)[K];
 
   /**
    * Creates child container.
@@ -423,7 +420,7 @@ export interface IDIContainer<
    * localRequestContainer.get('request') === request;
    * ```
    */
-  fork<T extends TServices = TServices>(options?: {
+  fork<T extends (TOwnServices & TParentServices) = (TOwnServices & TParentServices)>(options?: {
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<{}, T>;
@@ -434,10 +431,10 @@ export interface IDIContainer<
    */
   flatten(options?: {
     fork?: boolean;
-    onKeyIntersection?: <K extends keyof TServices>(
+    onKeyIntersection?: <K extends keyof (TOwnServices & TParentServices)>(
       k: K,
-    ) => Resolve<TServices[K]>;
-  }): IDIContainer<TServices>;
+    ) => Resolve<(TOwnServices & TParentServices)[K]>;
+  }): IDIContainer<(TOwnServices & TParentServices)>;
 
   /**
    * Adopts callback result container services.
@@ -451,14 +448,14 @@ export interface IDIContainer<
   namespace<
     TNamespaceServices extends Flatten<ContainerOwnServices<ReturnType<TExtension>>>,
     TExtension extends (
-      c: IDIContainer<{}, TServices>,
-    ) => IDIContainer<any, TServices>,
+      c: IDIContainer<{}, (TOwnServices & TParentServices)>,
+    ) => IDIContainer<any, (TOwnServices & TParentServices)>,
     TNamespace extends string,
   >(
     namespace: TNamespace,
     extension: TExtension,
   ): IDIContainer<
-    TOwnServices & WithNamespace<TNamespace, TNamespaceServices, TServices>,
+    TOwnServices & WithNamespace<TNamespace, TNamespaceServices>,
     TParentServices
   >;
 
@@ -488,8 +485,8 @@ export interface IDIContainer<
   reset(resetParent?: boolean): IDIContainer<TOwnServices, TParentServices>;
 
   call<
-    FnKey extends KeyForValueOfType<TServices, (...p: any[]) => any>,
-    Fn extends TServices[FnKey],
+    FnKey extends KeyForValueOfType<(TOwnServices & TParentServices), (...p: any[]) => any>,
+    Fn extends (TOwnServices & TParentServices)[FnKey],
   >(
     key: FnKey,
     params: ArgumentsTypes<Fn>,
@@ -511,14 +508,14 @@ export interface IDIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
+    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, TResult>,
     Keys extends (
       | OptionalDependencySkipKey
-      | keyof TServices
-      | Resolve<TServices[keyof TServices]>
+      | keyof (TOwnServices & TParentServices)
+      | Resolve<(TOwnServices & TParentServices)[keyof (TOwnServices & TParentServices)]>
     )[],
   >(
     callable: TCallable,
-    options?: InjecuteOptions<keyof TServices, Keys> | [...Keys],
+    options?: InjecuteOptions<keyof (TOwnServices & TParentServices), Keys> | [...Keys],
   ): CallableResult<TCallable>;
 }
