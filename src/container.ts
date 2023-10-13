@@ -280,7 +280,7 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
-          dependencies?: [...Keys];
+          dependencies: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (
@@ -315,7 +315,7 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           replace?: boolean;
-          dependencies?: [...Keys];
+          dependencies: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (

@@ -315,7 +315,7 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          dependencies?: [...Keys];
+          dependencies: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (
@@ -355,7 +355,7 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          dependencies?: [...Keys];
+          dependencies: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
           beforeReplaced?: (
