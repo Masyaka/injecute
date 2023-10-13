@@ -27,5 +27,8 @@ export function setCacheInstance<
   S extends ContainerServices<C>,
   K extends keyof S,
 >(container: C, key: K, instance: S[K]) {
+  if (!(container instanceof DIContainer)) {
+    throw new Error('Only DIContainer supported');
+  }
   _setSingletonInstance.call(container, key, instance);
 }
