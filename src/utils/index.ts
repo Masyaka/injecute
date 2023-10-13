@@ -7,6 +7,7 @@ import {
 import { defer } from './defer';
 import { preload } from './preload';
 import { createProxyAccessor } from './proxy';
+import { setCacheInstance } from './set-cache-instance';
 
 export { construct } from './construct';
 export {
@@ -17,6 +18,7 @@ export {
 export { defer } from './defer';
 export { preload } from './preload';
 export { createProxyAccessor } from './proxy';
+export { setCacheInstance } from './set-cache-instance';
 
 export const utils = {
   preload,
@@ -26,4 +28,5 @@ export const utils = {
   createNamedResolvers,
   createResolversTuple,
   addNamedResolvers,
+  setCacheInstance,
 };
