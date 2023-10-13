@@ -68,6 +68,11 @@ export class CircularDependencyError extends Error {
 const stringOrNumber = (i: any): i is string | number =>
   ['string', 'number'].includes(typeof i);
 
+const createNamespaceServiceKey = <N extends string, K extends string | number>(
+  namespace: N,
+  key: K,
+) => `${namespace}.${key}`;
+
 export type DIContainerConstructorArguments<
   TParentServices extends Record<ArgumentsKey, any> = Empty,
 > = {
@@ -85,6 +90,21 @@ const getContainersChain = (c: IDIContainer<any>) => {
 };
 
 const factoryTypeKey = Symbol('TransientType');
+
+type Factory<
+  TServices extends Record<ArgumentsKey, any>,
+  K extends keyof TServices,
+  C extends Callable<ValueOf<TServices>[], TServices[K]> = Callable<
+    ValueOf<TServices>[],
+    TServices[K]
+  >,
+> = {
+  callable: C;
+  type: FactoryType;
+  beforeResolving?: (k: K) => void;
+  afterResolving?: (k: K, instance: TServices[K]) => void;
+  beforeReplaced?: (k: K, newFactory: C, oldFactory: C) => C | void;
+};
 
 /**
  * Dependency Injection container
@@ -117,13 +137,7 @@ export class DIContainer<
     return this.#parentContainer;
   }
   readonly #factories: MapOf<{
-    [key in keyof TServices]?: {
-      callable: Callable<ValueOf<TServices>[], TServices[key]>;
-      type: FactoryType;
-      beforeResolving?: (k: key) => void;
-      afterResolving?: (k: key, instance: TServices[key]) => void;
-      beforeReplaced?: (k: key) => void;
-    };
+    [key in keyof TServices]?: Factory<TServices, key>;
   }> = new Map();
   protected getFactory<K extends keyof TServices>(k: K) {
     return this.#factories.get(k);
@@ -157,6 +171,13 @@ export class DIContainer<
   ) {
     return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
   };
+
+  protected setSingletonInstance(
+    name: keyof (TOwnServices & TParentServices),
+    instance: any,
+  ) {
+    this.#singletonInstances.set(name, instance);
+  }
 
   addEventListener<
     E extends keyof Events<IDIContainer<TOwnServices, TParentServices>>,
@@ -219,11 +240,21 @@ export class DIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
+      beforeResolving?: (k: K) => void;
+      afterResolving?: (k: K, instance: TResult) => void;
+      beforeReplaced?: (
+        k: K,
+        newFactory: () => TResult,
+        oldFactory: () => TResult,
+      ) => (() => TResult) | void;
     },
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, () => instance, {
       [factoryTypeKey]: 'instance',
       replace: options?.replace,
+      beforeResolving: options?.beforeResolving,
+      afterResolving: options?.afterResolving,
+      beforeReplaced: options?.beforeReplaced,
       dependencies: [],
     });
   }
@@ -252,7 +283,11 @@ export class DIContainer<
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (k: K) => void;
+          beforeReplaced?: (
+            k: K,
+            newFactory: TCallable,
+            oldFactory: TCallable,
+          ) => TCallable | void;
         }
       | [...Keys] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -283,7 +318,11 @@ export class DIContainer<
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (k: K) => void;
+          beforeReplaced?: (
+            k: K,
+            newFactory: TCallable,
+            oldFactory: TCallable,
+          ) => TCallable | void;
         }
       | [...Keys] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -295,7 +334,7 @@ export class DIContainer<
       dependencies: optionsIsArray ? options : options?.dependencies,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: (k: ArgumentsKey, instance: TResult) => {
-        this.#singletonInstances.set(name, instance);
+        this.setSingletonInstance(name, instance);
         !optionsIsArray && options?.afterResolving?.(k as K, instance);
       },
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
@@ -362,7 +401,7 @@ export class DIContainer<
 
     this.onGet(serviceName, instance);
 
-    if (instance) {
+    if (typeof instance !== 'undefined') {
       return instance;
     }
 
@@ -416,7 +455,7 @@ export class DIContainer<
     keys: [...Keys],
     callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
   ): () => TResult {
-    return () => this.injecute(callable, { argumentsNames: keys });
+    return () => this.injecute(callable, { arguments: keys });
   }
 
   protected callFactory<D extends any[], C extends Callable<D, any>>(
@@ -515,6 +554,11 @@ export class DIContainer<
    * Provided fork of current container can be used or new created container.
    * Current container will have access to namespace services with namespace prefix.
    * For cases when you want to avoid keys intersection conflict.
+   *
+   * Only the returned container services will be exposed in namespace types.
+   * It means if you made few forks in namespace and returned latest fork,
+   * only registered in latest fork entries will be listed in namespace services type.
+   * Btw in runtime every service from returned container can be accessed.
    *
    * @param namespace
    * @param extension
@@ -639,22 +683,22 @@ export class DIContainer<
     options?:
       | {
           argumentsKey?: keyof TServices | ArgumentsKey | undefined;
-          argumentsNames?: [...Keys];
+          arguments?: [...Keys];
         }
       | [...Keys],
   ): CallableResult<TCallable> {
     const optionsIsArray = Array.isArray(options);
-    const argumentsNames = optionsIsArray ? options : options?.argumentsNames;
+    const argumentsOption = optionsIsArray ? options : options?.arguments;
     const argumentsKey = !optionsIsArray ? options?.argumentsKey : undefined;
     const args = this.resolveAndCacheArguments(
       callable,
       argumentsKey,
-      argumentsNames,
+      argumentsOption,
     );
 
     if (!args) {
       throw new Error(
-        `Not resolved arguments for ${String(argumentsKey)} "${callable
+        `Not resolved arguments for "${String(argumentsKey)}": "${callable
           .toString()
           .substring(0, 50)}"`,
       );
@@ -723,17 +767,17 @@ export class DIContainer<
     }
   }
 
-  protected onReplace(name: keyof TServices) {
-    const factory = this.#factories.get(name);
-    if (!factory) return;
-    factory.beforeReplaced?.(name);
+  protected onReplace(name: keyof TServices, newCallable: any) {
+    const currentFactory = this.#factories.get(name);
+    if (!currentFactory) return;
+    currentFactory.beforeReplaced?.(name, newCallable, currentFactory.callable);
     for (const handler of this.eventHandlers.replace) {
       handler({
         key: name,
         container: this as IDIContainer<TOwnServices, TParentServices>,
         replaced: {
-          callable: factory.callable,
-          type: factory.type,
+          callable: currentFactory.callable,
+          type: currentFactory.type,
         },
       });
     }
@@ -769,16 +813,30 @@ export class DIContainer<
   }
 
   private linkNamespaceService<N extends string, C extends IDIContainer<any>>(
-    container: C,
-    key: string | number,
+    namespaceContainer: C,
     namespace: N,
+    key: string | number,
   ) {
-    const namespaceKey = `${namespace}.${key}` as Exclude<
+    const namespaceKey = createNamespaceServiceKey(namespace, key) as Exclude<
       string,
       OptionalDependencySkipKey | keyof TServices
     >;
-    this.addFactory(namespaceKey, () => container.get(key), {
-      // TODO: use beforeReplaced to replace in namespace as well.
+    this.addFactory(namespaceKey, namespaceContainer.createResolver(key), {
+      beforeReplaced: () => {
+        // if parent container replaces namespace entry, namespace container will use this replaced entry as well
+        namespaceContainer.addTransient(
+          key,
+          this.createResolver(namespaceKey),
+          {
+            replace: true,
+            dependencies: [],
+            beforeReplaced: () => {
+              this.#factories.delete(namespaceKey);
+              this.#singletonInstances.delete(namespaceKey);
+            },
+          },
+        );
+      },
       dependencies: [],
       [factoryTypeKey]: 'namespace-pass-through',
     });
@@ -790,22 +848,29 @@ export class DIContainer<
   >(namespace: N, namespaceContainer: C) {
     this.addInstance(namespace as any, namespaceContainer);
 
-    let adoptee;
+    let adoptee: IDIContainer<any> | undefined;
     while (true) {
-      adoptee = !adoptee ? namespaceContainer : adoptee.getParent();
-      if (!adoptee || adoptee === this) {
+      const currentAdoptee = (adoptee = !adoptee
+        ? namespaceContainer
+        : adoptee.getParent());
+      if (!currentAdoptee || currentAdoptee === this) {
         break;
       }
+
       // 1. can't concatenate symbol. 2. symbols are for private services
-      for (const key of adoptee.ownKeys.filter(stringOrNumber)) {
-        this.linkNamespaceService(adoptee, key, namespace);
+      for (const key of currentAdoptee.ownKeys.filter(stringOrNumber)) {
+        this.linkNamespaceService(currentAdoptee, namespace, key);
       }
 
       // If for, some reason, something added to namespace after adoption - it should be added as well.
-      adoptee.addEventListener('add', ({ key, container }) => {
-        if (stringOrNumber(key)) {
-          this.linkNamespaceService(container, key, namespace);
-        }
+      currentAdoptee.addEventListener('add', ({ key }) => {
+        if (!stringOrNumber(key)) return;
+        if (this.has(createNamespaceServiceKey(namespace, key))) return;
+        this.linkNamespaceService(currentAdoptee, namespace, key);
+      });
+
+      this.addEventListener('reset', () => {
+        currentAdoptee.reset();
       });
     }
   }
@@ -836,7 +901,11 @@ export class DIContainer<
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (k: K) => void;
+          beforeReplaced?: (
+            k: K,
+            newFactory: TCallable,
+            oldFactory: TCallable,
+          ) => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -846,9 +915,10 @@ export class DIContainer<
     this.validateAdd(name, factory, replace);
     if (replace) {
       if (this.#factories.has(name)) {
-        this.onReplace(name as any);
+        this.onReplace(name as any, factory);
       }
       this.#singletonInstances.delete(name);
+      this.#arguments.delete(name);
     }
     this.resolveAndCacheArguments(factory, name, dependencies);
     this.#factories.set(name, {
@@ -856,7 +926,9 @@ export class DIContainer<
         'transient') as FactoryType,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
-      beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
+      beforeReplaced: !optionsIsArray
+        ? (options?.beforeReplaced as any)
+        : undefined,
       callable: factory as Callable<any[], any>,
     });
     this.onAdd(name as any, replace);

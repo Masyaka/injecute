@@ -177,7 +177,6 @@ export type InjecuteOptions<
   )[],
 > = {
   argumentsKey?: TContainerKey | undefined;
-  useNew?: boolean;
   argumentsNames?: [...Keys];
 };
 
@@ -212,7 +211,8 @@ export type FactoryType =
   | 'transient'
   | 'instance'
   | 'alias'
-  | 'namespace-pass-through';
+  | 'namespace-pass-through'
+  | 'reverse-namespace-replacement';
 
 export type Events<C extends IDIContainer<any>> = {
   add: { key: ArgumentsKey; replace: boolean; container: C };
@@ -234,12 +234,16 @@ export interface IDIContainer<
 > {
   addEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TOwnServices & TParentServices>>[E]) => void,
+    handler: (
+      e: Events<IDIContainer<TOwnServices & TParentServices>>[E],
+    ) => void,
   ): this;
 
   removeEventListener<E extends keyof Events<this>>(
     e: E,
-    handler: (e: Events<IDIContainer<TOwnServices & TParentServices>>[E]) => void,
+    handler: (
+      e: Events<IDIContainer<TOwnServices & TParentServices>>[E],
+    ) => void,
   ): this;
 
   getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
@@ -273,6 +277,13 @@ export interface IDIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
+      beforeResolving?: (k: K) => void;
+      afterResolving?: (k: K, instance: TResult) => void;
+      beforeReplaced?: (
+        k: K,
+        newFactory: () => TResult,
+        oldFactory: () => TResult,
+      ) => (() => TResult) | void;
     },
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
@@ -287,8 +298,15 @@ export interface IDIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices) | (() => any))[],
+    TCallable extends Callable<
+      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      any
+    >,
+    Keys extends (
+      | OptionalDependencySkipKey
+      | keyof (TOwnServices & TParentServices)
+      | (() => any)
+    )[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -297,11 +315,14 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          useNew?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (k: K) => void;
+          beforeReplaced?: (
+            k: K,
+            newFactory: TCallable,
+            oldFactory: TCallable,
+          ) => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
@@ -317,8 +338,15 @@ export interface IDIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices) | (() => any))[],
+    TCallable extends Callable<
+      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      any
+    >,
+    Keys extends (
+      | OptionalDependencySkipKey
+      | keyof (TOwnServices & TParentServices)
+      | (() => any)
+    )[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -327,11 +355,14 @@ export interface IDIContainer<
     options?:
       | {
           replace?: boolean;
-          useNew?: boolean;
           dependencies?: [...Keys];
           beforeResolving?: (k: K) => void;
           afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (k: K) => void;
+          beforeReplaced?: (
+            k: K,
+            newFactory: TCallable,
+            oldFactory: TCallable,
+          ) => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
@@ -398,17 +429,25 @@ export interface IDIContainer<
    */
   bind<
     TResult extends any,
-    Keys extends readonly (OptionalDependencySkipKey | keyof (TOwnServices & TParentServices))[],
+    Keys extends readonly (
+      | OptionalDependencySkipKey
+      | keyof (TOwnServices & TParentServices)
+    )[],
   >(
     keys: [...Keys],
-    callable: Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, TResult>,
+    callable: Callable<
+      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      TResult
+    >,
   ): () => TResult;
 
   /**
    * Create getter for specified key
    * @param key
    */
-  createResolver<K extends keyof (TOwnServices & TParentServices)>(key: K): () => (TOwnServices & TParentServices)[K];
+  createResolver<K extends keyof (TOwnServices & TParentServices)>(
+    key: K,
+  ): () => (TOwnServices & TParentServices)[K];
 
   /**
    * Creates child container.
@@ -420,7 +459,9 @@ export interface IDIContainer<
    * localRequestContainer.get('request') === request;
    * ```
    */
-  fork<T extends (TOwnServices & TParentServices) = (TOwnServices & TParentServices)>(options?: {
+  fork<
+    T extends TOwnServices & TParentServices = TOwnServices & TParentServices,
+  >(options?: {
     skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<{}, T>;
@@ -434,7 +475,7 @@ export interface IDIContainer<
     onKeyIntersection?: <K extends keyof (TOwnServices & TParentServices)>(
       k: K,
     ) => Resolve<(TOwnServices & TParentServices)[K]>;
-  }): IDIContainer<(TOwnServices & TParentServices)>;
+  }): IDIContainer<TOwnServices & TParentServices>;
 
   /**
    * Adopts callback result container services.
@@ -446,10 +487,12 @@ export interface IDIContainer<
    * @param extension
    */
   namespace<
-    TNamespaceServices extends Flatten<ContainerOwnServices<ReturnType<TExtension>>>,
+    TNamespaceServices extends Flatten<
+      ContainerOwnServices<ReturnType<TExtension>>
+    >,
     TExtension extends (
-      c: IDIContainer<{}, (TOwnServices & TParentServices)>,
-    ) => IDIContainer<any, (TOwnServices & TParentServices)>,
+      c: IDIContainer<{}, TOwnServices & TParentServices>,
+    ) => IDIContainer<any, TOwnServices & TParentServices>,
     TNamespace extends string,
   >(
     namespace: TNamespace,
@@ -485,7 +528,10 @@ export interface IDIContainer<
   reset(resetParent?: boolean): IDIContainer<TOwnServices, TParentServices>;
 
   call<
-    FnKey extends KeyForValueOfType<(TOwnServices & TParentServices), (...p: any[]) => any>,
+    FnKey extends KeyForValueOfType<
+      TOwnServices & TParentServices,
+      (...p: any[]) => any
+    >,
     Fn extends (TOwnServices & TParentServices)[FnKey],
   >(
     key: FnKey,
@@ -508,14 +554,22 @@ export interface IDIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<KeysToTypes<Keys, (TOwnServices & TParentServices)>, TResult>,
+    TCallable extends Callable<
+      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      TResult
+    >,
     Keys extends (
       | OptionalDependencySkipKey
       | keyof (TOwnServices & TParentServices)
-      | Resolve<(TOwnServices & TParentServices)[keyof (TOwnServices & TParentServices)]>
+      | Resolve<
+          (TOwnServices & TParentServices)[keyof (TOwnServices &
+            TParentServices)]
+        >
     )[],
   >(
     callable: TCallable,
-    options?: InjecuteOptions<keyof (TOwnServices & TParentServices), Keys> | [...Keys],
+    options?:
+      | InjecuteOptions<keyof (TOwnServices & TParentServices), Keys>
+      | [...Keys],
   ): CallableResult<TCallable>;
 }

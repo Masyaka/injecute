@@ -161,6 +161,107 @@ describe('injecute container', () => {
           '23',
         );
       });
+      it('replaces namespace entry when parent container replaces entry', () => {
+        let c = 0;
+        const container = new DIContainer()
+          .addTransient('count', () => {
+            return c++;
+          })
+          .namespace('NS', (ns) =>
+            ns.addSingleton(
+              'service',
+              (count) => {
+                return 'original' + count;
+              },
+              ['count'],
+            ),
+          );
+
+        expect(container.get('NS.service')).to.eq('original0');
+        expect(container.get('NS.service')).to.eq('original0');
+        container.addTransient('NS.service', (count) => 'replaced' + count, {
+          replace: true,
+          dependencies: ['count'],
+        });
+        expect(container.get('NS.service')).to.eq('replaced1');
+        expect(container.get('NS').get('service')).to.eq('replaced2');
+
+        container.addTransient(
+          'NS.service',
+          (count) => 'over-replaced-' + count,
+          {
+            replace: true,
+            dependencies: ['count'],
+          },
+        );
+        expect(container.get('NS.service')).to.eq('over-replaced-3');
+        expect(container.get('NS').get('service')).to.eq('over-replaced-4');
+
+        container.get('NS').addTransient('service', () => 'final-replacement', {
+          replace: true,
+          dependencies: [],
+        });
+        expect(container.get('NS.service')).to.eq('final-replacement');
+        expect(container.get('NS').get('service')).to.eq('final-replacement');
+      });
+      it('replaces deep nested namespace entry', () => {
+        const container = new DIContainer()
+          .addInstance('rootVal', 'rootVal')
+          .namespace('NS1', (ns1) =>
+            ns1
+              .addSingleton(
+                'ns1Service',
+                (rootVal) => `ns1Service(${rootVal})`,
+                ['rootVal'],
+              )
+              .namespace('NS2', (ns2) =>
+                ns2.addSingleton(
+                  'ns2Service',
+                  (rootVal, ns1Service) =>
+                    `ns2Service(${rootVal}, ${ns1Service})`,
+                  ['rootVal', 'ns1Service'],
+                ),
+              ),
+          );
+
+        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+          'ns2Service(rootVal, ns1Service(rootVal))',
+        );
+        container.addInstance('rootVal', 'newRootVal', { replace: true });
+        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+          'ns2Service(rootVal, ns1Service(rootVal))',
+        );
+        container.reset();
+        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+          'ns2Service(newRootVal, ns1Service(newRootVal))',
+        );
+        container.addSingleton(
+          'NS1.ns1Service',
+          (rootVal) => `ns1ServiceUpdated(${rootVal})`,
+          {
+            replace: true,
+            dependencies: ['rootVal'],
+          },
+        );
+        container.reset();
+        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+          'ns2Service(newRootVal, ns1ServiceUpdated(newRootVal))',
+        );
+        expect(container.get('NS1.ns1Service')).to.be.eq(
+          'ns1ServiceUpdated(newRootVal)',
+        );
+        container.addSingleton(
+          'NS1.NS2.ns2Service',
+          (rootVal) => `ns2ServiceUpdated2(${rootVal})`,
+          {
+            replace: true,
+            dependencies: ['rootVal'],
+          },
+        );
+        expect(container.get('NS1').get('NS2.ns2Service')).to.be.eq(
+          'ns2ServiceUpdated2(newRootVal)',
+        );
+      });
     });
     describe('reset', () => {
       it('removes cached singleton instances', () => {
@@ -249,7 +350,9 @@ describe('injecute container', () => {
           .addSingleton('nonFunctor', (dep) => dep() + 1, ['dep']);
 
         // @ts-expect-error call for non function type entries not allowed
-        expect(() => container.call('nonFunctor', [1])).to.throw('Entry "nonFunctor" is not a function and can not be invoked');
+        expect(() => container.call('nonFunctor', [1])).to.throw(
+          'Entry "nonFunctor" is not a function and can not be invoked',
+        );
       });
     });
 

@@ -10,6 +10,7 @@ import {
   addNamedResolvers,
   DIContainer,
 } from '../src';
+import { setCacheInstance } from '../src/utils/set-cache-instance';
 
 describe('utils', () => {
   describe('proxy', () => {
@@ -279,5 +280,46 @@ describe('utils', () => {
       expect(resolvers.aliasForY()).eq('y');
       expect(resolvers[zSymbol]()).eq('z');
     });
+  });
+});
+
+describe('setCacheInstance', () => {
+  it('overrides service until reset()', () => {
+    let factoryCalls = 0;
+    const container = new DIContainer()
+      .addSingleton('service', () => {
+        factoryCalls++;
+        return {
+          method(p: string) {
+            return p + p;
+          },
+        };
+      })
+      .addTransient(
+        'serviceUsageResult',
+        (service) => {
+          return service.method('hello');
+        },
+        ['service'],
+      );
+
+    expect(factoryCalls).to.eq(0);
+    expect(container.get('serviceUsageResult')).to.eq('hellohello');
+    expect(factoryCalls).to.eq(1);
+    expect(container.get('serviceUsageResult')).to.eq('hellohello');
+    expect(factoryCalls).to.eq(1);
+    container.reset();
+    setCacheInstance(container, 'service', {
+      method(p) {
+        return p + 1;
+      },
+    });
+    expect(container.get('serviceUsageResult')).to.eq('hello1');
+    expect(factoryCalls).to.eq(1);
+    container.reset();
+    expect(container.get('serviceUsageResult')).to.eq('hellohello');
+    expect(factoryCalls).to.eq(2);
+    expect(container.get('serviceUsageResult')).to.eq('hellohello');
+    expect(factoryCalls).to.eq(2);
   });
 });
