@@ -2,24 +2,24 @@ import {
   Argument,
   ArgumentsKey,
   ArgumentsResolver,
+  ArgumentsTypes,
   Callable,
   CallableResult,
+  ContainerOwnServices,
   Empty,
   Events,
   FactoryType,
   Func,
   GetOptions,
-  Resolve,
   IDIContainer,
+  KeyForValueOfType,
   KeysToTypes,
   MapOf,
-  optionalDependencySkipKey,
   OptionalDependencySkipKey,
+  Resolve,
   Resolver,
   ValueOf,
-  ContainerOwnServices,
-  KeyForValueOfType,
-  ArgumentsTypes,
+  optionalDependencySkipKey,
 } from './types';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
@@ -621,14 +621,28 @@ export class DIContainer<
    * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
    * Helpful when some service is replaced and cached dependant should be created once more.
    *
-   * @param resetParent false by default.
+   * @param {{
+   * resetParent?: boolean;
+   * keys?: (keyof (TOwnServices & TParentServices))[];
+   * } | undefined} options
    */
-  reset(resetParent = false): IDIContainer<TOwnServices, TParentServices> {
-    this.#singletonInstances.clear();
-    if (resetParent) {
-      this.#parentContainer?.reset(resetParent);
+  reset(
+    options: {
+      resetParent?: boolean;
+      keys?: (keyof (TOwnServices & TParentServices))[];
+    } = {},
+  ): IDIContainer<TOwnServices, TParentServices> {
+    if (!options.keys) {
+      this.#singletonInstances.clear();
+    } else {
+      options.keys.forEach((k) => {
+        this.#singletonInstances.delete(k);
+      });
     }
-    this.onReset(resetParent);
+    if (options.resetParent) {
+      this.#parentContainer?.reset(options);
+    }
+    this.onReset(options);
     return this as IDIContainer<TOwnServices, TParentServices>;
   }
 
@@ -793,10 +807,14 @@ export class DIContainer<
     }
   }
 
-  protected onReset(resetParent: boolean) {
+  protected onReset(resetOptions: {
+    resetParent?: boolean;
+    keys?: (keyof (TOwnServices & TParentServices))[];
+  }) {
     for (const handler of this.eventHandlers.reset) {
       handler({
-        resetParent,
+        resetParent: resetOptions.resetParent || false,
+        keys: resetOptions.keys,
         container: this as IDIContainer<TOwnServices, TParentServices>,
       });
     }

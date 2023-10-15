@@ -224,7 +224,7 @@ export type Events<C extends IDIContainer<any>> = {
       type: FactoryType;
     };
   };
-  reset: { resetParent: boolean; container: C };
+  reset: { resetParent: boolean; container: C, keys?: ArgumentsKey[] };
   get: { key: ArgumentsKey; value: any; container: C };
 };
 
@@ -523,9 +523,15 @@ export interface IDIContainer<
    * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
    * Helpful when some service is replaced and cached dependant should be created once more.
    *
-   * @param resetParent false by default.
+   * @param {{
+   * resetParent?: boolean;
+   * keys?: (keyof (TOwnServices & TParentServices))[];
+   * } | undefined} options
    */
-  reset(resetParent?: boolean): IDIContainer<TOwnServices, TParentServices>;
+  reset(options?: {
+    resetParent?: boolean;
+    keys?: (keyof (TOwnServices & TParentServices))[];
+  }): IDIContainer<TOwnServices, TParentServices>;
 
   call<
     FnKey extends KeyForValueOfType<

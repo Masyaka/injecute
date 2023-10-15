@@ -31,10 +31,17 @@ describe('injecute container', () => {
         const handler: any = ({ container }: { container: any }) => {
           resetContainer = container;
         };
+        const parentHandler: any = (e) => {
+          expect(e.keys?.[0]).to.be.eq('singleton');
+          expect(e.resetParent).to.be.true;
+        };
         const container = new DIContainer()
+          .addSingleton('singleton', () => 'parent singleton')
+          .addEventListener('reset', parentHandler)
+          .fork()
           .addEventListener('reset', handler)
           .addSingleton('singleton', () => 'singleton value', []);
-        container.reset();
+        container.reset({ keys: ['singleton'], resetParent: true });
         expect(resetContainer).to.be.eq(container);
         container.removeEventListener('reset', handler);
         resetContainer = undefined;
@@ -264,6 +271,34 @@ describe('injecute container', () => {
       });
     });
     describe('reset', () => {
+      it('removes listed entries, but keeps rest', () => {
+        let factory1Calls = 0;
+        let factory2Calls = 0;
+        const container = new DIContainer()
+          .addSingleton('service1', () => {
+            factory1Calls++;
+            return 'service1-calls-' + factory1Calls;
+          })
+          .addSingleton('service2', () => {
+            factory2Calls++;
+            return 'service2-calls-' + factory2Calls;
+          });
+
+        container.get('service1');
+        container.get('service2');
+        expect(factory1Calls).to.eq(1);
+        expect(factory2Calls).to.eq(1);
+        container.get('service1');
+        container.get('service2');
+        expect(factory1Calls).to.eq(1);
+        expect(factory2Calls).to.eq(1);
+        container.reset({ keys: ['service2'] });
+        container.get('service1');
+        container.get('service2');
+        expect(factory1Calls).to.eq(1);
+        expect(factory2Calls).to.eq(2);
+      });
+
       it('removes cached singleton instances', () => {
         let singletonFactoryRuns = 0;
         let depFactoryRuns = 0;
@@ -319,7 +354,7 @@ describe('injecute container', () => {
         container.get('singleton');
         container.reset();
         container.get('singleton');
-        container.reset(true);
+        container.reset({ resetParent: true });
         container.get('singleton');
         container.get('singleton');
 
