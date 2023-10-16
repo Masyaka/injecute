@@ -224,7 +224,7 @@ export type Events<C extends IDIContainer<any>> = {
       type: FactoryType;
     };
   };
-  reset: { resetParent: boolean; container: C, keys?: ArgumentsKey[] };
+  reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };
   get: { key: ArgumentsKey; value: any; container: C };
 };
 
