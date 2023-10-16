@@ -31,7 +31,7 @@ describe('injecute container', () => {
         const handler: any = ({ container }: { container: any }) => {
           resetContainer = container;
         };
-        const parentHandler: any = (e) => {
+        const parentHandler = (e: any) => {
           expect(e.keys?.[0]).to.be.eq('singleton');
           expect(e.resetParent).to.be.true;
         };
