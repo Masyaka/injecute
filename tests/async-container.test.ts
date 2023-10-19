@@ -25,10 +25,10 @@ describe('async container', () => {
     expect(syncServiceWithAsyncDeps)
       .to.have.property('then')
       .to.be.a('function');
-    await (syncServiceWithAsyncDeps as any).then((v) => {
+    await (syncServiceWithAsyncDeps as any).then((v: any) => {
       expect(v.number).to.be.a('number');
       expect(v.str).to.be.a('string');
-      return x.get('asyncService').then((s) => {
+      return x.get('asyncService').then((s: any) => {
         expect(s.dep.number).to.be.a('number');
         expect(s.dep.str).to.be.a('string');
         expect(s.str).to.be.a('string');
