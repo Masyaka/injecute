@@ -163,7 +163,6 @@ describe('injecute container', () => {
             .businessMethod(41),
         ).to.be.eq(42);
 
-        // @ts-expect-error Generic.value is hidden
         expect(container.get('Domain.Context').get('Generic.value')).to.be.eq(
           '23',
         );
