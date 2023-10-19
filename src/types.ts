@@ -184,7 +184,12 @@ export type WithNamespace<
   TNamespace extends string,
   TNamespaceServices extends Record<ArgumentsKey, any>,
 > = {
-  [K in TNamespace]: IDIContainer<TNamespaceServices>;
+  [K in TNamespace]: IDIContainer<
+    Record<
+      ArgumentsKey,
+      any
+    > /* should be the TNamespaceServices, but needed to be optimized inferred type */
+  >;
 } & {
   [K in keyof TNamespaceServices as K extends string
     ? `${TNamespace}.${K}`
