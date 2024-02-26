@@ -227,6 +227,35 @@ describe('utils', () => {
       expect(instance.field1).to.be.a('number');
       expect(instance.field2).to.be.a('string');
     });
+
+    it('returns promise', async () => {
+      const container = new DIContainer()
+        .addTransient('number', () => Promise.resolve(1), [])
+        .addInstance('string', '2')
+        .addTransient(
+          'deferredString',
+          defer(
+            (num: number, str: string): Promise<string> =>
+              Promise.resolve(str + num),
+          ),
+          ['number', 'string'],
+        )
+        .addTransient(
+          'dependedOnDeferred',
+          (deferredString) =>
+            deferredString.then((deferredStringValue) => {
+              // @ts-expect-error no promise of promise;
+              expect(deferredStringValue.then).is.undefined;
+              return `deferred string was ${deferredStringValue}`;
+            }),
+          ['deferredString'],
+        );
+
+      const deferredString = await container.get('deferredString');
+      const dependedOnDeferred = await container.get('dependedOnDeferred');
+      expect(deferredString).to.be.a.string;
+      expect(dependedOnDeferred).to.be.eq('deferred string was 21');
+    });
   });
 
   describe('resolvers', () => {

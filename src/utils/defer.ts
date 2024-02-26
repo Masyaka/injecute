@@ -18,7 +18,11 @@ export const defer = <
   Factory extends Func<readonly any[], any>,
   InitialArgs extends Factory extends Func<infer A, any> ? A : never,
   ResultArgs extends MayBePromiseTuple<InitialArgs>,
-  Result extends Factory extends Func<any, infer R> ? R : never,
+  Result extends Factory extends Func<any, infer R>
+    ? R extends Promise<infer PR>
+      ? PR
+      : R
+    : never,
 >(
   factory: Factory,
 ) => {
