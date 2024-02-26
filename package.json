@@ -3,7 +3,7 @@
   "version": "0.13.1",
   "description": "Lightweight extendable typesafe dependency injection container",
   "repository": {
-    "url": "https://github.com/Masyaka/injecute"
+    "url": "git+https://github.com/Masyaka/injecute.git"
   },
   "scripts": {
     "clean": "rm -rf ./lib",
