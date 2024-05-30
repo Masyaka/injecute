@@ -1,6 +1,6 @@
 {
   "name": "injecute",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "description": "Lightweight extendable typesafe dependency injection container",
   "repository": {
     "url": "git+https://github.com/Masyaka/injecute.git"
