@@ -1,7 +1,5 @@
 import {
-  Argument,
   ArgumentsKey,
-  ArgumentsResolver,
   ArgumentsTypes,
   Callable,
   CallableResult,
@@ -9,7 +7,6 @@ import {
   Empty,
   Events,
   FactoryType,
-  Func,
   GetOptions,
   IDIContainer,
   KeyForValueOfType,
@@ -20,6 +17,7 @@ import {
   Resolver,
   ValueOf,
   optionalDependencySkipKey,
+  type Dependency,
 } from './types';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
@@ -34,18 +32,6 @@ export const firstResult =
       if (predicate(result)) return result;
     }
   };
-
-export const argumentsNamesToArguments = (
-  argsNames: (ArgumentsKey | (() => any))[],
-): Argument[] =>
-  argsNames.map((a) =>
-    typeof a === 'function'
-      ? { getter: a }
-      : {
-          name: a,
-          required: a !== optionalDependencySkipKey,
-        },
-  );
 
 export type Middleware<
   TServices extends Record<ArgumentsKey, any>,
@@ -99,12 +85,26 @@ type Factory<
     TServices[K]
   >,
 > = {
+  [factoryTypeKey]: FactoryType;
   callable: C;
-  type: FactoryType;
-  beforeResolving?: (k: K) => void;
-  afterResolving?: (k: K, instance: TServices[K]) => void;
-  beforeReplaced?: (k: K, newFactory: C, oldFactory: C) => C | void;
+  dependencies: Dependency<TServices>[];
+  beforeResolving?: () => void;
+  afterResolving?: (instance: any) => void;
+  beforeReplaced?: (newFactory: Factory<TServices, K>) => C | void;
 };
+
+const isFactory = (f: unknown): f is Factory<any, any> => {
+  return (
+    !!f &&
+    typeof f === 'object' &&
+    'dependencies' in f &&
+    'callable' in f &&
+    factoryTypeKey in f
+  );
+};
+
+const isKey = (a: unknown): a is string | number | symbol =>
+  ['string', 'number', 'symbol'].includes(typeof a);
 
 /**
  * Dependency Injection container
@@ -118,7 +118,6 @@ export class DIContainer<
 {
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
     this.#parentContainer = p?.parentContainer;
-    this.addArgumentsResolver(DIContainer.resolveArgumentsFromCache);
     this.rebuildMiddlewareStack();
   }
 
@@ -131,6 +130,7 @@ export class DIContainer<
     add: new Set(),
     reset: new Set(),
     get: new Set(),
+    produce: new Set(),
   };
   readonly #parentContainer: IDIContainer<TParentServices> | undefined;
   getParent() {
@@ -145,9 +145,6 @@ export class DIContainer<
   readonly #singletonInstances: MapOf<{
     [key in keyof TServices]?: TServices[key];
   }> = new Map();
-  readonly #arguments: MapOf<{ [key in keyof TServices]?: Argument[] }> =
-    new Map();
-  readonly #argumentsResolvers: ArgumentsResolver[] = [];
   readonly #middlewares: Middleware<TServices>[] = [];
   #middlewareStack!: Resolver<TServices>;
 
@@ -163,14 +160,6 @@ export class DIContainer<
   get ownKeys(): (keyof TServices)[] {
     return Array.from(this.#factories.keys()) as (keyof TServices)[];
   }
-
-  static readonly resolveArgumentsFromCache: ArgumentsResolver = function (
-    this,
-    _,
-    argumentsKey,
-  ) {
-    return argumentsKey ? this.getArgumentsFor(argumentsKey) : undefined;
-  };
 
   protected setSingletonInstance(
     name: keyof (TOwnServices & TParentServices),
@@ -209,10 +198,6 @@ export class DIContainer<
     throw this.eventNotSupported(e);
   }
 
-  public getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined {
-    return this.#arguments.get(argumentsKey);
-  }
-
   /**
    * true if services with such name is registered, false otherwise
    * @param name
@@ -240,13 +225,9 @@ export class DIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
-      beforeResolving?: (k: K) => void;
-      afterResolving?: (k: K, instance: TResult) => void;
-      beforeReplaced?: (
-        k: K,
-        newFactory: () => TResult,
-        oldFactory: () => TResult,
-      ) => (() => TResult) | void;
+      beforeResolving?: () => void;
+      afterResolving?: (instance: TResult) => void;
+      beforeReplaced?: () => () => TResult | void;
     },
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, () => instance, {
@@ -281,13 +262,9 @@ export class DIContainer<
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
           dependencies: [...Keys];
-          beforeResolving?: (k: K) => void;
-          afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (
-            k: K,
-            newFactory: TCallable,
-            oldFactory: TCallable,
-          ) => TCallable | void;
+          beforeResolving?: () => void;
+          afterResolving?: (instance: TResult) => void;
+          beforeReplaced?: () => TCallable | void;
         }
       | [...Keys] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -316,13 +293,9 @@ export class DIContainer<
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           replace?: boolean;
           dependencies: [...Keys];
-          beforeResolving?: (k: K) => void;
-          afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (
-            k: K,
-            newFactory: TCallable,
-            oldFactory: TCallable,
-          ) => TCallable | void;
+          beforeResolving?: () => void;
+          afterResolving?: (instance: TResult) => void;
+          beforeReplaced?: () => TCallable | void;
         }
       | [...Keys] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -333,9 +306,9 @@ export class DIContainer<
       replace: optionsIsArray ? false : options?.replace,
       dependencies: optionsIsArray ? options : options?.dependencies,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: (k: ArgumentsKey, instance: TResult) => {
+      afterResolving: (instance: TResult) => {
         this.setSingletonInstance(name, instance);
-        !optionsIsArray && options?.afterResolving?.(k as K, instance);
+        !optionsIsArray && options?.afterResolving?.(instance);
       },
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
     });
@@ -412,25 +385,6 @@ export class DIContainer<
     throw new Error(`No service registered for "${String(serviceName)}" key.`);
   }
 
-  //  ArgumentsResolver
-  public addArgumentsResolver(
-    ar: ArgumentsResolver,
-  ): DIContainer<TParentServices, TServices> {
-    this.#argumentsResolvers.push(ar);
-    return this;
-  }
-
-  readonly resolveArguments: ArgumentsResolver = (fn, argumentsKey) => {
-    for (const argumentsResolver of this.#argumentsResolvers) {
-      const args = argumentsResolver.call(
-        this as IDIContainer<TOwnServices, TParentServices>,
-        fn,
-        argumentsKey,
-      );
-      if (args) return args;
-    }
-  };
-
   /**
    * Binds Callable to container with specific arguments keys.
    * "Injecute but later"
@@ -455,15 +409,7 @@ export class DIContainer<
     keys: [...Keys],
     callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
   ): () => TResult {
-    return () => this.injecute(callable, { arguments: keys });
-  }
-
-  protected callFactory<D extends any[], C extends Callable<D, any>>(
-    callable: C,
-    dependencies: D,
-  ) {
-    const func = callable as Func<any, any>;
-    return func(...(dependencies as Parameters<typeof func>));
+    return () => this.injecute(callable, keys);
   }
 
   /**
@@ -485,17 +431,11 @@ export class DIContainer<
    * ```
    */
   fork<T extends TServices = TServices>(options?: {
-    skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<{}, T> {
     const child = new DIContainer<T>({
       parentContainer: this as IDIContainer<TOwnServices, TParentServices>,
     });
-
-    if (!options?.skipMiddlewares) {
-      child.#argumentsResolvers.length = 0;
-      this.#argumentsResolvers.forEach((ar) => child.addArgumentsResolver(ar));
-    }
 
     if (!options?.skipResolvers) {
       this.#middlewares.forEach((m) => child.use(m));
@@ -687,40 +627,32 @@ export class DIContainer<
   injecute<
     TResult,
     TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof TServices
-      | Resolve<TServices[keyof TServices]>
-    )[],
-  >(
-    callable: TCallable,
-    options?:
-      | {
-          argumentsKey?: keyof TServices | ArgumentsKey | undefined;
-          arguments?: [...Keys];
-        }
-      | [...Keys],
-  ): CallableResult<TCallable> {
-    const optionsIsArray = Array.isArray(options);
-    const argumentsOption = optionsIsArray ? options : options?.arguments;
-    const argumentsKey = !optionsIsArray ? options?.argumentsKey : undefined;
-    const args = this.resolveAndCacheArguments(
-      callable,
-      argumentsKey,
-      argumentsOption,
-    );
+    Keys extends Dependency<TServices>[],
+  >(callable: TCallable, dependencies: [...Keys]): CallableResult<TCallable> {
+    return this.applyCallable(callable, dependencies as any);
+  }
 
-    if (!args) {
-      throw new Error(
-        `Not resolved arguments for "${String(argumentsKey)}": "${callable
-          .toString()
-          .substring(0, 50)}"`,
-      );
-    }
+  protected applyCallable<D extends any[]>(
+    callable: Callable<D, any>,
+    dependencies: D,
+  ) {
+    const dependenciesInstances: any =
+      this.mapDependenciesToInstances(dependencies);
+    return callable(...dependenciesInstances) as any;
+  }
 
-    const dependencies = this.mapAgrsToInstances(args);
-
-    return this.callFactory(callable, dependencies as any);
+  protected mapDependenciesToInstances(dependencies: Dependency<TServices>[]) {
+    return dependencies.map((d) => {
+      if (d === optionalDependencySkipKey) {
+        return undefined;
+      }
+      if (isKey(d)) {
+        return this.get(d);
+      }
+      if (isFactory(d)) {
+        return this.injecute(d.callable, d.dependencies);
+      }
+    });
   }
 
   protected assertNotRegistered(name: keyof TServices | ArgumentsKey) {
@@ -731,20 +663,26 @@ export class DIContainer<
     }
   }
 
+  protected applyFactory(factory: Factory<any, any>) {
+    factory.beforeResolving?.();
+    const result = this.injecute(
+      factory.callable as Callable<any, any>,
+      factory.dependencies,
+    );
+    factory.afterResolving?.(result);
+    return result;
+  }
+
   protected resolveInstance: Resolver<TServices> = (name) =>
     this.#singletonInstances.get(name);
 
   protected resolveFromFactory: Resolver<TServices> = (name) => {
     const factory = this.#factories.get(name);
     if (factory) {
-      factory.beforeResolving?.(name);
-      const result = this.injecute(
-        factory.callable as Callable<any, TServices[typeof name]>,
-        {
-          argumentsKey: name as any,
-        },
-      );
-      factory.afterResolving?.(name, result);
+      const result = this.applyFactory(factory);
+      if (factory[factoryTypeKey] !== 'instance') {
+        this.onProduce(name, result);
+      }
       return result;
     }
   };
@@ -781,17 +719,20 @@ export class DIContainer<
     }
   }
 
-  protected onReplace(name: keyof TServices, newCallable: any) {
+  protected onReplace(
+    name: keyof TServices,
+    newFactory: Factory<TServices, keyof TServices>,
+  ) {
     const currentFactory = this.#factories.get(name);
     if (!currentFactory) return;
-    currentFactory.beforeReplaced?.(name, newCallable, currentFactory.callable);
+    currentFactory.beforeReplaced?.(newFactory);
     for (const handler of this.eventHandlers.replace) {
       handler({
         key: name,
         container: this as IDIContainer<TOwnServices, TParentServices>,
         replaced: {
           callable: currentFactory.callable,
-          type: currentFactory.type,
+          type: currentFactory[factoryTypeKey],
         },
       });
     }
@@ -822,6 +763,16 @@ export class DIContainer<
 
   protected onGet(name: ArgumentsKey, value: any) {
     for (const handler of this.eventHandlers.get) {
+      handler({
+        key: name,
+        value,
+        container: this as IDIContainer<TOwnServices, TParentServices>,
+      });
+    }
+  }
+
+  protected onProduce(name: ArgumentsKey, value: any) {
+    for (const handler of this.eventHandlers.produce) {
       handler({
         key: name,
         value,
@@ -917,38 +868,41 @@ export class DIContainer<
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
           dependencies?: [...Keys];
-          beforeResolving?: (k: K) => void;
-          afterResolving?: (k: K, instance: TResult) => void;
+          beforeResolving?: () => void;
+          afterResolving?: (instance: TResult) => void;
           beforeReplaced?: (
-            k: K,
-            newFactory: TCallable,
-            oldFactory: TCallable,
+            oldFactory: Factory<TServices, K>,
           ) => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     const replace = !optionsIsArray && !!options?.replace;
-    const dependencies = optionsIsArray ? options : options?.dependencies;
-    this.validateAdd(name, factory, replace);
-    if (replace) {
-      if (this.#factories.has(name)) {
-        this.onReplace(name as any, factory);
-      }
-      this.#singletonInstances.delete(name);
-      this.#arguments.delete(name);
-    }
-    this.resolveAndCacheArguments(factory, name, dependencies);
-    this.#factories.set(name, {
-      type: ((!optionsIsArray && options?.[factoryTypeKey]) ||
+    const dependencies: Dependency<TServices>[] =
+      (optionsIsArray ? options : options?.dependencies) || [];
+    const newFactory: Factory<TServices, K> = {
+      [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
         'transient') as FactoryType,
+      dependencies,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       beforeReplaced: !optionsIsArray
         ? (options?.beforeReplaced as any)
         : undefined,
       callable: factory as Callable<any[], any>,
-    });
+    };
+    this.validateAdd(name, newFactory, replace);
+    if (replace) {
+      if (this.#factories.has(name)) {
+        this.onReplace(name as any, newFactory);
+      }
+      const sameKeyIndex = dependencies?.indexOf(name) ?? -1;
+      if (sameKeyIndex !== -1) {
+        dependencies[sameKeyIndex] = this.getFactory(name) as any;
+      }
+      this.#singletonInstances.delete(name);
+    }
+    this.#factories.set(name, newFactory);
     this.onAdd(name as any, replace);
     return this as any;
   }
@@ -960,73 +914,34 @@ export class DIContainer<
     ) as Resolver<TServices>;
   }
 
-  private resolveAndCacheArguments(
-    fn: Callable<any, any>,
-    argumentsKey?: ArgumentsKey,
-    argumentsNames?: (
-      | OptionalDependencySkipKey
-      | keyof TServices
-      | (() => TServices[keyof TServices])
-    )[],
-  ) {
-    const args: Argument[] | undefined = argumentsNames
-      ? argumentsNamesToArguments(argumentsNames)
-      : this.resolveArguments<TServices, typeof this>(
-          fn as Callable<any, any>,
-          argumentsKey,
-        );
-
-    if (args && argumentsKey && !this.#arguments.get(argumentsKey)) {
-      this.cacheArguments(args, argumentsKey);
-    }
-
-    return args;
-  }
-
-  private mapAgrsToInstances(args: Argument[]) {
-    return args.map((arg) =>
-      'getter' in arg
-        ? arg.getter()
-        : this.get(arg.name as keyof TServices, {
-            allowUnresolved: !arg.required,
-          }),
-    );
-  }
-
   private ensureNoCirculars(
     key: ArgumentsKey,
     stack: ArgumentsKey[] = [],
+    initialDependencies?: Dependency<TServices>[],
   ): ArgumentsKey[][] {
-    const args = this.#arguments.get(key);
-    if (!args) return [stack];
-    return args.flatMap((a) => {
-      if ('getter' in a) {
+    const dependencies =
+      initialDependencies || this.#factories.get(key)?.dependencies;
+    if (!dependencies) return [stack];
+    return dependencies.flatMap((a) => {
+      if (isFactory(a) || typeof a === 'function') {
         return [];
       }
-      const newStack = [...stack, a.name];
-      if (stack.includes(a.name)) {
+      const newStack = [...stack, a];
+      if (stack.includes(a)) {
         throw new CircularDependencyError(newStack);
       }
-      return this.ensureNoCirculars(a.name, newStack);
+      return this.ensureNoCirculars(a, newStack);
     });
-  }
-
-  private cacheArguments(
-    args: Argument[],
-    argumentsKey: keyof TServices | ArgumentsKey,
-  ) {
-    this.#arguments.set(argumentsKey, args);
-    this.ensureNoCirculars(argumentsKey);
-    return args;
   }
 
   private validateAdd(
     name: Exclude<ArgumentsKey, OptionalDependencySkipKey>,
-    factory: Callable<any, any>,
+    factory: Factory<TServices, keyof TServices>,
     replace?: boolean,
   ) {
+    this.ensureNoCirculars(name, replace ? [] : [name], factory.dependencies);
     this.assertKeyIsValid(name);
-    this.assertFactoryIsAcceptable(factory, name);
+    this.assertFactoryIsAcceptable(factory.callable, name);
     if (!replace) {
       this.assertNotRegistered(name);
     }

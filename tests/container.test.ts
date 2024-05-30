@@ -86,6 +86,30 @@ describe('injecute container', () => {
         expect(requested).to.be.eq('');
         expect(gotValue).to.be.undefined;
       });
+      it('emit produce event', () => {
+        const instances: any = {};
+        const container = new DIContainer()
+          .addEventListener('produce', ({ key, value }) => {
+            instances[key] = instances[key] || [];
+            instances[key].push(value);
+          })
+          .addSingleton('singleton', () => ({ type: 'singletonInstance' }))
+          .addInstance('instance', { type: 'instance' })
+          .addTransient('transient', () => ({ type: 'transientInstance' }));
+
+        container.get('transient');
+        container.get('transient');
+        container.get('instance');
+        container.get('instance');
+        container.get('singleton');
+        container.get('singleton');
+        expect(instances.singleton[0]).to.be.eql({ type: 'singletonInstance' });
+        expect(instances.singleton[1]).to.be.undefined;
+        expect(instances.instance).to.be.undefined;
+        expect(instances.transient[0]).to.be.eql({ type: 'transientInstance' });
+        expect(instances.transient[1]).to.be.eql({ type: 'transientInstance' });
+        expect(instances.transient[0] !== instances.transient[1]).to.be.true;
+      });
       it('throws when event is wrong', () => {
         const container = new DIContainer();
         expect(() => container.addEventListener('add', () => {})).to.not.throw;
@@ -405,21 +429,62 @@ describe('injecute container', () => {
       expect(child.get('s')).to.be.eql({ x: 1, y: 2 });
     });
 
-    it('should prevent creating of circular dependencies', () => {
-      const addZ: IDIContainerExtension<any, any> = (container) =>
-        container.addTransient(
-          'z',
-          (y) => ({
-            ...y,
-            z: 1,
-          }),
-          ['y'],
-        );
-      const c = new DIContainer()
-        .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'] as [any])
-        .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
+    it('should allow to override service using prev value', () => {
+      const container = new DIContainer().addTransient('service', () => ({
+        name: 'initial service',
+      }));
+      const initialInstance1 = container.get('service');
+      const initialInstance2 = container.get('service');
+      expect(initialInstance1).to.be.eql({ name: 'initial service' });
+      expect(initialInstance2).to.be.eql({ name: 'initial service' });
+      expect(initialInstance1 === initialInstance2).to.be.false;
+      container.addSingleton(
+        'service',
+        (initialService) => ({ name: 'replaced service', initialService }),
+        {
+          dependencies: ['service'],
+          replace: true,
+        },
+      );
+      const replacedInstance1 = container.get('service');
+      const replacedInstance2 = container.get('service');
+      expect(replacedInstance1).to.be.eql({
+        name: 'replaced service',
+        initialService: { name: 'initial service' },
+      });
+      expect(replacedInstance2).to.be.eql({
+        name: 'replaced service',
+        initialService: { name: 'initial service' },
+      });
+      expect(replacedInstance1 === replacedInstance2).to.be.true;
+    });
 
-      expect(() => c.extend(addZ)).to.throw(CircularDependencyError);
+    it('should not allow to depend on self key without replace option', () => {
+      const container = new DIContainer().addTransient('service', () => ({
+        name: 'initial service',
+      }));
+      expect(() =>
+        container.addSingleton(
+          'service',
+          (initialService) => ({ name: 'replaced service', initialService }),
+          ['service'],
+        ),
+      ).to.throw(CircularDependencyError);
+    });
+
+    it('should prevent creating of circular dependencies', () => {
+      expect(() => {
+        const c = new DIContainer()
+          .addTransient(
+            'z',
+            function () {
+              return { y: arguments[0] };
+            },
+            ['y'] as any,
+          )
+          .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'])
+          .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
+      }).to.throw(CircularDependencyError);
     });
   });
   describe('explicit keys providing container', () => {

@@ -22,9 +22,7 @@ export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   : TCallable extends Func<any, any>
   ? ReturnType<TCallable>
   : unknown;
-export type Argument =
-  | { name: ArgumentsKey; required: boolean }
-  | { getter: () => any };
+
 export type Factory<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
   : Callable<ValueOf<TServices>[], any>;
@@ -79,12 +77,14 @@ export type TypesToKeys<
   ? [KeyForValueOfType<TServices, H> | (() => H), ...TypesToKeys<R, TServices>]
   : [];
 
+export type Dependency<TServices extends Record<string, any>> =
+  | OptionalDependencySkipKey
+  | keyof TServices
+  | (() => TServices[keyof TServices])
+  | Factory<TServices, keyof TServices>;
+
 export type KeysToTypes<
-  Keys extends readonly (
-    | (() => any)
-    | OptionalDependencySkipKey
-    | keyof TServices
-  )[],
+  Keys extends readonly Dependency<TServices>[],
   TServices extends Record<ArgumentsKey, any>,
 > = Keys extends readonly [
   infer Head extends any,
@@ -143,8 +143,8 @@ export type ArgumentsResolver = <
 >(
   this: C,
   fn: Callable<any, any>,
-  argumentsKey?: ArgumentsKey,
-) => Argument[] | undefined;
+  argumentsKey: ArgumentsKey,
+) => () => TServices[ArgumentsKey] | undefined;
 
 export type IDIContainerExtension<
   In extends Record<string, any>,
@@ -231,6 +231,7 @@ export type Events<C extends IDIContainer<any>> = {
   };
   reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };
   get: { key: ArgumentsKey; value: any; container: C };
+  produce: { key: ArgumentsKey; value: any; container: C };
 };
 
 export interface IDIContainer<
@@ -250,8 +251,6 @@ export interface IDIContainer<
       e: Events<IDIContainer<TOwnServices & TParentServices>>[E],
     ) => void,
   ): this;
-
-  getArgumentsFor(argumentsKey: ArgumentsKey): Argument[] | undefined;
 
   /**
    * true if services with such key is registered, false otherwise
@@ -282,13 +281,9 @@ export interface IDIContainer<
     instance: TResult,
     options?: {
       replace: boolean;
-      beforeResolving?: (k: K) => void;
-      afterResolving?: (k: K, instance: TResult) => void;
-      beforeReplaced?: (
-        k: K,
-        newFactory: () => TResult,
-        oldFactory: () => TResult,
-      ) => (() => TResult) | void;
+      beforeResolving?: () => void;
+      afterResolving?: (instance: TResult) => void;
+      beforeReplaced?: () => () => TResult | void;
     },
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
@@ -321,13 +316,9 @@ export interface IDIContainer<
       | {
           replace?: boolean;
           dependencies: [...Keys];
-          beforeResolving?: (k: K) => void;
-          afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (
-            k: K,
-            newFactory: TCallable,
-            oldFactory: TCallable,
-          ) => TCallable | void;
+          beforeResolving?: () => void;
+          afterResolving?: (instance: TResult) => void;
+          beforeReplaced?: () => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
@@ -361,13 +352,9 @@ export interface IDIContainer<
       | {
           replace?: boolean;
           dependencies: [...Keys];
-          beforeResolving?: (k: K) => void;
-          afterResolving?: (k: K, instance: TResult) => void;
-          beforeReplaced?: (
-            k: K,
-            newFactory: TCallable,
-            oldFactory: TCallable,
-          ) => TCallable | void;
+          beforeResolving?: () => void;
+          afterResolving?: (instance: TResult) => void;
+          beforeReplaced?: () => TCallable | void;
         }
       | [...Keys],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
