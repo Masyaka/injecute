@@ -6,6 +6,6 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "outDir": "./lib/esm",
-    "declarationDir": "./lib/esm/types"
+    "declarationDir": "./lib/esm/typedefs"
   }
 }
