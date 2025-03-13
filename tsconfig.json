@@ -3,14 +3,15 @@
     "strict": true,
     "target": "ES2015",
     "lib": ["es2019"],
-    "esModuleInterop": true,
+    "esModuleInterop": false,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "allowJs": false,
     "declaration": true,
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "noEmit": true,
   },
   "files": ["./src/index.ts"]
 }
