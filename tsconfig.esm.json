@@ -3,9 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "outDir": "./lib/esm",
-    "declarationDir": "./lib/esm/typedefs"
+    "moduleDetection": "force"
   }
 }

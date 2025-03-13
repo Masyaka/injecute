@@ -1,6 +1,6 @@
 {
   "name": "injecute",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Lightweight extendable typesafe dependency injection container",
   "repository": {
     "url": "git+https://github.com/Masyaka/injecute.git"
@@ -15,7 +15,7 @@
     "format": "npx prettier ./src -w",
     "test": "mocha -r ts-node/register --exit './tests/**/*.test.ts'"
   },
-  "types": "./lib/cjs/types/index.d.ts",
+  "types": "./lib/cjs/index.d.ts",
   "main": "./lib/cjs/index.js",
   "files": [
     "lib/**/*"
@@ -23,11 +23,11 @@
   "exports": {
     ".": {
       "import": {
-        "types": "./lib/esm/typedefs/index.d.ts",
+        "types": "./lib/esm/index.d.ts",
         "default": "./lib/esm/index.mjs"
       },
       "require": {
-        "types": "./lib/cjs/typedefs/index.d.ts",
+        "types": "./lib/cjs/index.d.ts",
         "default": "./lib/cjs/index.js"
       }
     }
