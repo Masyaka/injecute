@@ -1,6 +1,6 @@
 {
   "name": "injecute",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Lightweight extendable typesafe dependency injection container",
   "repository": {
     "url": "git+https://github.com/Masyaka/injecute.git"
@@ -24,7 +24,7 @@
     ".": {
       "import": {
         "types": "./lib/esm/index.d.ts",
-        "default": "./lib/esm/index.mjs"
+        "default": "./lib/esm/index.js"
       },
       "require": {
         "types": "./lib/cjs/index.d.ts",
