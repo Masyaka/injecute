@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { describe, it } from 'vitest';
 import { AsyncDIContainer } from '../src/async-container';
 
 describe('async container', () => {

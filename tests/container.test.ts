@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { describe, it } from 'mocha';
+import { describe, it } from 'vitest';
 import {
   ArgumentsKey,
   CircularDependencyError,
@@ -504,7 +504,7 @@ describe('injecute container', () => {
     });
     it('will allow to not provide optional dependency key', () => {
       class SrvWithOptionalConstructorArgument {
-        constructor(public readonly val: string | undefined = undefined) {}
+        constructor(public readonly val: undefined | string = undefined) {}
       }
 
       const c = new DIContainer().addSingleton(

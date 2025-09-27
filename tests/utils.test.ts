@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { describe } from 'mocha';
+import { describe, it } from 'vitest';
 import {
   defer,
   construct,

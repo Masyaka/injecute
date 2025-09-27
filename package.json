@@ -13,7 +13,7 @@
     "build:cjs": "tsc -p ./tsconfig.cjs.json",
     "prepack": "npm run build",
     "format": "npx prettier ./src -w",
-    "test": "mocha -r ts-node/register --exit './tests/**/*.test.ts'"
+    "test": "vitest"
   },
   "types": "./lib/cjs/index.d.ts",
   "main": "./lib/cjs/index.js",
@@ -39,6 +39,7 @@
     "injection",
     "container",
     "typesafe",
+    "ioc",
     "inversion",
     "of",
     "control",
@@ -48,12 +49,13 @@
   "author": "Masyaka",
   "license": "MIT",
   "devDependencies": {
-    "@types/chai": "^4.3.4",
-    "@types/mocha": "^10.0.1",
-    "chai": "^4.3.7",
-    "mocha": "^10.2.0",
+    "@types/chai": "^4.3.20",
+    "chai": "^4.5.0",
     "prettier": "^2.8.8",
-    "ts-node": "^10.9.1",
-    "typescript": "^5.8.2"
-  }
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "monaco-editor": "^0.52.2",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {}
 }

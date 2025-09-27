@@ -10,7 +10,7 @@ import {
   GetOptions,
   IDIContainer,
   KeyForValueOfType,
-  KeysToTypes,
+  DependenciesToTypes,
   MapOf,
   OptionalDependencySkipKey,
   Resolve,
@@ -75,7 +75,7 @@ const getContainersChain = (c: IDIContainer<any>) => {
   return result;
 };
 
-const factoryTypeKey = Symbol('TransientType');
+const factoryTypeKey = Symbol('factoryType');
 
 type Factory<
   TServices extends Record<ArgumentsKey, any>,
@@ -251,8 +251,8 @@ export class DIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
+    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
+    Keys extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,
@@ -282,8 +282,8 @@ export class DIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (OptionalDependencySkipKey | keyof TServices | (() => any))[],
+    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
+    Keys extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,
@@ -398,16 +398,9 @@ export class DIContainer<
    * @param keys
    * @param callable
    */
-  bind<
-    TResult extends any,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof TServices
-      | Resolve<TServices[keyof TServices]>
-    )[],
-  >(
+  bind<TResult extends any, Keys extends Dependency<TServices>[]>(
     keys: [...Keys],
-    callable: Callable<KeysToTypes<Keys, TServices>, TResult>,
+    callable: Callable<DependenciesToTypes<Keys, TServices>, TResult>,
   ): () => TResult {
     return () => this.injecute(callable, keys);
   }
@@ -626,7 +619,7 @@ export class DIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, TResult>,
+    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, TResult>,
     Keys extends Dependency<TServices>[],
   >(callable: TCallable, dependencies: [...Keys]): CallableResult<TCallable> {
     return this.applyCallable(callable, dependencies as any);
@@ -650,7 +643,10 @@ export class DIContainer<
         return this.get(d);
       }
       if (isFactory(d)) {
-        return this.injecute(d.callable, d.dependencies);
+        return this.injecute(
+          d.callable,
+          d.dependencies as Dependency<TServices>[],
+        );
       }
     });
   }
@@ -667,7 +663,7 @@ export class DIContainer<
     factory.beforeResolving?.();
     const result = this.injecute(
       factory.callable as Callable<any, any>,
-      factory.dependencies,
+      factory.dependencies as Dependency<TServices>[],
     );
     factory.afterResolving?.(result);
     return result;
@@ -853,12 +849,8 @@ export class DIContainer<
 
   private addFactory<
     K extends ArgumentsKey,
-    TCallable extends Callable<KeysToTypes<Keys, TServices>, any>,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof TServices
-      | (() => TServices[keyof TServices])
-    )[],
+    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
+    Keys extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,

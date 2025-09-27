@@ -23,7 +23,7 @@ export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
   ? ReturnType<TCallable>
   : unknown;
 
-export type Factory<K, TServices> = K extends keyof TServices
+export type CallableOf<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
   : Callable<ValueOf<TServices>[], any>;
 
@@ -80,10 +80,9 @@ export type TypesToKeys<
 export type Dependency<TServices extends Record<string, any>> =
   | OptionalDependencySkipKey
   | keyof TServices
-  | (() => TServices[keyof TServices])
-  | Factory<TServices, keyof TServices>;
+  | CallableOf<keyof TServices, TServices>;
 
-export type KeysToTypes<
+export type DependenciesToTypes<
   Keys extends readonly Dependency<TServices>[],
   TServices extends Record<ArgumentsKey, any>,
 > = Keys extends readonly [
@@ -98,7 +97,7 @@ export type KeysToTypes<
         : Head extends ArgumentsKey
         ? TServices[Head]
         : never,
-      ...KeysToTypes<Rest, TServices>,
+      ...DependenciesToTypes<Rest, TServices>,
     ]
   : [];
 
@@ -216,8 +215,7 @@ export type FactoryType =
   | 'transient'
   | 'instance'
   | 'alias'
-  | 'namespace-pass-through'
-  | 'reverse-namespace-replacement';
+  | 'namespace-pass-through';
 
 export type Events<C extends IDIContainer<any>> = {
   add: { key: ArgumentsKey; replace: boolean; container: C };
@@ -299,14 +297,10 @@ export interface IDIContainer<
   addTransient<
     K extends ArgumentsKey,
     TCallable extends Callable<
-      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      DependenciesToTypes<Keys, TOwnServices & TParentServices>,
       any
     >,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof (TOwnServices & TParentServices)
-      | (() => any)
-    )[],
+    Keys extends Dependency<TOwnServices & TParentServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -335,14 +329,10 @@ export interface IDIContainer<
   addSingleton<
     K extends ArgumentsKey,
     TCallable extends Callable<
-      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      DependenciesToTypes<Keys, TOwnServices & TParentServices>,
       any
     >,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof (TOwnServices & TParentServices)
-      | (() => any)
-    )[],
+    Keys extends Dependency<TOwnServices & TParentServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     this: unknown,
@@ -428,7 +418,7 @@ export interface IDIContainer<
   >(
     keys: [...Keys],
     callable: Callable<
-      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      DependenciesToTypes<Keys, TOwnServices & TParentServices>,
       TResult
     >,
   ): () => TResult;
@@ -553,17 +543,10 @@ export interface IDIContainer<
   injecute<
     TResult,
     TCallable extends Callable<
-      KeysToTypes<Keys, TOwnServices & TParentServices>,
+      DependenciesToTypes<Keys, TOwnServices & TParentServices>,
       TResult
     >,
-    Keys extends (
-      | OptionalDependencySkipKey
-      | keyof (TOwnServices & TParentServices)
-      | Resolve<
-          (TOwnServices & TParentServices)[keyof (TOwnServices &
-            TParentServices)]
-        >
-    )[],
+    Keys extends Dependency<TOwnServices & TParentServices>[],
   >(
     callable: TCallable,
     options?:
