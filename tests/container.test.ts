@@ -577,9 +577,13 @@ describe('injecute container', () => {
     it('Should allow to provide dependency with callable', () => {
       const getMultiplied2By2 = () =>
         new DIContainer<{}>()
-          .addSingleton('withCustomResolver', (val) => {
-            return 2 * val
-          }, [() => 2])
+          .addSingleton(
+            'withCustomResolver',
+            (val) => {
+              return 2 * val;
+            },
+            [() => 2],
+          )
           .get('withCustomResolver');
       expect(getMultiplied2By2()).to.be.eql(4);
     });
