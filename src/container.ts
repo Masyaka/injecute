@@ -251,8 +251,8 @@ export class DIContainer<
    */
   addTransient<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
-    Keys extends Dependency<TServices>[],
+    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
+    Deps extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,
@@ -261,12 +261,12 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
-          dependencies: [...Keys];
+          dependencies: [...Deps];
           beforeResolving?: () => void;
           afterResolving?: (instance: TResult) => void;
           beforeReplaced?: () => TCallable | void;
         }
-      | [...Keys] = [] as any,
+      | [...Deps] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, factory, options);
   }
@@ -282,8 +282,8 @@ export class DIContainer<
    */
   addSingleton<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
-    Keys extends Dependency<TServices>[],
+    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
+    Deps extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,
@@ -292,12 +292,12 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
           replace?: boolean;
-          dependencies: [...Keys];
+          dependencies: [...Deps];
           beforeResolving?: () => void;
           afterResolving?: (instance: TResult) => void;
           beforeReplaced?: () => TCallable | void;
         }
-      | [...Keys] = [] as any,
+      | [...Deps] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
@@ -398,9 +398,9 @@ export class DIContainer<
    * @param keys
    * @param callable
    */
-  bind<TResult extends any, Keys extends Dependency<TServices>[]>(
-    keys: [...Keys],
-    callable: Callable<DependenciesToTypes<Keys, TServices>, TResult>,
+  bind<TResult extends any, Deps extends Dependency<TServices>[]>(
+    keys: [...Deps],
+    callable: Callable<DependenciesToTypes<Deps, TServices>, TResult>,
   ): () => TResult {
     return () => this.injecute(callable, keys);
   }
@@ -619,9 +619,9 @@ export class DIContainer<
    */
   injecute<
     TResult,
-    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, TResult>,
-    Keys extends Dependency<TServices>[],
-  >(callable: TCallable, dependencies: [...Keys]): CallableResult<TCallable> {
+    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, TResult>,
+    Deps extends Dependency<TServices>[],
+  >(callable: TCallable, dependencies: [...Deps]): CallableResult<TCallable> {
     return this.applyCallable(callable, dependencies as any);
   }
 
@@ -648,6 +648,10 @@ export class DIContainer<
           d.dependencies as Dependency<TServices>[],
         );
       }
+      if (typeof d === 'function') {
+        return d();
+      }
+      throw new Error(`Invalid dependency type`);
     });
   }
 
@@ -849,8 +853,8 @@ export class DIContainer<
 
   private addFactory<
     K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Keys, TServices>, any>,
-    Keys extends Dependency<TServices>[],
+    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
+    Deps extends Dependency<TServices>[],
     TResult extends CallableResult<TCallable>,
   >(
     name: K,
@@ -859,14 +863,14 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
-          dependencies?: [...Keys];
+          dependencies?: [...Deps];
           beforeResolving?: () => void;
           afterResolving?: (instance: TResult) => void;
           beforeReplaced?: (
             oldFactory: Factory<TServices, K>,
           ) => TCallable | void;
         }
-      | [...Keys],
+      | [...Deps],
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     const replace = !optionsIsArray && !!options?.replace;

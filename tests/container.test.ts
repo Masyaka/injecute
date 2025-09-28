@@ -574,6 +574,15 @@ describe('injecute container', () => {
           .get('multiplied2');
       expect(getMultiplied2By2()).to.be.eql(4);
     });
+    it('Should allow to provide dependency with callable', () => {
+      const getMultiplied2By2 = () =>
+        new DIContainer<{}>()
+          .addSingleton('withCustomResolver', (val) => {
+            return 2 * val
+          }, [() => 2])
+          .get('withCustomResolver');
+      expect(getMultiplied2By2()).to.be.eql(4);
+    });
   });
   describe('middlewares', () => {
     it('allow to use few middlewares', () => {
