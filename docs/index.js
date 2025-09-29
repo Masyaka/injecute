@@ -50,15 +50,45 @@ const initialCode = `
     }
   }
 
+
+  class BlogService {
+    constructor(private transport: UserMessageTransport) {}
+
+    createBlog(title: string, content: string): void {
+      this.transport.sendUserMessage(1, \`New blog post: \${title}\`);
+    }
+  }
+
+  class BlogRepository {
+    constructor(private db: Connection) {}
+
+    async createBlog(title: string, content: string): Promise<void> {
+      // query to db
+    }
+  }
+
+  type Connection = {
+
+  }
+
+  function addBlogServices<T extends { db: Database }>(container: IDIContainer<T>) {
+    return container
+    .addSingleton('blogService', construct(BlogService), ['userMessageTransport'])
+    .addSingleton('blogRepository', construct(BlogRepository), ['db']);
+  }
+
   function createContainer(cfg: { useMockMailer?: boolean } = {}) {
     return new DIContainer()
+      .addSingleton('connection', () => ({}) as any)
+      .addAlias('db', 'connection')
       .addSingleton('emailTransport', construct(Mailer))
       .addSingleton('mockTransport', construct(MockTransport))
       .addAlias(
         'userMessageTransport',
         cfg.useMockMailer ? 'mockTransport' : 'emailTransport',
       )
-      .addSingleton('greetService', construct(GreetService), ['userMessageTransport']);
+      .addSingleton('greetService', construct(GreetService), ['userMessageTransport'])
+      .namespace('blog', addBlogServices);
   }
 
   const greetService = createContainer().get('greetService');
@@ -264,23 +294,14 @@ function renderServicesTree(tree) {
 
     servicesByDepth.entries().forEach(([depth, services]) => {
       nodesHtml +=
-        '<div style="display: flex; flex-direction: column; gap: 10px">';
+        '<div style="display: flex; flex-direction: column; gap: 10px; justify-content: space-evenly">';
       services.forEach(([key, node]) => {
-        console.log(node);
-        const dependencyCount = node.dependencies
-          ? Object.keys(node.dependencies).length
-          : 0;
-        const dependencyCountText =
-          dependencyCount > 0
-            ? ` <span class="dependency-count">(${dependencyCount})</span>`
-            : '';
-
         nodesHtml += `
           <div class="tree-node-svg depth-${depth}" style="width: 180px; display: inline-block;" data-node-id=${
           node.title
         }>
             <div class="service-name">${escapeHtml(node.title)}</div>
-            ${dependencyCountText}
+            <div class="factory-type">${node.factoryType}</div>
             <div class="depth-indicator">Depth: ${depth}</div>
           </div>`;
       });

@@ -88,6 +88,7 @@ type Factory<
   [factoryTypeKey]: FactoryType;
   callable: C;
   dependencies: Dependency<TServices>[];
+  linkedFactory?: Factory<TServices, K>;
   beforeResolving?: () => void;
   afterResolving?: (instance: any) => void;
   beforeReplaced?: (newFactory: Factory<TServices, K>) => C | void;
@@ -806,10 +807,11 @@ export class DIContainer<
           },
         );
       },
-      dependencies:
-        namespaceContainer instanceof DIContainer
-          ? namespaceContainer.getFactory(key)?.dependencies || []
-          : [],
+      linkedFactory:
+        (namespaceContainer instanceof DIContainer &&
+          namespaceContainer.getFactory(key)) ||
+        undefined,
+      dependencies: [],
       [factoryTypeKey]: 'namespace-pass-through',
     });
   }
@@ -866,6 +868,7 @@ export class DIContainer<
       | {
           [factoryTypeKey]?: FactoryType;
           replace?: boolean;
+          linkedFactory?: Factory<TServices, K>;
           dependencies?: [...Deps];
           beforeResolving?: () => void;
           afterResolving?: (instance: TResult) => void;
@@ -883,6 +886,7 @@ export class DIContainer<
       [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
         'transient') as FactoryType,
       dependencies,
+      linkedFactory: !optionsIsArray ? options?.linkedFactory : undefined,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       beforeReplaced: !optionsIsArray

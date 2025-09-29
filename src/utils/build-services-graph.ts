@@ -3,7 +3,7 @@ import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
 
 type Tree = Record<
   string,
-  | { title: string; dependencies?: Tree; depth: number; type: string }
+  | { title: string; dependencies?: Tree; depth: number; factoryType: string }
   | undefined
 >;
 
@@ -17,11 +17,20 @@ function toTreeNode<C extends DIContainer<any, any>>(
 ): Tree[string] {
   const stringKey = String(key);
   const factory = this.getFactory(key);
+  const renderDependencies =
+    (factory?.linkedFactory
+      ? factory.linkedFactory.dependencies
+      : factory?.dependencies) || [];
+  let factoryType = factory?.[factoryTypeKey] || '';
+  if (factoryType === 'namespace-pass-through') {
+    factoryType += factory?.linkedFactory?.[factoryTypeKey] || '';
+  }
+
   const result = {
     depth,
     title: stringKey,
-    type: factory?.[factoryTypeKey] || '',
-    dependencies: factory?.dependencies.reduce((r, d) => {
+    factoryType,
+    dependencies: renderDependencies.reduce((r, d) => {
       const isFunction = typeof d === 'function';
       const k = isFunction ? d.name : String(d);
       r[k] = isFunction ? void 0 : toTreeNode.apply(this, [k, tree, depth + 1]);
