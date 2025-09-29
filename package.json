@@ -11,6 +11,8 @@
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p ./tsconfig.esm.json",
     "build:cjs": "tsc -p ./tsconfig.cjs.json",
+    "docs:build": "vite build docs/",
+    "docs:dev": "vite docs/",
     "prepack": "npm run build",
     "format": "npx prettier ./src -w",
     "test": "vitest"

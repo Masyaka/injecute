@@ -75,7 +75,7 @@ const getContainersChain = (c: IDIContainer<any>) => {
   return result;
 };
 
-const factoryTypeKey = Symbol('factoryType');
+export const factoryTypeKey = Symbol('factoryType');
 
 type Factory<
   TServices extends Record<ArgumentsKey, any>,
@@ -139,7 +139,7 @@ export class DIContainer<
   readonly #factories: MapOf<{
     [key in keyof TServices]?: Factory<TServices, key>;
   }> = new Map();
-  protected getFactory<K extends keyof TServices>(k: K) {
+  getFactory<K extends keyof TServices>(k: K) {
     return this.#factories.get(k);
   }
   readonly #singletonInstances: MapOf<{
@@ -332,9 +332,9 @@ export class DIContainer<
   >(name: K, aliasTo: A): IDIContainer<TServices & { [k in K]: T }> {
     return this.addFactory(
       name as Exclude<K, OptionalDependencySkipKey>,
-      () => this.get(aliasTo),
+      (aliased) => aliased,
       {
-        dependencies: [],
+        dependencies: [aliasTo],
         [factoryTypeKey]: 'alias',
       },
     );
@@ -806,7 +806,10 @@ export class DIContainer<
           },
         );
       },
-      dependencies: [],
+      dependencies:
+        namespaceContainer instanceof DIContainer
+          ? namespaceContainer.getFactory(key)?.dependencies || []
+          : [],
       [factoryTypeKey]: 'namespace-pass-through',
     });
   }
