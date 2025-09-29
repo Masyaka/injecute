@@ -210,10 +210,11 @@ export type Flatten<T> = { [k in keyof T]: T[k] } & {};
 /**
  * How factory was added
  */
-export type FactoryType =
+export type EntryType =
   | 'singleton'
   | 'transient'
   | 'instance'
+  | 'namespace-container'
   | 'alias'
   | 'namespace-pass-through';
 
@@ -224,7 +225,7 @@ export type Events<C extends IDIContainer<any>> = {
     container: C;
     replaced: {
       callable: Callable<any, any>;
-      type: FactoryType;
+      type: EntryType;
     };
   };
   reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };

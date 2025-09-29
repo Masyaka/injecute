@@ -70,6 +70,7 @@
 
       .service-name {
         font-weight: 500;
+        color: #569cd6;
       }
 
       .factory-type {
@@ -208,7 +209,7 @@
         border-color: #ff6b35 !important;
         background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.1)) !important;
         transform: translateY(-3px) scale(1.08) !important;
-        box-shadow: 
+        box-shadow:
           0 8px 20px rgba(255, 107, 53, 0.5),
           0 0 0 2px rgba(255, 107, 53, 0.3) !important;
         z-index: 10;
@@ -262,19 +263,19 @@
 
       @keyframes highlight-glow {
         0%, 100% {
-          box-shadow: 
+          box-shadow:
             0 8px 20px rgba(255, 107, 53, 0.5),
             0 0 0 2px rgba(255, 107, 53, 0.3),
             inset 0 0 10px rgba(255, 107, 53, 0.1);
         }
         33% {
-          box-shadow: 
+          box-shadow:
             0 10px 25px rgba(255, 107, 53, 0.6),
             0 0 0 2.5px rgba(255, 107, 53, 0.4),
             inset 0 0 15px rgba(255, 107, 53, 0.15);
         }
         66% {
-          box-shadow: 
+          box-shadow:
             0 12px 30px rgba(255, 107, 53, 0.7),
             0 0 0 3px rgba(255, 107, 53, 0.5),
             inset 0 0 20px rgba(255, 107, 53, 0.2);
@@ -294,7 +295,7 @@
       /* Add flowing effect to highlighted connections */
       .tree-container-svg svg path.highlighted {
         stroke-dasharray: 5 3 !important;
-        animation: 
+        animation:
           pulse-connection 1.8s ease-in-out infinite,
           connection-flow 1s linear infinite !important;
       }

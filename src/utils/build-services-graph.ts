@@ -1,4 +1,4 @@
-import { DIContainer, factoryTypeKey } from '../container';
+import { DIContainer, entryTypeKey } from '../container';
 import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
 
 type Tree = Record<
@@ -21,9 +21,9 @@ function toTreeNode<C extends DIContainer<any, any>>(
     (factory?.linkedFactory
       ? factory.linkedFactory.dependencies
       : factory?.dependencies) || [];
-  let factoryType = factory?.[factoryTypeKey] || '';
+  let factoryType = factory?.[entryTypeKey] || '';
   if (factoryType === 'namespace-pass-through') {
-    factoryType += factory?.linkedFactory?.[factoryTypeKey] || '';
+    factoryType += factory?.linkedFactory?.[entryTypeKey] || '';
   }
 
   const result = {
