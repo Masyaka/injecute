@@ -157,6 +157,165 @@
         border-radius: 4px;
         margin: 10px 0;
       }
+
+      /* Tooltip styles */
+      .service-tooltip {
+        position: absolute;
+        background: rgba(20, 20, 20, 0.95);
+        border: 1px solid #569cd6;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #d4d4d4;
+        z-index: 1000;
+        pointer-events: none;
+        max-width: 250px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: all 0.2s ease;
+      }
+
+      .service-tooltip.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .service-tooltip .tooltip-title {
+        font-weight: bold;
+        color: #ff6b35;
+        margin-bottom: 4px;
+      }
+
+      .service-tooltip .tooltip-section {
+        margin: 6px 0;
+      }
+
+      .service-tooltip .tooltip-label {
+        color: #888;
+        font-size: 10px;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+      }
+
+      .service-tooltip .dependency-list {
+        color: #569cd6;
+        font-size: 11px;
+      }
+
+      /* Hover highlighting styles */
+      .tree-node-svg.highlighted {
+        border-color: #ff6b35 !important;
+        background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(255, 107, 53, 0.1)) !important;
+        transform: translateY(-3px) scale(1.08) !important;
+        box-shadow: 
+          0 8px 20px rgba(255, 107, 53, 0.5),
+          0 0 0 2px rgba(255, 107, 53, 0.3) !important;
+        z-index: 10;
+        position: relative;
+        animation: highlight-glow 2s ease-in-out infinite;
+      }
+
+      .tree-node-svg.dimmed {
+        opacity: 0.25 !important;
+        filter: grayscale(0.8) blur(0.5px);
+        transform: scale(0.95) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+      }
+
+      .tree-container-svg svg path.highlighted {
+        stroke: #ff6b35 !important;
+        stroke-width: 4 !important;
+        opacity: 1 !important;
+        filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.8));
+        animation: pulse-connection 1.8s ease-in-out infinite;
+      }
+
+      .tree-container-svg svg path.dimmed {
+        opacity: 0.1 !important;
+        stroke: #555555 !important;
+        stroke-width: 1 !important;
+      }
+
+      @keyframes pulse-connection {
+        0%, 100% {
+          stroke-width: 4;
+          opacity: 1;
+          filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.8));
+        }
+        25% {
+          stroke-width: 4.5;
+          opacity: 1;
+          filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.9));
+        }
+        50% {
+          stroke-width: 5;
+          opacity: 1;
+          filter: drop-shadow(0 0 12px rgba(255, 107, 53, 1));
+        }
+        75% {
+          stroke-width: 4.5;
+          opacity: 1;
+          filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.9));
+        }
+      }
+
+      @keyframes highlight-glow {
+        0%, 100% {
+          box-shadow: 
+            0 8px 20px rgba(255, 107, 53, 0.5),
+            0 0 0 2px rgba(255, 107, 53, 0.3),
+            inset 0 0 10px rgba(255, 107, 53, 0.1);
+        }
+        33% {
+          box-shadow: 
+            0 10px 25px rgba(255, 107, 53, 0.6),
+            0 0 0 2.5px rgba(255, 107, 53, 0.4),
+            inset 0 0 15px rgba(255, 107, 53, 0.15);
+        }
+        66% {
+          box-shadow: 
+            0 12px 30px rgba(255, 107, 53, 0.7),
+            0 0 0 3px rgba(255, 107, 53, 0.5),
+            inset 0 0 20px rgba(255, 107, 53, 0.2);
+        }
+      }
+
+      /* Connection flow animation */
+      @keyframes connection-flow {
+        0% {
+          stroke-dashoffset: 0;
+        }
+        100% {
+          stroke-dashoffset: 20;
+        }
+      }
+
+      /* Add flowing effect to highlighted connections */
+      .tree-container-svg svg path.highlighted {
+        stroke-dasharray: 5 3 !important;
+        animation: 
+          pulse-connection 1.8s ease-in-out infinite,
+          connection-flow 1s linear infinite !important;
+      }
+
+      /* Enhanced dimmed effect */
+      .tree-node-svg.dimmed {
+        opacity: 0.2 !important;
+        filter: grayscale(0.9) blur(1px);
+        transform: scale(0.92) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Smooth transitions for all elements */
+      .tree-node-svg {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .tree-container-svg svg path {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     </style>
     <script src="https://unpkg.com/monaco-editor@0.52.0/min/vs/loader.js"></script>
     <script type="module" src="./index.js"></script>

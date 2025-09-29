@@ -328,7 +328,7 @@ function renderServicesTree(tree) {
 
       // Generate SVG content with actual DOM positioning
       let svgLines = '';
-      connections.forEach((conn) => {
+      connections.forEach((conn, index) => {
         const fromElement = servicesTreeElement.querySelector(
           `[data-node-id="${conn.from}"]`,
         );
@@ -365,7 +365,10 @@ function renderServicesTree(tree) {
                        stroke-width="${strokeWidth}"
                        stroke-dasharray="${strokeDasharray}"
                        fill="none"
-                       opacity="0.7"/>`;
+                       opacity="0.7"
+                       data-connection-id="conn-${index}"
+                       data-from="${conn.from}"
+                       data-to="${conn.to}"/>`;
         }
       });
 
@@ -380,6 +383,12 @@ function renderServicesTree(tree) {
         );
         if (treeContainer) {
           treeContainer.insertAdjacentHTML('afterbegin', svgOverlay);
+
+          // Add hover functionality for service nodes
+          const cleanup = setupServiceHoverHandlers(tree, connections);
+
+          // Store cleanup function for potential future use
+          servicesTreeElement._hoverCleanup = cleanup;
         }
       }
     });
@@ -390,6 +399,219 @@ function renderServicesTree(tree) {
       <br><small>Check console for detailed error information</small>
     </div>`;
   }
+
+  // Clean up any existing hover handlers
+  if (servicesTreeElement._hoverCleanup) {
+    servicesTreeElement._hoverCleanup();
+    servicesTreeElement._hoverCleanup = null;
+  }
+}
+
+// Function to setup hover handlers for service dependency highlighting
+function setupServiceHoverHandlers(tree, connections) {
+  const serviceNodes = servicesTreeElement.querySelectorAll('.tree-node-svg');
+  const connectionPaths = servicesTreeElement.querySelectorAll('svg path');
+
+  // Create tooltip element
+  const tooltip = document.createElement('div');
+  tooltip.className = 'service-tooltip';
+  document.body.appendChild(tooltip);
+
+  // Helper function to get all dependencies recursively
+  function getAllDependencies(serviceId, visited = new Set()) {
+    if (!serviceId || visited.has(serviceId)) return [];
+    visited.add(serviceId);
+
+    const dependencies = [];
+    const service = tree[serviceId];
+
+    if (
+      service &&
+      service.dependencies &&
+      typeof service.dependencies === 'object'
+    ) {
+      Object.keys(service.dependencies).forEach((depId) => {
+        if (depId && tree[depId]) {
+          dependencies.push(depId);
+          // Recursively get dependencies of dependencies
+          const subDeps = getAllDependencies(depId, new Set(visited));
+          dependencies.push(...subDeps);
+        }
+      });
+    }
+
+    return [...new Set(dependencies)]; // Remove duplicates
+  }
+
+  // Helper function to get all services that depend on this service
+  function getAllDependents(serviceId, visited = new Set()) {
+    if (!serviceId || visited.has(serviceId)) return [];
+    visited.add(serviceId);
+
+    const dependents = [];
+
+    Object.entries(tree).forEach(([id, service]) => {
+      if (
+        id !== serviceId &&
+        service &&
+        service.dependencies &&
+        typeof service.dependencies === 'object' &&
+        serviceId in service.dependencies
+      ) {
+        dependents.push(id);
+        // Recursively get dependents of dependents
+        const subDeps = getAllDependents(id, new Set(visited));
+        dependents.push(...subDeps);
+      }
+    });
+
+    return [...new Set(dependents)]; // Remove duplicates
+  }
+
+  serviceNodes.forEach((node) => {
+    const serviceId = node.dataset.nodeId;
+
+    if (!serviceId) return; // Skip nodes without valid IDs
+
+    node.addEventListener('mouseenter', (event) => {
+      try {
+        // Get all related services (dependencies and dependents)
+        const dependencies = getAllDependencies(serviceId);
+        const dependents = getAllDependents(serviceId);
+        const relatedServices = new Set([
+          serviceId,
+          ...dependencies,
+          ...dependents,
+        ]);
+
+        // Show tooltip with dependency information
+        const service = tree[serviceId];
+        let tooltipContent = `<div class="tooltip-title">${serviceId}</div>`;
+
+        if (service) {
+          tooltipContent += `<div class="tooltip-section">
+            <div class="tooltip-label">Factory Type</div>
+            <div>${service.factoryType || 'Unknown'}</div>
+          </div>`;
+
+          tooltipContent += `<div class="tooltip-section">
+            <div class="tooltip-label">Depth Level</div>
+            <div>${
+              service.depth !== undefined ? service.depth : 'Unknown'
+            }</div>
+          </div>`;
+
+          if (dependencies.length > 0) {
+            tooltipContent += `<div class="tooltip-section">
+              <div class="tooltip-label">Dependencies (${
+                dependencies.length
+              })</div>
+              <div class="dependency-list">${dependencies
+                .slice(0, 8)
+                .join(', ')}${dependencies.length > 8 ? '...' : ''}</div>
+            </div>`;
+          }
+
+          if (dependents.length > 0) {
+            tooltipContent += `<div class="tooltip-section">
+              <div class="tooltip-label">Used By (${dependents.length})</div>
+              <div class="dependency-list">${dependents
+                .slice(0, 8)
+                .join(', ')}${dependents.length > 8 ? '...' : ''}</div>
+            </div>`;
+          }
+
+          // Show total related services count
+          tooltipContent += `<div class="tooltip-section">
+            <div class="tooltip-label">Total Related Services</div>
+            <div>${relatedServices.size}</div>
+          </div>`;
+        }
+
+        tooltip.innerHTML = tooltipContent;
+
+        // Position tooltip near mouse with viewport boundary checking
+        const rect = node.getBoundingClientRect();
+        const tooltipWidth = 250; // max-width from CSS
+        const tooltipHeight = 150; // estimated height
+
+        let left = rect.right + 10;
+        let top = rect.top;
+
+        // Check if tooltip would go off right edge of viewport
+        if (left + tooltipWidth > window.innerWidth) {
+          left = rect.left - tooltipWidth - 10;
+        }
+
+        // Check if tooltip would go off bottom edge of viewport
+        if (top + tooltipHeight > window.innerHeight) {
+          top = window.innerHeight - tooltipHeight - 10;
+        }
+
+        // Ensure tooltip doesn't go off top edge
+        if (top < 10) {
+          top = 10;
+        }
+
+        tooltip.style.left = `${Math.max(10, left)}px`;
+        tooltip.style.top = `${top}px`;
+        tooltip.classList.add('visible');
+        // Highlight related nodes
+        serviceNodes.forEach((n) => {
+          const nodeId = n.dataset.nodeId;
+          if (nodeId && relatedServices.has(nodeId)) {
+            n.classList.add('highlighted');
+          } else {
+            n.classList.add('dimmed');
+          }
+        });
+
+        // Highlight related connections
+        connectionPaths.forEach((path) => {
+          const fromId = path.dataset.from;
+          const toId = path.dataset.to;
+
+          if (
+            fromId &&
+            toId &&
+            relatedServices.has(fromId) &&
+            relatedServices.has(toId)
+          ) {
+            path.classList.add('highlighted');
+          } else {
+            path.classList.add('dimmed');
+          }
+        });
+      } catch (error) {
+        console.warn('Error during hover highlighting:', error);
+      }
+    });
+
+    node.addEventListener('mouseleave', () => {
+      try {
+        // Remove all highlighting
+        serviceNodes.forEach((n) => {
+          n.classList.remove('highlighted', 'dimmed');
+        });
+
+        connectionPaths.forEach((path) => {
+          path.classList.remove('highlighted', 'dimmed');
+        });
+
+        // Hide tooltip
+        tooltip.classList.remove('visible');
+      } catch (error) {
+        console.warn('Error during hover cleanup:', error);
+      }
+    });
+  });
+
+  // Cleanup function to remove tooltip when tree is re-rendered
+  return () => {
+    if (tooltip && tooltip.parentNode) {
+      tooltip.parentNode.removeChild(tooltip);
+    }
+  };
 }
 
 // Debounced tree update function with 300ms delay
