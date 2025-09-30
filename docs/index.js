@@ -296,8 +296,10 @@ function renderServicesTree(tree) {
       nodesHtml +=
         '<div style="display: flex; flex-direction: column; gap: 10px; justify-content: space-evenly">';
       services.forEach(([key, node]) => {
+        const isNamespaceContainer = node.factoryType === 'namespace-container';
+        const namespaceClass = isNamespaceContainer ? ' namespace-container' : '';
         nodesHtml += `
-          <div class="tree-node-svg depth-${depth}" style="width: 180px; display: inline-block;" data-node-id=${
+          <div class="tree-node-svg depth-${depth}${namespaceClass}" style="width: 180px; display: inline-block;" data-node-id=${
           node.title
         }>
             <div class="service-name">${escapeHtml(node.title)}</div>
@@ -417,6 +419,31 @@ function setupServiceHoverHandlers(tree, connections) {
   tooltip.className = 'service-tooltip';
   document.body.appendChild(tooltip);
 
+  // Create namespace hover indicator
+  const namespaceIndicator = document.createElement('div');
+  namespaceIndicator.className = 'namespace-hover-indicator';
+  namespaceIndicator.textContent = 'Highlighting namespace services';
+  document.body.appendChild(namespaceIndicator);
+
+  // Helper function to get all namespace services
+  function getNamespaceServices(serviceId) {
+    const namespaceServices = [];
+    const service = tree[serviceId];
+
+    // Check if this is a namespace container
+    if (service && service.factoryType === 'namespace-container') {
+      // Find all services that start with this namespace name + '.'
+      const namespacePrefix = serviceId + '.';
+      Object.keys(tree).forEach(key => {
+        if (key.startsWith(namespacePrefix)) {
+          namespaceServices.push(key);
+        }
+      });
+    }
+
+    return namespaceServices;
+  }
+
   // Helper function to get all dependencies recursively
   function getAllDependencies(serviceId, visited = new Set()) {
     if (!serviceId || visited.has(serviceId)) return [];
@@ -425,12 +452,8 @@ function setupServiceHoverHandlers(tree, connections) {
     const dependencies = [];
     const service = tree[serviceId];
 
-    if (
-      service &&
-      service.dependencies &&
-      typeof service.dependencies === 'object'
-    ) {
-      Object.keys(service.dependencies).forEach((depId) => {
+    if (service && service.dependencies && typeof service.dependencies === 'object') {
+      Object.keys(service.dependencies).forEach(depId => {
         if (depId && tree[depId]) {
           dependencies.push(depId);
           // Recursively get dependencies of dependencies
@@ -475,14 +498,30 @@ function setupServiceHoverHandlers(tree, connections) {
 
     node.addEventListener('mouseenter', (event) => {
       try {
-        // Get all related services (dependencies and dependents)
-        const dependencies = getAllDependencies(serviceId);
-        const dependents = getAllDependents(serviceId);
-        const relatedServices = new Set([
-          serviceId,
-          ...dependencies,
-          ...dependents,
-        ]);
+        // Check if this is a namespace container
+        const namespaceServices = getNamespaceServices(serviceId);
+
+        let relatedServices;
+        if (namespaceServices.length > 0) {
+          // Show namespace indicator
+          namespaceIndicator.classList.add('visible');
+
+          // For namespace containers, highlight all namespace services and their dependencies
+          relatedServices = new Set([serviceId, ...namespaceServices]);
+
+          // Also include dependencies and dependents of all namespace services
+          namespaceServices.forEach(nsService => {
+            const nsDependencies = getAllDependencies(nsService);
+            const nsDependents = getAllDependents(nsService);
+            nsDependencies.forEach(dep => relatedServices.add(dep));
+            nsDependents.forEach(dep => relatedServices.add(dep));
+          });
+        } else {
+          // Regular service highlighting
+          const dependencies = getAllDependencies(serviceId);
+          const dependents = getAllDependents(serviceId);
+          relatedServices = new Set([serviceId, ...dependencies, ...dependents]);
+        }
 
         // Show tooltip with dependency information
         const service = tree[serviceId];
@@ -501,23 +540,45 @@ function setupServiceHoverHandlers(tree, connections) {
             }</div>
           </div>`;
 
-          if (dependencies.length > 0) {
+          // Check if this is a namespace container
+          if (namespaceServices.length > 0) {
             tooltipContent += `<div class="tooltip-section">
-              <div class="tooltip-label">Dependencies (${
-                dependencies.length
-              })</div>
-              <div class="dependency-list">${dependencies
+              <div class="tooltip-label">Namespace Services (${namespaceServices.length})</div>
+              <div class="dependency-list">${namespaceServices
                 .slice(0, 8)
-                .join(', ')}${dependencies.length > 8 ? '...' : ''}</div>
+                .join(', ')}${namespaceServices.length > 8 ? '...' : ''}</div>
             </div>`;
+          } else {
+            // For regular services, show dependencies and dependents
+            const dependencies = getAllDependencies(serviceId);
+            const dependents = getAllDependents(serviceId);
+
+            if (dependencies.length > 0) {
+              tooltipContent += `<div class="tooltip-section">
+                <div class="tooltip-label">Dependencies (${
+                  dependencies.length
+                })</div>
+                <div class="dependency-list">${dependencies
+                  .slice(0, 8)
+                  .join(', ')}${dependencies.length > 8 ? '...' : ''}</div>
+              </div>`;
+            }
+
+            if (dependents.length > 0) {
+              tooltipContent += `<div class="tooltip-section">
+                <div class="tooltip-label">Used By (${dependents.length})</div>
+                <div class="dependency-list">${dependents
+                  .slice(0, 8)
+                  .join(', ')}${dependents.length > 8 ? '...' : ''}</div>
+              </div>`;
+            }
           }
 
-          if (dependents.length > 0) {
+          // For namespace containers, add special indication
+          if (namespaceServices.length > 0) {
             tooltipContent += `<div class="tooltip-section">
-              <div class="tooltip-label">Used By (${dependents.length})</div>
-              <div class="dependency-list">${dependents
-                .slice(0, 8)
-                .join(', ')}${dependents.length > 8 ? '...' : ''}</div>
+              <div class="tooltip-label">🎯 Hover Effect</div>
+              <div style="color: #4CAF50; font-size: 11px;">Highlights all namespace services in <strong>green</strong></div>
             </div>`;
           }
 
@@ -557,10 +618,15 @@ function setupServiceHoverHandlers(tree, connections) {
         tooltip.style.top = `${top}px`;
         tooltip.classList.add('visible');
         // Highlight related nodes
-        serviceNodes.forEach((n) => {
+        serviceNodes.forEach(n => {
           const nodeId = n.dataset.nodeId;
           if (nodeId && relatedServices.has(nodeId)) {
-            n.classList.add('highlighted');
+            // Check if this is a namespace service being highlighted due to namespace container hover
+            if (namespaceServices.length > 0 && namespaceServices.includes(nodeId)) {
+              n.classList.add('namespace-service');
+            } else {
+              n.classList.add('highlighted');
+            }
           } else {
             n.classList.add('dimmed');
           }
@@ -577,7 +643,15 @@ function setupServiceHoverHandlers(tree, connections) {
             relatedServices.has(fromId) &&
             relatedServices.has(toId)
           ) {
-            path.classList.add('highlighted');
+            // Check if this connection involves namespace services
+            const isNamespaceConnection = namespaceServices.length > 0 &&
+              (namespaceServices.includes(fromId) || namespaceServices.includes(toId));
+
+            if (isNamespaceConnection) {
+              path.classList.add('namespace-connection');
+            } else {
+              path.classList.add('highlighted');
+            }
           } else {
             path.classList.add('dimmed');
           }
@@ -590,26 +664,32 @@ function setupServiceHoverHandlers(tree, connections) {
     node.addEventListener('mouseleave', () => {
       try {
         // Remove all highlighting
-        serviceNodes.forEach((n) => {
-          n.classList.remove('highlighted', 'dimmed');
+        serviceNodes.forEach(n => {
+          n.classList.remove('highlighted', 'dimmed', 'namespace-service');
         });
 
         connectionPaths.forEach((path) => {
-          path.classList.remove('highlighted', 'dimmed');
+          path.classList.remove('highlighted', 'dimmed', 'namespace-connection');
         });
 
         // Hide tooltip
         tooltip.classList.remove('visible');
+
+        // Hide namespace indicator
+        namespaceIndicator.classList.remove('visible');
       } catch (error) {
         console.warn('Error during hover cleanup:', error);
       }
     });
   });
 
-  // Cleanup function to remove tooltip when tree is re-rendered
+  // Cleanup function to remove tooltip and indicator when tree is re-rendered
   return () => {
     if (tooltip && tooltip.parentNode) {
       tooltip.parentNode.removeChild(tooltip);
+    }
+    if (namespaceIndicator && namespaceIndicator.parentNode) {
+      namespaceIndicator.parentNode.removeChild(namespaceIndicator);
     }
   };
 }

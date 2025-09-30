@@ -126,6 +126,56 @@
         margin-top: 4px;
       }
 
+      /* Namespace container specific styling */
+      .tree-node-svg.namespace-container {
+        border: 2px solid #569cd6;
+        background: linear-gradient(135deg, rgba(86, 156, 214, 0.1), rgba(86, 156, 214, 0.05));
+        position: relative;
+      }
+
+      .tree-node-svg.namespace-container::before {
+        content: "📦";
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: #569cd6;
+        color: white;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        border: 2px solid #1e1e1e;
+      }
+
+      .tree-node-svg.namespace-container:hover {
+        border-color: #569cd6 !important;
+        background: linear-gradient(135deg, rgba(86, 156, 214, 0.2), rgba(86, 156, 214, 0.1)) !important;
+      }
+
+      .tree-node-svg.namespace-container.highlighted {
+        border-color: #ff6b35 !important;
+        background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(86, 156, 214, 0.1)) !important;
+      }
+
+      .tree-node-svg.namespace-container.highlighted::before {
+        background: #ff6b35;
+        animation: namespace-pulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes namespace-pulse {
+        0%, 100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.7);
+        }
+        50% {
+          transform: scale(1.1);
+          box-shadow: 0 0 0 4px rgba(255, 107, 53, 0);
+        }
+      }
+
       /* SVG connection lines */
       .tree-container-svg svg {
         pointer-events: none;
@@ -295,9 +345,33 @@
       /* Add flowing effect to highlighted connections */
       .tree-container-svg svg path.highlighted {
         stroke-dasharray: 5 3 !important;
-        animation:
+        animation: 
           pulse-connection 1.8s ease-in-out infinite,
           connection-flow 1s linear infinite !important;
+      }
+
+      /* Special styling for namespace service connections */
+      .tree-container-svg svg path.namespace-connection {
+        stroke: #4CAF50 !important;
+        stroke-width: 3 !important;
+        opacity: 0.9 !important;
+        stroke-dasharray: 8 4 !important;
+        filter: drop-shadow(0 0 4px rgba(76, 175, 80, 0.7));
+        animation: 
+          namespace-connection-pulse 2s ease-in-out infinite,
+          connection-flow 1.5s linear infinite !important;
+      }
+
+      @keyframes namespace-connection-pulse {
+        0%, 100% {
+          stroke-width: 3;
+          opacity: 0.9;
+        }
+        50% {
+          stroke-width: 4;
+          opacity: 1;
+          filter: drop-shadow(0 0 8px rgba(76, 175, 80, 1));
+        }
       }
 
       /* Enhanced dimmed effect */
@@ -307,6 +381,60 @@
         transform: scale(0.92) !important;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Namespace service highlighting when namespace container is hovered */
+      .tree-node-svg.namespace-service {
+        border-color: #4CAF50 !important;
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.15), rgba(76, 175, 80, 0.05)) !important;
+        transform: translateY(-2px) scale(1.03) !important;
+        box-shadow: 
+          0 6px 16px rgba(76, 175, 80, 0.4),
+          0 0 0 1px rgba(76, 175, 80, 0.3) !important;
+        animation: namespace-service-glow 2s ease-in-out infinite;
+      }
+
+      @keyframes namespace-service-glow {
+        0%, 100% {
+          box-shadow: 
+            0 6px 16px rgba(76, 175, 80, 0.4),
+            0 0 0 1px rgba(76, 175, 80, 0.3);
+        }
+        50% {
+          box-shadow: 
+            0 8px 20px rgba(76, 175, 80, 0.6),
+            0 0 0 2px rgba(76, 175, 80, 0.5);
+        }
+      }
+
+      /* Namespace hover notification */
+      .namespace-hover-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(76, 175, 80, 0.8));
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        z-index: 1001;
+        opacity: 0;
+        transform: translateX(100px);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        border: 1px solid rgba(76, 175, 80, 0.4);
+      }
+
+      .namespace-hover-indicator.visible {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .namespace-hover-indicator::before {
+        content: "📦";
+        margin-right: 6px;
       }
 
       /* Smooth transitions for all elements */
