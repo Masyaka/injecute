@@ -1,7 +1,7 @@
 import { DIContainer, entryTypeKey } from '../container';
 import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
 
-type Tree = Record<
+export type Tree = Record<
   string,
   | { title: string; dependencies?: Tree; depth: number; factoryType: string }
   | undefined
@@ -22,8 +22,8 @@ function toTreeNode<C extends DIContainer<any, any>>(
       ? factory.linkedFactory.dependencies
       : factory?.dependencies) || [];
   let factoryType = factory?.[entryTypeKey] || '';
-  if (factoryType === 'namespace-pass-through') {
-    factoryType += factory?.linkedFactory?.[entryTypeKey] || '';
+  if (factoryType === 'namespace-entry') {
+    factoryType += ': ' + factory?.linkedFactory?.[entryTypeKey] || '';
   }
 
   const result = {
@@ -54,7 +54,7 @@ function _buildServicesGraph<C extends DIContainer<any, any>>(this: C) {
 
 export function buildServicesGraph<C extends IDIContainer<any, any>>(
   container: C,
-) {
+): Tree {
   if (!(container instanceof DIContainer)) {
     throw new Error('Only DIContainer supported');
   }

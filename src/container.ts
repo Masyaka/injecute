@@ -813,7 +813,7 @@ export class DIContainer<
           namespaceContainer.getFactory(key)) ||
         undefined,
       dependencies: [],
-      [entryTypeKey]: 'namespace-pass-through',
+      [entryTypeKey]: 'namespace-entry',
     });
   }
 

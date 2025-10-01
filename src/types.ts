@@ -216,7 +216,7 @@ export type EntryType =
   | 'instance'
   | 'namespace-container'
   | 'alias'
-  | 'namespace-pass-through';
+  | 'namespace-entry';
 
 export type Events<C extends IDIContainer<any>> = {
   add: { key: ArgumentsKey; replace: boolean; container: C };
