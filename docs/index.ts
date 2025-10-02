@@ -9,7 +9,7 @@ import DIContainer, {
 } from '../src/index.ts';
 import './declarations.d.ts';
 import { setupPlayground } from './playground.ts';
-import { renderServicesGraph } from './servicesGraph.ts';
+import { renderServicesGraph } from './render-services-graph.ts';
 import { renderConnections, setupServiceHoverHandlers } from './services-graph.ts';
 
 // Debounce function

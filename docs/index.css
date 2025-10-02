@@ -1,0 +1,459 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.main-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+}
+
+#container {
+  flex: 1;
+  min-height: 400px;
+  border-bottom: 2px solid #3c3c3c;
+}
+
+#services-tree-container {
+  flex: 1;
+  padding: 20px;
+  background: #252526;
+  overflow: auto;
+  min-height: 200px;
+}
+
+#services-tree-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #569cd6;
+  border-bottom: 1px solid #3c3c3c;
+  padding-bottom: 8px;
+}
+
+#services-tree {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tree-node {
+  margin: 3px 0;
+  padding: 2px 0;
+  transition: background-color 0.2s ease;
+  border-radius: 2px;
+}
+
+.tree-node:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tree-connector {
+  color: #666666;
+  font-weight: normal;
+  margin-right: 4px;
+}
+
+.service-name {
+  font-weight: 500;
+  color: #569cd6;
+}
+
+.factory-type {
+  color: #858585;
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* SVG Tree Styles */
+.tree-container-svg {
+  border: 1px solid #404040;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  margin-top: 10px;
+  overflow: auto;
+  max-height: 600px;
+}
+
+.tree-node-svg {
+  background: rgba(30, 30, 30, 0.9);
+  border: 2px solid #404040;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.tree-node-svg:hover {
+  border-color: #569cd6;
+  background: rgba(40, 40, 40, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.tree-node-svg .service-name {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.tree-node-svg .dependency-count {
+  color: #858585;
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.tree-node-svg .depth-indicator {
+  color: #666666;
+  font-size: 10px;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Namespace container specific styling */
+.tree-node-svg.namespace-container {
+  border: 2px solid #569cd6;
+  background: linear-gradient(
+    135deg,
+    rgba(86, 156, 214, 0.1),
+    rgba(86, 156, 214, 0.05)
+  );
+  position: relative;
+}
+
+.tree-node-svg.namespace-container::before {
+  content: '📦';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #569cd6;
+  color: white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border: 2px solid #1e1e1e;
+}
+
+.tree-node-svg.namespace-container:hover {
+  border-color: #569cd6 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(86, 156, 214, 0.2),
+    rgba(86, 156, 214, 0.1)
+  ) !important;
+}
+
+.tree-node-svg.namespace-container.highlighted {
+  border-color: #ff6b35 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 53, 0.2),
+    rgba(86, 156, 214, 0.1)
+  ) !important;
+}
+
+.tree-node-svg.namespace-container.highlighted::before {
+  background: #ff6b35;
+  animation: namespace-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes namespace-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.7);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px rgba(255, 107, 53, 0);
+  }
+}
+
+/* SVG connection lines */
+.tree-container-svg svg {
+  pointer-events: none;
+}
+
+.tree-container-svg path {
+  transition: opacity 0.3s ease;
+}
+
+.tree-container-svg:hover path {
+  opacity: 0.9 !important;
+}
+
+.dependency-count {
+  color: #858585;
+  font-size: 11px;
+  font-weight: normal;
+  margin-left: 4px;
+}
+
+.loading {
+  color: #858585;
+  font-style: italic;
+}
+
+.error {
+  color: #f48771;
+  background: rgba(244, 135, 113, 0.1);
+  padding: 8px;
+  border-radius: 4px;
+  margin: 10px 0;
+}
+
+/* Tooltip styles */
+.service-tooltip {
+  position: absolute;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid #569cd6;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #d4d4d4;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: 250px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+}
+
+.service-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.service-tooltip .tooltip-title {
+  font-weight: bold;
+  color: #ff6b35;
+  margin-bottom: 4px;
+}
+
+.service-tooltip .tooltip-section {
+  margin: 6px 0;
+}
+
+.service-tooltip .tooltip-label {
+  color: #888;
+  font-size: 10px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.service-tooltip .dependency-list {
+  color: #569cd6;
+  font-size: 11px;
+}
+
+/* Hover highlighting styles */
+.tree-node-svg.highlighted {
+  border-color: #ff6b35 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 53, 0.2),
+    rgba(255, 107, 53, 0.1)
+  ) !important;
+  transform: translateY(-3px) scale(1.08) !important;
+  box-shadow: 0 8px 20px rgba(255, 107, 53, 0.5),
+    0 0 0 2px rgba(255, 107, 53, 0.3) !important;
+  z-index: 10;
+  position: relative;
+  animation: highlight-glow 2s ease-in-out infinite;
+}
+
+.tree-node-svg.dimmed {
+  opacity: 0.25 !important;
+  filter: grayscale(0.8) blur(0.5px);
+  transform: scale(0.95) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.tree-container-svg svg path.highlighted {
+  stroke: #ff6b35 !important;
+  stroke-width: 4 !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.8));
+  animation: pulse-connection 1.8s ease-in-out infinite;
+}
+
+.tree-container-svg svg path.dimmed {
+  opacity: 0.1 !important;
+  stroke: #555555 !important;
+  stroke-width: 1 !important;
+}
+
+@keyframes pulse-connection {
+  0%,
+  100% {
+    stroke-width: 4;
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(255, 107, 53, 0.8));
+  }
+  25% {
+    stroke-width: 4.5;
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.9));
+  }
+  50% {
+    stroke-width: 5;
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(255, 107, 53, 1));
+  }
+  75% {
+    stroke-width: 4.5;
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(255, 107, 53, 0.9));
+  }
+}
+
+@keyframes highlight-glow {
+  0%,
+  100% {
+    box-shadow: 0 8px 20px rgba(255, 107, 53, 0.5),
+      0 0 0 2px rgba(255, 107, 53, 0.3), inset 0 0 10px rgba(255, 107, 53, 0.1);
+  }
+  33% {
+    box-shadow: 0 10px 25px rgba(255, 107, 53, 0.6),
+      0 0 0 2.5px rgba(255, 107, 53, 0.4),
+      inset 0 0 15px rgba(255, 107, 53, 0.15);
+  }
+  66% {
+    box-shadow: 0 12px 30px rgba(255, 107, 53, 0.7),
+      0 0 0 3px rgba(255, 107, 53, 0.5), inset 0 0 20px rgba(255, 107, 53, 0.2);
+  }
+}
+
+/* Connection flow animation */
+@keyframes connection-flow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 20;
+  }
+}
+
+/* Add flowing effect to highlighted connections */
+.tree-container-svg svg path.highlighted {
+  stroke-dasharray: 5 3 !important;
+  animation: pulse-connection 1.8s ease-in-out infinite,
+    connection-flow 1s linear infinite !important;
+}
+
+/* Special styling for namespace service connections */
+.tree-container-svg svg path.namespace-connection {
+  stroke: #4caf50 !important;
+  stroke-width: 3 !important;
+  opacity: 0.9 !important;
+  stroke-dasharray: 8 4 !important;
+  filter: drop-shadow(0 0 4px rgba(76, 175, 80, 0.7));
+  animation: namespace-connection-pulse 2s ease-in-out infinite,
+    connection-flow 1.5s linear infinite !important;
+}
+
+@keyframes namespace-connection-pulse {
+  0%,
+  100% {
+    stroke-width: 3;
+    opacity: 0.9;
+  }
+  50% {
+    stroke-width: 4;
+    opacity: 1;
+    filter: drop-shadow(0 0 8px rgba(76, 175, 80, 1));
+  }
+}
+
+/* Enhanced dimmed effect */
+.tree-node-svg.dimmed {
+  opacity: 0.2 !important;
+  filter: grayscale(0.9) blur(1px);
+  transform: scale(0.92) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Namespace service highlighting when namespace container is hovered */
+.tree-node-svg.namespace-service {
+  border-color: #4caf50 !important;
+  background: linear-gradient(
+    135deg,
+    rgba(76, 175, 80, 0.15),
+    rgba(76, 175, 80, 0.05)
+  ) !important;
+  transform: translateY(-2px) scale(1.03) !important;
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4),
+    0 0 0 1px rgba(76, 175, 80, 0.3) !important;
+  animation: namespace-service-glow 2s ease-in-out infinite;
+}
+
+@keyframes namespace-service-glow {
+  0%,
+  100% {
+    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4),
+      0 0 0 1px rgba(76, 175, 80, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6),
+      0 0 0 2px rgba(76, 175, 80, 0.5);
+  }
+}
+
+/* Namespace hover notification */
+.namespace-hover-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(76, 175, 80, 0.9),
+    rgba(76, 175, 80, 0.8)
+  );
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 1001;
+  opacity: 0;
+  transform: translateX(100px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+}
+
+.namespace-hover-indicator.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.namespace-hover-indicator::before {
+  content: '📦';
+  margin-right: 6px;
+}
+
+/* Smooth transitions for all elements */
+.tree-node-svg {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tree-container-svg svg path {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

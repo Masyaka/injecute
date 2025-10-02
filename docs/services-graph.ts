@@ -1,4 +1,4 @@
-import type { Tree } from "../src/utils/build-services-graph";
+import type { Tree } from '../src/utils/build-services-graph';
 
 function buildConnections() {
   return Array.from(document.querySelectorAll('[data-node-id]')).flatMap(
@@ -68,24 +68,38 @@ export function renderConnections() {
   container.insertAdjacentHTML('afterbegin', svgOverlay);
 }
 
+function createTooltip() {
+  const tooltip = document.createElement('div');
+  tooltip.className = 'service-tooltip';
+  tooltip.id = 'service-tooltip';
+  document.body.appendChild(tooltip);
+  return tooltip;
+}
+
+function createNamespaceIndicator() {
+  const namespaceIndicator = document.createElement('div');
+  namespaceIndicator.className = 'namespace-hover-indicator';
+  namespaceIndicator.id = 'namespace-hover-indicator';
+  namespaceIndicator.textContent = 'Highlighting namespace services';
+  document.body.appendChild(namespaceIndicator);
+  return namespaceIndicator;
+}
+
 export function setupServiceHoverHandlers(tree: Tree) {
   const serviceNodes = document.querySelectorAll('.tree-node-svg');
   const connectionPaths = document.querySelectorAll('svg path');
 
   // Create tooltip element
-  const tooltip = document.createElement('div');
-  tooltip.className = 'service-tooltip';
-  document.body.appendChild(tooltip);
+  const tooltip = document.getElementById('service-tooltip') || createTooltip();
 
   // Create namespace hover indicator
-  const namespaceIndicator = document.createElement('div');
-  namespaceIndicator.className = 'namespace-hover-indicator';
-  namespaceIndicator.textContent = 'Highlighting namespace services';
-  document.body.appendChild(namespaceIndicator);
+  const namespaceIndicator =
+    document.getElementById('namespace-hover-indicator') ||
+    createNamespaceIndicator();
 
   // Helper function to get all namespace services
-  function getNamespaceServices(serviceId) {
-    const namespaceServices = [];
+  function getNamespaceServices(serviceId: string) {
+    const namespaceServices: string[] = [];
     const service = tree[serviceId];
 
     // Check if this is a namespace container
@@ -107,7 +121,7 @@ export function setupServiceHoverHandlers(tree: Tree) {
     if (!serviceId || visited.has(serviceId)) return [];
     visited.add(serviceId);
 
-    const dependencies = [];
+    const dependencies: string[] = [];
     const service = tree[serviceId];
 
     if (
@@ -133,7 +147,7 @@ export function setupServiceHoverHandlers(tree: Tree) {
     if (!serviceId || visited.has(serviceId)) return [];
     visited.add(serviceId);
 
-    const dependents = [];
+    const dependents: string[] = [];
 
     Object.entries(tree).forEach(([id, service]) => {
       if (
@@ -153,7 +167,8 @@ export function setupServiceHoverHandlers(tree: Tree) {
     return [...new Set(dependents)]; // Remove duplicates
   }
 
-  serviceNodes.forEach((node) => {
+  serviceNodes.forEach((n) => {
+    const node = n as HTMLElement;
     const serviceId = node.dataset.nodeId;
 
     if (!serviceId) return; // Skip nodes without valid IDs
@@ -285,11 +300,11 @@ export function setupServiceHoverHandlers(tree: Tree) {
         tooltip.style.left = `${Math.max(10, left)}px`;
         tooltip.style.top = `${top}px`;
         tooltip.classList.add('visible');
-        // Highlight related nodes
+
         serviceNodes.forEach((n) => {
-          const nodeId = n.dataset.nodeId;
+          const node = n as HTMLElement;
+          const nodeId = node.dataset.nodeId;
           if (nodeId && relatedServices.has(nodeId)) {
-            // Check if this is a namespace service being highlighted due to namespace container hover
             if (
               namespaceServices.length > 0 &&
               namespaceServices.includes(nodeId)
@@ -304,7 +319,8 @@ export function setupServiceHoverHandlers(tree: Tree) {
         });
 
         // Highlight related connections
-        connectionPaths.forEach((path) => {
+        connectionPaths.forEach((p) => {
+          const path = p as HTMLElement;
           const fromId = path.dataset.from;
           const toId = path.dataset.to;
 
@@ -359,14 +375,4 @@ export function setupServiceHoverHandlers(tree: Tree) {
       }
     });
   });
-
-  // Cleanup function to remove tooltip and indicator when tree is re-rendered
-  return () => {
-    if (tooltip && tooltip.parentNode) {
-      tooltip.parentNode.removeChild(tooltip);
-    }
-    if (namespaceIndicator && namespaceIndicator.parentNode) {
-      namespaceIndicator.parentNode.removeChild(namespaceIndicator);
-    }
-  };
 }

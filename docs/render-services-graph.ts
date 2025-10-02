@@ -49,7 +49,7 @@ export function renderServicesGraph(graph: Tree) {
 
   const output = `
     <div id="tree-container-svg" class="tree-container-svg" style="position: relative">
-      <div style="position: relative; z-index: 2; padding: 10px; display: flex; flex-direction: row; gap: 30px">
+      <div style="position: relative; z-index: 2; padding: 10px; display: flex; flex-direction: row; gap: 50px">
         ${nodesHtml}
       </div>
     </div>
