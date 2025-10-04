@@ -45,6 +45,18 @@ body {
   line-height: 1.5;
 }
 
+#services-tree-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .tree-node {
   margin: 3px 0;
   padding: 2px 0;

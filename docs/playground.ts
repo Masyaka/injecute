@@ -1,4 +1,5 @@
 import * as monaco from 'monaco-editor';
+import ts from 'typescript';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 import injecuteUtils from '../lib/cjs/utils/index.d.ts?raw';
@@ -6,6 +7,14 @@ import injecuteIndex from '../lib/cjs/index.d.ts?raw';
 import injecuteTypes from '../lib/cjs/types.d.ts?raw';
 import injecuteContainer from '../lib/cjs/container.d.ts?raw';
 import injecuteBuildServicesGraph from '../lib/cjs/utils/build-services-graph.d.ts?raw';
+import DIContainer, {
+  construct,
+  createProxyAccessor,
+  defer,
+  preload,
+  setCacheInstance,
+  buildServicesGraph,
+} from '../src/index.ts';
 
 const initialCode = `
 
@@ -158,4 +167,53 @@ export function setupPlayground(containerId = 'container'): Playground {
     setCode: (code: string) => model.setValue(code),
     onCodeChange: (callback: () => void) => model.onDidChangeContent(callback),
   };
+}
+
+export function codeToServicesGraph(code: string) {
+  const compiledCode = ts
+    .transpile(code, {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.ESNext,
+      noEmit: true,
+      esModuleInterop: true,
+      strict: false,
+      types: ['node'],
+    })
+    .replace(/import.*from.*['"'];?\r?\n/g, '')
+    .replace(/export\s+/g, '');
+
+  const evalFunction = new Function(
+    'DIContainer',
+    'construct',
+    'defer',
+    'preload',
+    'createProxyAccessor',
+    'setCacheInstance',
+    `
+  ${compiledCode}
+
+  // Return the container from createContainer function
+  if (typeof createContainer === 'function') {
+    return createContainer();
+  }
+  return container;
+`,
+  );
+
+  const container = evalFunction(
+    DIContainer,
+    construct,
+    defer,
+    preload,
+    createProxyAccessor,
+    setCacheInstance,
+  );
+
+  if (!container) {
+    throw new Error(
+      'Declare "container" variable in playground to preview services tree',
+    );
+  }
+
+  return buildServicesGraph(container);
 }
