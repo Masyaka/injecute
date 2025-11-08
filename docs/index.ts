@@ -1,8 +1,6 @@
 import './declarations.d.ts';
 import { codeToServicesGraph, setupPlayground } from './playground.ts';
 import {
-  renderConnections as updateConnections,
-  setupServiceHoverHandlers,
   renderServicesGraph,
 } from './services-graph.ts';
 
@@ -35,10 +33,7 @@ if (!servicesTreeElement || !servicesTreeInputElement) {
 
 servicesTreeInputElement.addEventListener('change', (e: any) => {
   const graph = JSON.parse(e.target.value);
-  const html = renderServicesGraph(graph);
-  servicesTreeElement!.innerHTML = html;
-  updateConnections(graph);
-  setupServiceHoverHandlers(graph);
+  renderServicesGraph(graph);
 });
 
 // Function to update services graph

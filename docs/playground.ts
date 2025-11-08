@@ -18,83 +18,98 @@ import DIContainer, {
 
 const initialCode = `
 
-  import DIContainer, { construct, IDIContainer } from "injecute";
 
-  interface UserMessageTransport {
-    sendUserMessage(userId: number, content: string): void;
-  }
 
-  interface User {
-    id: number;
-    name: string;
-    email: string;
-  }
+    import DIContainer, { construct, IDIContainer } from "injecute";
 
-  class GreetService {
-    constructor(private transport: UserMessageTransport) {}
-
-    greet(user: User) {
-      this.transport.sendUserMessage(user.id, \`Hello \${user.name}\`);
+    interface UserMessageTransport {
+      sendUserMessage(userId: number, content: string): void;
     }
-  }
 
-  class Mailer implements UserMessageTransport {
-    sendUserMessage(userId: number, content: string): void {
-      // send email
+    interface User {
+      id: number;
+      name: string;
+      email: string;
     }
-  }
 
-  class MockTransport implements UserMessageTransport {
-    sendUserMessage(userId: number, content: string): void {
-      console.log(userId, content);
+    class GreetService {
+      constructor(private transport: UserMessageTransport) {}
+
+      greet(user: User) {
+        this.transport.sendUserMessage(user.id, \`Hello \${user.name}\`);
+      }
     }
-  }
 
-
-  class BlogService {
-    constructor(private transport: UserMessageTransport) {}
-
-    createBlog(title: string, content: string): void {
-      this.transport.sendUserMessage(1, \`New blog post: \${title}\`);
+    class Mailer implements UserMessageTransport {
+      sendUserMessage(userId: number, content: string): void {
+        // send email
+      }
     }
-  }
 
-  class BlogRepository {
-    constructor(private db: Connection) {}
-
-    async createBlog(title: string, content: string): Promise<void> {
-      // query to db
+    class MockTransport implements UserMessageTransport {
+      sendUserMessage(userId: number, content: string): void {
+        console.log(userId, content);
+      }
     }
-  }
 
-  type Connection = {
 
-  }
+    class BlogService {
+      constructor(private transport: UserMessageTransport, private repo: any) {}
 
-  type Database = any;
+      createBlog(title: string, content: string): void {
+        this.transport.sendUserMessage(1, \`New blog post: \${title}\`);
+        this.repo.save(title, content);
+      }
+    }
 
-  function addBlogServices<T extends { db: Database, userMessageTransport: UserMessageTransport }>(container: IDIContainer<T>) {
-    return container
-    .addSingleton('blogService', construct(BlogService), ['userMessageTransport'])
-    .addSingleton('blogRepository', construct(BlogRepository), ['db']);
-  }
+    class BlogRepository {
+      constructor(private db: any) {}
+      save(title: string, content: string): void {}
+    }
 
-  function createContainer(cfg: { useMockMailer?: boolean } = {}) {
-    return new DIContainer()
-      .addSingleton('connection', () => ({}) as any)
-      .addAlias('db', 'connection')
-      .addSingleton('emailTransport', construct(Mailer))
-      .addSingleton('mockTransport', construct(MockTransport))
-      .addAlias(
-        'userMessageTransport',
-        cfg.useMockMailer ? 'mockTransport' : 'emailTransport',
-      )
-      .addSingleton('greetService', construct(GreetService), ['userMessageTransport'])
-      .namespace('blog', addBlogServices);
-  }
+    class CommentService {
+      constructor(private repo: any) {}
+      addComment(blogId: number, text: string): void {}
+    }
 
-  const greetService = createContainer().get('greetService');
-  greetService.greet({ id: 1, name: 'John', email: 'john@example.com' });
+    class CommentRepository {
+      constructor(private db: any) {}
+      save(blogId: number, text: string): void {}
+    }
+
+    type Connection = any;
+    type Database = any;
+
+    // Nested namespace example: Domain.Blog with sub-namespace Domain.Blog.Comments
+    function addBlogServices<T extends { db: Database, userMessageTransport: UserMessageTransport }>(container: IDIContainer<T>) {
+      return container
+        .addSingleton('blogRepository', construct(BlogRepository), ['db'])
+        .addSingleton('blogService', construct(BlogService), ['userMessageTransport', 'blogRepository'])
+        .namespace('Comments', (comments) => 
+          comments
+            .addSingleton('commentRepository', construct(CommentRepository), ['db'])
+            .addSingleton('commentService', construct(CommentService), ['commentRepository'])
+        );
+    }
+
+    function createContainer(cfg: { useMockMailer?: boolean } = {}) {
+      return new DIContainer()
+        .addSingleton('connection', () => ({}) as any)
+        .addAlias('db', 'connection')
+        .addSingleton('emailTransport', construct(Mailer))
+        .addSingleton('mockTransport', construct(MockTransport))
+        .addAlias(
+          'userMessageTransport',
+          cfg.useMockMailer ? 'mockTransport' : 'emailTransport',
+        )
+        .addSingleton('greetService', construct(GreetService), ['userMessageTransport'])
+        .namespace('Domain', (domain) => 
+          domain.namespace('Blog', addBlogServices)
+        );
+    }
+
+    const greetService = createContainer().get('greetService');
+    greetService.greet({ id: 1, name: 'John', email: 'john@example.com' });
 `;
 
 export type Playground = {
