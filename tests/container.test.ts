@@ -568,7 +568,7 @@ describe('injecute container', () => {
           .addSingleton(multiplierKey, (str) => Number(str), {
             dependencies: [multiplierStringKey],
           })
-          .addTransient('multiplied2', (n: number) => 2 * n, {
+          .addTransient('multiplied2', (n) => 2 * n, {
             dependencies: [multiplierKey],
           })
           .get('multiplied2');
