@@ -27,7 +27,7 @@ function toTreeNode<C extends DIContainer<any, any>>(
   let factoryType = finalFactory?.[entryTypeKey] || "";
   while (finalFactory?.linkedFactory) {
     finalFactory = finalFactory.linkedFactory;
-    factoryType += "->" + finalFactory?.[entryTypeKey] || "";
+    factoryType += " -> " + finalFactory?.[entryTypeKey] || "";
   }
   const renderDependencies = finalFactory?.dependencies || [];
 

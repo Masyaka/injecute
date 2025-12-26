@@ -276,9 +276,9 @@ export function renderServicesGraph(graph: Tree) {
 
   // Create pack layout
   const pack = d3.pack<PackNode>()
-    .size([width - 100, height - 100])
-    .padding(10)
-    .radius(d => 70);
+    .size([width - 50, height - 50])
+    .padding(30)
+    .radius(d => 100);
 
   const root = d3.hierarchy(packData)
     .sum(d => d.value || 0)
@@ -425,16 +425,6 @@ export function renderServicesGraph(graph: Tree) {
         : d.data.factoryType;
     });
 
-  // Add depth indicator
-  nodes.append('text')
-    .attr('class', 'depth-indicator')
-    .attr('y', 22)
-    .attr('text-anchor', 'middle')
-    .attr('fill', '#666666')
-    .attr('font-size', '10px')
-    .attr('font-style', 'italic')
-    .text(d => `Depth: ${d.data.depth}`);
-
   // Setup click handlers
   setupClickHandlers(nodes, links);
 
@@ -566,10 +556,6 @@ function setupClickHandlers(
     tooltipContent += `<div class="tooltip-section">
       <div class="tooltip-label">Factory Type</div>
       <div>${d.data.factoryType || 'Unknown'}</div>
-    </div>`;
-    tooltipContent += `<div class="tooltip-section">
-      <div class="tooltip-label">Depth Level</div>
-      <div>${d.data.depth}</div>
     </div>`;
 
     if (namespaceServices.length > 0) {

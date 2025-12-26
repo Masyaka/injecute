@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/injecute/',
+  base: './',
   build: {
     outDir: 'docs/dist',
     emptyOutDir: true,
