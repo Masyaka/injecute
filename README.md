@@ -4,7 +4,11 @@ Lightweight extendable typesafe dependency injection container written in TypeSc
 
 ![Build and tests](https://github.com/Masyaka/injecute/actions/workflows/tests.yml/badge.svg)
 
-### Key features
+
+## Try it
+Check out the [playground](https://masyaka.github.io/injecute/)
+
+## Key features
 
 - typesafe
 - explicit dependencies by default
