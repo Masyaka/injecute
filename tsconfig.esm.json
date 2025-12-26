@@ -3,6 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "module": "ES2022",
+    "moduleResolution": "node",
     "esModuleInterop": false,
     "outDir": "./lib/esm",
     "target": "ES2022",

@@ -6,7 +6,7 @@ import {
   ContainerOwnServices,
   Empty,
   Events,
-  FactoryType,
+  EntryType,
   GetOptions,
   IDIContainer,
   KeyForValueOfType,
@@ -75,7 +75,7 @@ const getContainersChain = (c: IDIContainer<any>) => {
   return result;
 };
 
-const factoryTypeKey = Symbol('factoryType');
+export const entryTypeKey = Symbol('factoryType');
 
 type Factory<
   TServices extends Record<ArgumentsKey, any>,
@@ -85,9 +85,10 @@ type Factory<
     TServices[K]
   >,
 > = {
-  [factoryTypeKey]: FactoryType;
+  [entryTypeKey]: EntryType;
   callable: C;
   dependencies: Dependency<TServices>[];
+  linkedFactory?: Factory<TServices, K>;
   beforeResolving?: () => void;
   afterResolving?: (instance: any) => void;
   beforeReplaced?: (newFactory: Factory<TServices, K>) => C | void;
@@ -99,7 +100,7 @@ const isFactory = (f: unknown): f is Factory<any, any> => {
     typeof f === 'object' &&
     'dependencies' in f &&
     'callable' in f &&
-    factoryTypeKey in f
+    entryTypeKey in f
   );
 };
 
@@ -139,7 +140,7 @@ export class DIContainer<
   readonly #factories: MapOf<{
     [key in keyof TServices]?: Factory<TServices, key>;
   }> = new Map();
-  protected getFactory<K extends keyof TServices>(k: K) {
+  getFactory<K extends keyof TServices>(k: K) {
     return this.#factories.get(k);
   }
   readonly #singletonInstances: MapOf<{
@@ -224,15 +225,16 @@ export class DIContainer<
     name: K,
     instance: TResult,
     options?: {
-      replace: boolean;
+      replace?: boolean;
       beforeResolving?: () => void;
       afterResolving?: (instance: TResult) => void;
       beforeReplaced?: () => () => TResult | void;
+      [entryTypeKey]?: 'instance' | 'namespace-container';
     },
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     return this.addFactory(name, () => instance, {
-      [factoryTypeKey]: 'instance',
-      replace: options?.replace,
+      [entryTypeKey]: options?.[entryTypeKey] ?? 'instance',
+      replace: options?.replace || false,
       beforeResolving: options?.beforeResolving,
       afterResolving: options?.afterResolving,
       beforeReplaced: options?.beforeReplaced,
@@ -259,7 +261,7 @@ export class DIContainer<
     factory: TCallable,
     options:
       | {
-          [factoryTypeKey]?: FactoryType;
+          [entryTypeKey]?: EntryType;
           replace?: boolean;
           dependencies: [...Deps];
           beforeResolving?: () => void;
@@ -290,7 +292,7 @@ export class DIContainer<
     factory: TCallable,
     options:
       | {
-          [factoryTypeKey]?: Extract<FactoryType, 'instance'>;
+          [entryTypeKey]?: Extract<EntryType, 'instance'>;
           replace?: boolean;
           dependencies: [...Deps];
           beforeResolving?: () => void;
@@ -301,8 +303,8 @@ export class DIContainer<
   ): IDIContainer<TServices & { [k in K]: TResult }> {
     const optionsIsArray = Array.isArray(options);
     return this.addFactory(name, factory, {
-      [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
-        'singleton') as FactoryType,
+      [entryTypeKey]: ((!optionsIsArray && options?.[entryTypeKey]) ||
+        'singleton') as EntryType,
       replace: optionsIsArray ? false : options?.replace,
       dependencies: optionsIsArray ? options : options?.dependencies,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
@@ -332,10 +334,10 @@ export class DIContainer<
   >(name: K, aliasTo: A): IDIContainer<TServices & { [k in K]: T }> {
     return this.addFactory(
       name as Exclude<K, OptionalDependencySkipKey>,
-      () => this.get(aliasTo),
+      (aliased) => aliased,
       {
-        dependencies: [],
-        [factoryTypeKey]: 'alias',
+        dependencies: [aliasTo],
+        [entryTypeKey]: 'alias',
       },
     );
   }
@@ -680,7 +682,7 @@ export class DIContainer<
     const factory = this.#factories.get(name);
     if (factory) {
       const result = this.applyFactory(factory);
-      if (factory[factoryTypeKey] !== 'instance') {
+      if (factory[entryTypeKey] !== 'instance') {
         this.onProduce(name, result);
       }
       return result;
@@ -732,7 +734,7 @@ export class DIContainer<
         container: this as IDIContainer<TOwnServices, TParentServices>,
         replaced: {
           callable: currentFactory.callable,
-          type: currentFactory[factoryTypeKey],
+          type: currentFactory[entryTypeKey],
         },
       });
     }
@@ -806,8 +808,12 @@ export class DIContainer<
           },
         );
       },
+      linkedFactory:
+        (namespaceContainer instanceof DIContainer &&
+          namespaceContainer.getFactory(key)) ||
+        undefined,
       dependencies: [],
-      [factoryTypeKey]: 'namespace-pass-through',
+      [entryTypeKey]: 'namespace-entry',
     });
   }
 
@@ -815,7 +821,9 @@ export class DIContainer<
     N extends string,
     C extends IDIContainer<any>,
   >(namespace: N, namespaceContainer: C) {
-    this.addInstance(namespace as any, namespaceContainer);
+    this.addInstance(namespace as any, namespaceContainer, {
+      [entryTypeKey]: 'namespace-container',
+    });
 
     let adoptee: IDIContainer<any> | undefined;
     while (true) {
@@ -861,8 +869,9 @@ export class DIContainer<
     factory: TCallable,
     options?:
       | {
-          [factoryTypeKey]?: FactoryType;
+          [entryTypeKey]?: EntryType;
           replace?: boolean;
+          linkedFactory?: Factory<TServices, K>;
           dependencies?: [...Deps];
           beforeResolving?: () => void;
           afterResolving?: (instance: TResult) => void;
@@ -877,9 +886,10 @@ export class DIContainer<
     const dependencies: Dependency<TServices>[] =
       (optionsIsArray ? options : options?.dependencies) || [];
     const newFactory: Factory<TServices, K> = {
-      [factoryTypeKey]: ((!optionsIsArray && options?.[factoryTypeKey]) ||
-        'transient') as FactoryType,
+      [entryTypeKey]: ((!optionsIsArray && options?.[entryTypeKey]) ||
+        'transient') as EntryType,
       dependencies,
+      linkedFactory: !optionsIsArray ? options?.linkedFactory : undefined,
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
       beforeReplaced: !optionsIsArray

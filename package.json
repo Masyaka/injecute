@@ -11,6 +11,8 @@
     "build": "npm run clean && npm run build:esm && npm run build:cjs",
     "build:esm": "tsc -p ./tsconfig.esm.json",
     "build:cjs": "tsc -p ./tsconfig.cjs.json",
+    "docs:build": "vite build docs/",
+    "docs:dev": "vite docs/",
     "prepack": "npm run build",
     "format": "npx prettier ./src -w",
     "test": "vitest"
@@ -56,6 +58,9 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
-    "vitest": "^3.2.4"
-  }
+    "vitest": "^3.2.4",
+    "@types/d3": "^7.4.3",
+    "d3": "^7.9.0"
+  },
+  "dependencies": {}
 }
