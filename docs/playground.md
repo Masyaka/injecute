@@ -2,9 +2,7 @@
 
 A sophisticated interactive playground for visualizing dependency injection containers and their service dependency trees in real-time.
 
-## 🎯 How It Works
-
-### Architecture Overview
+## Flow Overview
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
