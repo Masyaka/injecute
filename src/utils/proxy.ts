@@ -3,6 +3,7 @@ import type {
   ServiceKey,
   ServiceProvider,
 } from '../types.ts';
+import { InjecuteError } from '../errors.ts';
 import {
   type ExposedName,
   type KeySpec,
@@ -63,7 +64,10 @@ export function createProxyAccessor<
   const names = (): ServiceKey[] =>
     exposed ? [...exposed.keys()] : [...container.keys];
   const readOnly = () => {
-    throw new Error('The proxy accessor is read-only.');
+    throw new InjecuteError(
+      'INJECUTE_READ_ONLY',
+      'The proxy accessor is read-only.',
+    );
   };
   return new Proxy({} as any, {
     get: (_target, property) => {

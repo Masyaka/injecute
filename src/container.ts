@@ -1,4 +1,11 @@
 import { optionalKey } from './dependencies.ts';
+import {
+  CircularDependencyError,
+  InjecuteError,
+  isClassCallError,
+  looksLikeConstructor,
+  suggestKeys,
+} from './errors.ts';
 import { callableOf, isClass, SET_CACHE_INSTANCE } from './internal.ts';
 import type {
   ContainerEvents,
@@ -24,15 +31,6 @@ import type {
   ServiceRegistry,
   SingletonOptions,
 } from './types.ts';
-
-export class CircularDependencyError extends Error {
-  constructor(stack: ServiceKey[]) {
-    const circularStackDescription = stack
-      .map((k) => (k === stack[stack.length - 1] ? `*${k.toString()}*` : k))
-      .join(' -> ');
-    super(`Circular dependency detected ${circularStackDescription}.`);
-  }
-}
 
 /** Internal: a dependency after normalization. */
 type InternalDependency =
@@ -216,8 +214,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   ): ReturnType<Extract<S[K], (...args: any[]) => any>> {
     const value = this.get(key);
     if (typeof value !== 'function') {
-      throw new Error(
-        `Entry "${String(key)}" is not a function and can not be invoked`,
+      throw new InjecuteError(
+        'INJECUTE_NOT_A_FUNCTION',
+        `Service "${describeKey(key)}" is not a function, so it cannot be called.`,
       );
     }
     return value.apply(thisArg, args);
@@ -378,17 +377,24 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         },
   ): DIContainer<S & NamespacedServices<N, NA>> {
     if (this.has(name)) {
-      throw new Error(`Namespace key "${name}" already in use.`);
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_CONFLICT',
+        `Namespace "${name}" cannot be added: the key is already in use.`,
+      );
     }
     const run = extension as unknown as (registry: unknown) => unknown;
     const result = run(this.fork());
     if (result === this) {
-      throw new Error(
-        'Namespace result can not be the same container. Use parent.fork(), provided namespace container or new container as result.',
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_RESULT',
+        `Namespace "${name}" callback returned the parent container itself.`,
       );
     }
     if (!(result instanceof DIContainer)) {
-      throw new Error('Namespace extension must return a container.');
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_RESULT',
+        `Namespace "${name}" callback did not return a container.`,
+      );
     }
     this.#adoptNamespace(name, result, run);
     return this as any;
@@ -425,8 +431,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
       if (current === this) return result as any;
       current = current.#parent;
     }
-    throw new Error(
-      'Extension result container not the same container or its child.',
+    throw new InjecuteError(
+      'INJECUTE_EXTENSION_RESULT',
+      'The extension returned a container that is not the same container or its child.',
     );
   }
 
@@ -446,7 +453,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   ): R {
     const deps = normalizeDependencies(dependencies, undefined);
     const args = deps.map((d) => this.#resolveDependency(d, undefined, []));
-    return this.invokeFactory(callableOf(factory), args) as R;
+    return this.#invoke(callableOf(factory), args, factory, []) as R;
   }
 
   /**
@@ -615,6 +622,66 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
 
   // ---------------------------------------------------------------- internals
 
+  /**
+   * Runs a factory. Errors that are not InjecuteErrors are wrapped with the resolution path (the
+   * original is `cause`); a class called without `new` gets a CLASS_NOT_CONSTRUCTED hint.
+   */
+  #invoke(
+    factory: (...args: any[]) => unknown,
+    args: unknown[],
+    original: unknown,
+    path: readonly ServiceKey[],
+  ): unknown {
+    const name = describeKey(
+      path.at(-1) ?? ((original as { name?: string })?.name || 'factory'),
+    );
+    let value: unknown;
+    try {
+      value = this.invokeFactory(factory, args);
+    } catch (error) {
+      if (error instanceof InjecuteError) throw error;
+      if (!isClass(original) && isClassCallError(error, original)) {
+        throw classNotConstructed(name, original, path, error);
+      }
+      throw new InjecuteError(
+        'INJECUTE_RESOLUTION_FAILED',
+        `Failed to create "${name}": ${error instanceof Error ? error.message : String(error)}`,
+        { path, cause: error },
+      );
+    }
+    if (
+      value === undefined &&
+      !isClass(original) &&
+      looksLikeConstructor(original)
+    ) {
+      throw classNotConstructed(name, original, path, undefined);
+    }
+    return value;
+  }
+
+  #notRegistered(key: ServiceKey, path: readonly ServiceKey[]): InjecuteError {
+    const suggestions = suggestKeys(key, this.keys);
+    let levels = 0;
+    for (
+      let level: DIContainer<any> | undefined = this;
+      level;
+      level = level.#parent
+    )
+      levels++;
+    const searched =
+      levels === 1
+        ? 'this container'
+        : `this container and ${levels - 1} parent(s)`;
+    return new InjecuteError(
+      'INJECUTE_NOT_REGISTERED',
+      `No service registered for "${describeKey(key)}" (searched ${searched}).` +
+        (suggestions.length > 0
+          ? ` Did you mean ${suggestions.map((s) => `"${s}"`).join(', ')}?`
+          : ''),
+      { path },
+    );
+  }
+
   /** This container as the read-only view handed to middlewares and event listeners. */
   #view(): ServiceProvider<any> {
     return this as unknown as ServiceProvider<any>;
@@ -643,7 +710,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
 
   #assertNotDisposed() {
     if (this.#disposed) {
-      throw new Error('This container is disposed.');
+      throw new InjecuteError(
+        'INJECUTE_DISPOSED',
+        'This container is disposed.',
+      );
     }
   }
 
@@ -690,9 +760,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     }
     this.#emit('dispose', { container: this.#view() });
     if (errors.length > 0) {
-      throw new AggregateError(
-        errors,
+      throw new InjecuteError(
+        'INJECUTE_DISPOSE_FAILED',
         `Failed to dispose ${errors.length} service(s).`,
+        { cause: new AggregateError(errors, 'Dispose failures') },
       );
     }
   }
@@ -701,7 +772,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     const supported = Object.keys(this.#listeners)
       .map((k) => `"${k}"`)
       .join(', ');
-    return new Error(`Event "${e}" not supported. ${supported} allowed`);
+    return new InjecuteError(
+      'INJECUTE_UNKNOWN_EVENT',
+      `Event "${e}" is not supported. Supported: ${supported}.`,
+    );
   }
 
   #emit<E extends keyof ContainerEvents>(
@@ -729,8 +803,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
       | undefined,
   ) {
     if (typeof factory !== 'function') {
-      throw new Error(
-        `Non function factory or class constructor added for "${describeKey(key)}" key`,
+      throw new InjecuteError(
+        'INJECUTE_INVALID_FACTORY',
+        `The factory for "${describeKey(key)}" is not a function or class (got ${typeof factory}).`,
       );
     }
     const isArray = Array.isArray(options);
@@ -738,7 +813,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     const dependencies = (isArray ? options : options?.dependencies) ?? [];
     const dispose = isArray ? undefined : options?.dispose;
     if (kind === 'transient' && dispose !== undefined && dispose !== false) {
-      throw new Error(
+      throw new InjecuteError(
+        'INJECUTE_INVALID_OPTION',
         `"dispose" is not supported for transient "${describeKey(key)}": the container does not keep transient instances.`,
       );
     }
@@ -761,13 +837,17 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     const key = reg.key;
     const existing = this.#registrations.get(key);
     if (existing && !replace) {
-      throw new Error(
-        `Factory or instance with name "${describeKey(key)}" already registered. Pass { replace: true } to replace it.`,
+      throw new InjecuteError(
+        'INJECUTE_ALREADY_REGISTERED',
+        `"${describeKey(key)}" is already registered in this container.`,
       );
     }
     const usesPrevious = reg.dependencies.some((d) => d.type === 'previous');
     if (usesPrevious && !existing && !this.#parent?.has(key)) {
-      throw new CircularDependencyError([key, key]);
+      throw new InjecuteError(
+        'INJECUTE_NO_PREVIOUS_DEFINITION',
+        `"${describeKey(key)}" depends on itself, but no previous definition of "${describeKey(key)}" is registered.`,
+      );
     }
     this.#assertNoCycle(reg);
     const stored: Registration = existing
@@ -863,7 +943,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     this.#emit('get', { key, value, container: this.#view() });
     if (!found && value === undefined) {
       if (allowUnresolved) return undefined;
-      throw new Error(`No service registered for "${describeKey(key)}" key.`);
+      throw this.#notRegistered(key, [...path, key]);
     }
     return value;
   }
@@ -948,7 +1028,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     const factory = reg.construct
       ? callableOf(reg.factory as unknown as new (...args: any[]) => unknown)
       : reg.factory!;
-    const value = this.invokeFactory(factory, args);
+    const value = this.#invoke(factory, args, reg.factory, path);
     this.#emit('produce', { key: reg.key, value, container: this.#view() });
     return value;
   }
@@ -971,8 +1051,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         const above = reg ? reg.owner.#parent : undefined;
         const found = above ? above.#lookup(d.key) : undefined;
         if (!found) {
-          throw new Error(
-            `No previous definition for "${describeKey(d.key)}".`,
+          throw new InjecuteError(
+            'INJECUTE_NO_PREVIOUS_DEFINITION',
+            `"${describeKey(d.key)}" depends on itself, but no previous definition of "${describeKey(d.key)}" is registered.`,
+            { path },
           );
         }
         if ('override' in found) return found.override;
@@ -1092,7 +1174,10 @@ function normalizeDependencies(
     }
     if (typeof d === 'function')
       return { type: 'function', fn: d as () => unknown };
-    throw new Error(`Invalid dependency type`);
+    throw new InjecuteError(
+      'INJECUTE_INVALID_DEPENDENCY',
+      `Invalid dependency ${String(d)}${ownKey === undefined ? '' : ` of "${describeKey(ownKey)}"`}.`,
+    );
   });
 }
 
@@ -1147,4 +1232,18 @@ async function disposeValue(
   } else if (typeof disposable[syncDispose] === 'function') {
     disposable[syncDispose]!();
   }
+}
+
+function classNotConstructed(
+  name: string,
+  factory: unknown,
+  path: readonly ServiceKey[],
+  cause: unknown,
+): InjecuteError {
+  const className = (factory as { name?: string })?.name || 'TheClass';
+  return new InjecuteError(
+    'INJECUTE_CLASS_NOT_CONSTRUCTED',
+    `"${name}" looks like a class that was called without new. Register it as construct(${className}).`,
+    { path, cause },
+  );
 }

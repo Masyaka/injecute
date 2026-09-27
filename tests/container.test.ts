@@ -416,7 +416,7 @@ describe('injecute container', () => {
 
         // @ts-expect-error call for non function type entries not allowed
         expect(() => container.call('nonFunctor', [1])).toThrow(
-          'Entry "nonFunctor" is not a function and can not be invoked',
+          'Service "nonFunctor" is not a function, so it cannot be called.',
         );
       });
     });
@@ -486,7 +486,7 @@ describe('injecute container', () => {
           ((self: unknown) => ({ self })) as any,
           ['service'] as any,
         ),
-      ).toThrow(CircularDependencyError);
+      ).toThrow(/no previous definition of "service"/);
     });
 
     it('should prevent creating of circular dependencies', () => {

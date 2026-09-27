@@ -10,3 +10,4 @@ CHANGELOG.md
 .changeset/*.md
 test-results
 playwright-report
+tests/fixtures

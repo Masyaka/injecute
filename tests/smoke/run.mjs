@@ -49,6 +49,13 @@ scope.get('conn');
 if (typeof scope[Symbol.asyncDispose] !== 'function') throw new Error('no Symbol.asyncDispose');
 await scope[Symbol.asyncDispose]();
 if (disposed.join() !== 'conn') throw new Error('not disposed');
+// A bound class cannot be detected; the engine-specific TypeError must still become CLASS_NOT_CONSTRUCTED.
+try {
+  new DIContainer().addSingleton('b', class Native {}.bind(null), []).get('b');
+  throw new Error('bound class did not throw');
+} catch (error) {
+  if (error.code !== 'INJECUTE_CLASS_NOT_CONSTRUCTED') throw new Error('bound class: ' + error.message);
+}
 console.log('ok');
 `;
 writeFileSync(

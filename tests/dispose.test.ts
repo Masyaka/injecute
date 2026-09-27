@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DIContainer } from '../src/index.ts';
+import { DIContainer, InjecuteError } from '../src/index.ts';
 
 const disposable = (name: string, log: string[]) => ({
   name,
@@ -148,7 +148,7 @@ describe('dispose()', () => {
     expect(log).toEqual(['repo', 'db']);
   });
 
-  it('keeps disposing after a failure and rejects with an AggregateError', async () => {
+  it('keeps disposing after a failure and rejects with DISPOSE_FAILED', async () => {
     const log: string[] = [];
     const c = new DIContainer()
       .addSingleton('ok', () => disposable('ok', log), [])
@@ -163,7 +163,10 @@ describe('dispose()', () => {
       );
     c.get('ok');
     c.get('broken');
-    await expect(c.dispose()).rejects.toBeInstanceOf(AggregateError);
+    const error = await c.dispose().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(InjecuteError);
+    expect((error as InjecuteError).code).toBe('INJECUTE_DISPOSE_FAILED');
+    expect((error as InjecuteError).cause).toBeInstanceOf(AggregateError);
     expect(log).toEqual(['ok']);
   });
 

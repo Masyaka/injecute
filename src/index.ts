@@ -28,6 +28,13 @@
  * @module
  */
 export type * from './types.ts';
-export { DIContainer, CircularDependencyError } from './container.ts';
+export { DIContainer } from './container.ts';
+export {
+  CircularDependencyError,
+  errorCodes,
+  InjecuteError,
+  type InjecuteErrorCode,
+  type InjecuteErrorOptions,
+} from './errors.ts';
 export { optional } from './dependencies.ts';
 export * from './utils/index.ts';

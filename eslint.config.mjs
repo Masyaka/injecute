@@ -12,6 +12,7 @@ export default tseslint.config(
       'coverage/**',
       'handoffs/**',
       'tests/types/fixtures/**',
+      'tests/fixtures/**',
     ],
   },
   js.configs.recommended,
@@ -50,6 +51,10 @@ export default tseslint.config(
       ...vitest.configs.recommended.rules,
       // Catches `expect(x).toBe` without a call and other no-op assertions.
       'vitest/valid-expect': 'error',
+      'vitest/expect-expect': [
+        'error',
+        { assertFunctionNames: ['expect', 'expectCode', 'expectTypeOf'] },
+      ],
       '@typescript-eslint/no-unused-expressions': 'off',
     },
   },

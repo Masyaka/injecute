@@ -1,4 +1,5 @@
 import { DIContainer } from '../container.ts';
+import { InjecuteError } from '../errors.ts';
 import { SET_CACHE_INSTANCE } from '../internal.ts';
 
 /**
@@ -21,7 +22,10 @@ export function setCacheInstance<S extends object, K extends keyof S>(
   value: S[K],
 ): void {
   if (!(container instanceof DIContainer)) {
-    throw new Error('setCacheInstance() needs a DIContainer.');
+    throw new InjecuteError(
+      'INJECUTE_INVALID_OPTION',
+      'setCacheInstance() needs a DIContainer.',
+    );
   }
   container[SET_CACHE_INSTANCE](key, value);
 }

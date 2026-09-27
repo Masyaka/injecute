@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // The built package (lib/) must load in browsers without a bundler: raw files and import maps.
-for (const page of ['raw-esm', 'import-map']) {
+for (const page of ['raw-esm', 'import-map', 'class-call']) {
   test(`${page}: loads injecute without a bundler`, async ({
     page: browser,
   }) => {
