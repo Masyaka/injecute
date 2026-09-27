@@ -47,7 +47,7 @@
   ],
   "scripts": {
     "clean": "rm -rf ./lib",
-    "build": "npm run clean && tsc -p ./tsconfig.build.json",
+    "build": "npm run clean && tsc -p ./tsconfig.build.json && node scripts/postbuild.mjs",
     "typecheck": "tsc -p ./tsconfig.json",
     "lint": "eslint .",
     "format": "prettier . --write",

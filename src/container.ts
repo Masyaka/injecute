@@ -60,9 +60,26 @@ interface Registration {
   readonly extension?: (c: any) => unknown;
   /** the registration this one replaced in the same container */
   readonly previous?: Registration;
+  readonly dispose?: DisposeOption<any>;
 }
 
 const NOT_FOUND: unique symbol = Symbol('injecute.notFound');
+
+// Well-known symbols with the same fallback TypeScript's `using` helper uses, for runtimes without them.
+const asyncDispose: typeof Symbol.asyncDispose = (Symbol.asyncDispose ??
+  Symbol.for('Symbol.asyncDispose')) as typeof Symbol.asyncDispose;
+const syncDispose: typeof Symbol.dispose = (Symbol.dispose ??
+  Symbol.for('Symbol.dispose')) as typeof Symbol.dispose;
+
+/** How a registration's instance is disposed: auto-detect (`true`/unset), never (`false`), or custom. */
+export type DisposeOption<T> = boolean | ((instance: T) => unknown);
+
+/** An instance this container created (or was asked to own), in creation order. */
+interface Owned {
+  readonly seq: number;
+  readonly reg: Registration;
+  readonly value: unknown;
+}
 
 const isKey = (a: unknown): a is string | number | symbol =>
   typeof a === 'string' || typeof a === 'number' || typeof a === 'symbol';
@@ -98,6 +115,12 @@ export class DIContainer<
   #inheritMiddlewares = true;
   /** Isolated forks run (and own) every factory they resolve, including parent-registered ones. */
   #isolated = false;
+  /** Owned instances, in creation order, including ones retired by replace()/reset(). */
+  #owned: Owned[] = [];
+  /** Creation order across all containers, so dispose() can run dependents first. */
+  static #sequence = 0;
+  #disposed = false;
+  #disposing: Promise<void> | undefined;
   /** Namespace containers re-created inside this isolated fork, keyed by the namespace registration. */
   readonly #isolatedNamespaces = new Map<Registration, DIContainer<any, any>>();
   #middlewareCache: { epoch: number; list: readonly Middleware[] } | undefined;
@@ -109,6 +132,7 @@ export class DIContainer<
     reset: new Set(),
     get: new Set(),
     produce: new Set(),
+    dispose: new Set(),
   };
 
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
@@ -216,18 +240,26 @@ export class DIContainer<
   addInstance<K extends ArgumentsKey, TResult>(
     name: K,
     instance: TResult,
-    options?: { replace?: boolean },
+    options?: {
+      replace?: boolean;
+      /**
+       * Instances are created outside the container, so it does not dispose them unless asked:
+       * `true` disposes with `[Symbol.asyncDispose]` / `[Symbol.dispose]`, a function disposes with it.
+       */
+      dispose?: DisposeOption<TResult>;
+    },
   ): IDIContainer<TServices & { [k in K]: TResult }> {
-    this.#register(
-      {
-        key: name,
-        kind: 'instance',
-        owner: this,
-        dependencies: [],
-        value: instance,
-      },
-      !!options?.replace,
-    );
+    const dispose = options?.dispose ?? false;
+    const reg: Registration = {
+      key: name,
+      kind: 'instance',
+      owner: this,
+      dependencies: [],
+      value: instance,
+      dispose,
+    };
+    this.#register(reg, !!options?.replace);
+    if (dispose !== false) this.#own(this.#registrations.get(name)!, instance);
     return this as any;
   }
 
@@ -268,6 +300,11 @@ export class DIContainer<
       | {
           replace?: boolean;
           dependencies: [...Deps];
+          /**
+           * How `dispose()` releases the instance. Default: auto-detect `[Symbol.asyncDispose]` /
+           * `[Symbol.dispose]`. `false` skips it; a function disposes with it.
+           */
+          dispose?: DisposeOption<TResult>;
         }
       | [...Deps] = [] as any,
   ): IDIContainer<TServices & { [k in K]: TResult }> {
@@ -346,7 +383,36 @@ export class DIContainer<
     serviceName: Key,
     options?: O,
   ): O['allowUnresolved'] extends true ? T | undefined : T {
+    this.#assertNotDisposed();
     return this.#get(serviceName, options?.allowUnresolved ?? false, []) as any;
+  }
+
+  /**
+   * Disposes every instance this container owns, dependents first (reverse creation order), then marks
+   * the container as disposed: later `get()` and registrations throw.
+   *
+   * Owned instances are the singletons this container created, and `addInstance` values registered
+   * with `dispose`. Each is disposed with its registration's `dispose` function, or with
+   * `[Symbol.asyncDispose]` / `[Symbol.dispose]` when it has one. Namespace containers are disposed
+   * too; forks are not (dispose each fork you create, e.g. with `await using`).
+   *
+   * Calling it again returns the same promise. If some disposers fail, the others still run and the
+   * promise rejects with an `AggregateError`.
+   *
+   * @example
+   * ```ts
+   * await using scope = app.fork().addInstance('request', request);
+   * // ... scope and its singletons are disposed at the end of the block
+   * ```
+   */
+  dispose(): Promise<void> {
+    this.#disposing ??= this.#runDispose();
+    return this.#disposing;
+  }
+
+  /** Same as {@link dispose}; enables `await using container = …`. */
+  [asyncDispose](): Promise<void> {
+    return this.dispose();
   }
 
   /**
@@ -391,6 +457,7 @@ export class DIContainer<
     /** Inherit middlewares from this container and its ancestors. Default: `true`. */
     middlewares?: boolean;
   }): IDIContainer<Empty, T> {
+    this.#assertNotDisposed();
     const child = this.createChild();
     child.#inheritMiddlewares = options?.middlewares ?? true;
     child.#isolated = options?.isolated ?? false;
@@ -539,6 +606,66 @@ export class DIContainer<
     return list;
   }
 
+  #own(reg: Registration, value: unknown) {
+    this.#owned.push({ seq: DIContainer.#sequence++, reg, value });
+  }
+
+  #assertNotDisposed() {
+    if (this.#disposed) {
+      throw new Error('This container is disposed.');
+    }
+  }
+
+  /** This container plus the namespace containers it owns (and theirs), up to this container. */
+  #ownedContainers(): DIContainer<any, any>[] {
+    const result: DIContainer<any, any>[] = [this];
+    const addChain = (container: DIContainer<any, any>) => {
+      for (
+        let level: DIContainer<any, any> | undefined = container;
+        level && level !== this && !result.includes(level);
+        level = level.#parent
+      ) {
+        result.push(...level.#ownedContainers());
+      }
+    };
+    for (const reg of this.#registrations.values()) {
+      if (reg.kind === 'namespace' && reg.container) addChain(reg.container);
+    }
+    for (const container of this.#isolatedNamespaces.values())
+      addChain(container);
+    return result;
+  }
+
+  async #runDispose(): Promise<void> {
+    const containers = this.#ownedContainers();
+    for (const container of containers) container.#disposed = true;
+    const owned = containers
+      .flatMap((container) => container.#owned)
+      .sort((a, b) => b.seq - a.seq);
+    const done = new Set<unknown>();
+    const errors: unknown[] = [];
+    for (const { reg, value } of owned) {
+      if (done.has(value)) continue;
+      done.add(value);
+      try {
+        await disposeValue(value, reg.dispose);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    for (const container of containers) {
+      container.#owned = [];
+      container.#instances.clear();
+    }
+    this.#emit('dispose', { container: this });
+    if (errors.length > 0) {
+      throw new AggregateError(
+        errors,
+        `Failed to dispose ${errors.length} service(s).`,
+      );
+    }
+  }
+
   #eventNotSupported(e: string) {
     const supported = Object.keys(this.#listeners)
       .map((k) => `"${k}"`)
@@ -557,7 +684,13 @@ export class DIContainer<
     key: ArgumentsKey,
     factory: unknown,
     options:
-      { replace?: boolean; dependencies?: unknown[] } | unknown[] | undefined,
+      | {
+          replace?: boolean;
+          dependencies?: unknown[];
+          dispose?: DisposeOption<any>;
+        }
+      | unknown[]
+      | undefined,
   ) {
     if (typeof factory !== 'function') {
       throw new Error(
@@ -567,6 +700,12 @@ export class DIContainer<
     const isArray = Array.isArray(options);
     const replace = !isArray && !!options?.replace;
     const dependencies = (isArray ? options : options?.dependencies) ?? [];
+    const dispose = isArray ? undefined : options?.dispose;
+    if (kind === 'transient' && dispose !== undefined && dispose !== false) {
+      throw new Error(
+        `"dispose" is not supported for transient "${describeKey(key)}": the container does not keep transient instances.`,
+      );
+    }
     this.#register(
       {
         key,
@@ -574,12 +713,14 @@ export class DIContainer<
         owner: this,
         factory: factory as (...args: any[]) => unknown,
         dependencies: normalizeDependencies(dependencies, key),
+        dispose,
       },
       replace,
     );
   }
 
   #register(reg: Registration, replace: boolean) {
+    this.#assertNotDisposed();
     const key = reg.key;
     if (key === optionalDependencySkipKey) {
       throw new Error(
@@ -761,8 +902,10 @@ export class DIContainer<
         return reg.container!.#get(reg.target!, false, path);
       case 'singleton': {
         if (this.#instances.has(reg)) return this.#instances.get(reg);
+        this.#assertNotDisposed();
         const value = this.#create(reg, path);
         this.#instances.set(reg, value);
+        if (reg.dispose !== false) this.#own(reg, value);
         return value;
       }
       case 'transient':
@@ -953,4 +1096,26 @@ function toInfo(reg: Registration, depth: number): RegistrationInfo {
     if (linked) return { ...info, linked };
   }
   return info;
+}
+
+async function disposeValue(
+  value: unknown,
+  dispose: DisposeOption<unknown> | undefined,
+): Promise<void> {
+  if (dispose === false) return;
+  if (typeof dispose === 'function') {
+    await dispose(value);
+    return;
+  }
+  if (
+    (typeof value !== 'object' && typeof value !== 'function') ||
+    value === null
+  )
+    return;
+  const disposable = value as Partial<AsyncDisposable & Disposable>;
+  if (typeof disposable[asyncDispose] === 'function') {
+    await disposable[asyncDispose]!();
+  } else if (typeof disposable[syncDispose] === 'function') {
+    disposable[syncDispose]!();
+  }
 }

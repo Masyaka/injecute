@@ -40,6 +40,15 @@ const root = new DIContainer()
 const repo = root.get('repo');
 if (!(repo instanceof Repo) || repo.db !== 'postgres://') throw new Error('wrong repo');
 if (root.fork().get('repo') !== repo) throw new Error('singleton not shared with fork');
+const disposed = [];
+const scope = new DIContainer().addSingleton('conn', () => ({ close: () => disposed.push('conn') }), {
+  dependencies: [],
+  dispose: (conn) => conn.close(),
+});
+scope.get('conn');
+if (typeof scope[Symbol.asyncDispose] !== 'function') throw new Error('no Symbol.asyncDispose');
+await scope[Symbol.asyncDispose]();
+if (disposed.join() !== 'conn') throw new Error('not disposed');
 console.log('ok');
 `;
 writeFileSync(
@@ -48,7 +57,8 @@ writeFileSync(
 );
 writeFileSync(
   join(work, 'cjs.cjs'),
-  `const { DIContainer, construct } = require('injecute');\n${body}`,
+  // CommonJS has no top-level await.
+  `const { DIContainer, construct } = require('injecute');\n(async () => {\n${body}\n})().catch((e) => { console.error(e); process.exit(1); });`,
 );
 
 const checks = {

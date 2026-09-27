@@ -275,6 +275,8 @@ export type Events<C extends IDIContainer<any>> = {
   reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };
   get: { key: ArgumentsKey; value: any; container: C };
   produce: { key: ArgumentsKey; value: any; container: C };
+  /** After `dispose()` has released every owned instance. */
+  dispose: { container: C };
 };
 
 export interface IDIContainer<
@@ -328,10 +330,9 @@ export interface IDIContainer<
     name: K,
     instance: TResult,
     options?: {
-      replace: boolean;
-      beforeResolving?: () => void;
-      afterResolving?: (instance: TResult) => void;
-      beforeReplaced?: () => () => TResult | void;
+      replace?: boolean;
+      /** Dispose the value with the container: `true` (auto-detect) or a function. Default: `false`. */
+      dispose?: boolean | ((instance: TResult) => unknown);
     },
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
 
@@ -360,9 +361,6 @@ export interface IDIContainer<
       | {
           replace?: boolean;
           dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
         }
       | [...Deps],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
@@ -392,9 +390,8 @@ export interface IDIContainer<
       | {
           replace?: boolean;
           dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
+          /** How `dispose()` releases the instance. Default: auto-detect; `false` skips it. */
+          dispose?: boolean | ((instance: TResult) => unknown);
         }
       | [...Deps],
   ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
