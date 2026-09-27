@@ -8,3 +8,5 @@ package-lock.json
 handoffs
 CHANGELOG.md
 .changeset/*.md
+test-results
+playwright-report

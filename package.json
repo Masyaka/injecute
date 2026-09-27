@@ -61,12 +61,18 @@
     "prepack": "npm run build",
     "check:versions": "node scripts/sync-jsr-version.mjs --check",
     "check:jsr": "deno publish --dry-run --allow-dirty",
-    "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json"
+    "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json",
+    "check:package": "publint --strict && attw --pack . --profile esm-only",
+    "test:smoke": "node tests/smoke/run.mjs",
+    "test:types-consumer": "node tests/types-consumer/run.mjs",
+    "test:browser": "playwright test -c tests/browser/playwright.config.ts"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "^5.0.2",
@@ -75,6 +81,7 @@
     "eslint": "^10.11.0",
     "monaco-editor": "^0.52.2",
     "prettier": "^3.9.9",
+    "publint": "^0.3.24",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",

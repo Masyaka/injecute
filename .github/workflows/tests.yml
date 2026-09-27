@@ -42,3 +42,74 @@ jobs:
       # Fails when the PR changes the package without a changeset.
       # Docs/CI-only PRs add an empty one: `npx changeset --empty`.
       - run: npx changeset status --since=origin/${{ github.base_ref }}
+
+  package:
+    name: Package (publint, attw, JSR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm run check:package
+      - run: deno check src/index.ts
+      - run: npm run check:jsr
+
+  smoke:
+    name: Smoke (Node ${{ matrix.node-version }}, Deno, Bun)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: npm run test:smoke
+        env:
+          SMOKE_RUNTIMES: node,deno,bun
+
+  types-consumer:
+    name: Consumer types (TypeScript ${{ matrix.typescript }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typescript: ['5.2', latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:types-consumer
+        env:
+          TS_VERSION: ${{ matrix.typescript }}
+
+  browser:
+    name: Browsers (no bundler)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build
+      - run: npm run test:browser

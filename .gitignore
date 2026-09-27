@@ -8,3 +8,8 @@ docs/dist
 
 # Local planning / agent handoff notes
 handoffs
+
+# Playwright output
+test-results
+playwright-report
+coverage
