@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
+      # 1.x docs go live when `next` is merged into `main` at the release (S6.3)
       - main
   workflow_dispatch:
 
@@ -31,10 +32,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build lib
-        run: npm run build
-
-      - name: Build docs
+      - name: Build docs (library, API reference, error pages, site)
         run: npm run docs:build
 
       - name: Setup Pages
@@ -43,7 +41,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: './docs/dist'
+          path: './docs/.vitepress/dist'
 
   deploy:
     environment:

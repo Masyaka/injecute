@@ -1,0 +1,32 @@
+.version-banner {
+  padding: 6px 16px;
+  font-size: 13px;
+  text-align: center;
+  background: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-1);
+}
+
+.agent-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.agent-links a,
+.agent-links button {
+  color: var(--vp-c-text-2);
+  text-decoration: none;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.agent-links a:hover,
+.agent-links button:hover {
+  color: var(--vp-c-brand-1);
+  border-color: var(--vp-c-brand-1);
+}

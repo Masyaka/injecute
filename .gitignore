@@ -5,6 +5,11 @@ lib
 .vscode
 .DS_Store
 docs/dist
+# generated docs
+docs/.vitepress/dist
+docs/.vitepress/cache
+docs/api
+docs/errors/*.md
 
 # Local planning / agent handoff notes
 handoffs

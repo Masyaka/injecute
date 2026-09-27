@@ -11,3 +11,5 @@ CHANGELOG.md
 test-results
 playwright-report
 tests/fixtures
+docs/api
+docs/errors/*.md

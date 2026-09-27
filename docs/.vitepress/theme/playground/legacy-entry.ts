@@ -1,5 +1,5 @@
 import './declarations.d.ts';
-import { codeToServicesGraph, setupPlayground } from './playground.ts';
+import { codeToServicesGraph, setupPlayground } from './setup-playground.ts';
 import { renderServicesGraph } from './services-graph.ts';
 
 // Debounce function

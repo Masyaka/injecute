@@ -1,12 +1,14 @@
 import * as monaco from 'monaco-editor';
 import ts from 'typescript';
+// Every published declaration file, so the editor types match the build.
+const declarations = import.meta.glob('../../../../lib/**/*.d.ts', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import injecuteUtils from '../lib/utils/index.d.ts?raw';
-import injecuteIndex from '../lib/index.d.ts?raw';
-import injecuteTypes from '../lib/types.d.ts?raw';
-import injecuteContainer from '../lib/container.d.ts?raw';
-import injecuteBuildServicesGraph from '../lib/utils/build-services-graph.d.ts?raw';
 import {
   DIContainer,
   construct,
@@ -15,7 +17,7 @@ import {
   preload,
   setCacheInstance,
   buildServicesGraph,
-} from '../src/index.ts';
+} from '../../../../src/index.ts';
 
 const initialCode = `
 
@@ -136,25 +138,16 @@ export function setupPlayground(containerId = 'container'): Playground {
   };
 
   monaco.languages.register({ id: 'typescript' });
+  for (const [path, source] of Object.entries(declarations)) {
+    const file = path.replace(/^(\.\.\/)+lib\//, '');
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      source,
+      `file:///node_modules/injecute/lib/${file}`,
+    );
+  }
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    injecuteUtils,
-    'file:///node_modules/injecute/utils/index.d.ts',
-  );
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    injecuteTypes,
-    'file:///node_modules/injecute/types.d.ts',
-  );
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    injecuteIndex,
-    'file:///node_modules/injecute/index.d.ts',
-  );
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    injecuteContainer,
-    'file:///node_modules/injecute/container.d.ts',
-  );
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-    injecuteBuildServicesGraph,
-    'file:///node_modules/injecute/utils/build-services-graph.d.ts',
+    JSON.stringify({ name: 'injecute', types: './lib/index.d.ts' }),
+    'file:///node_modules/injecute/package.json',
   );
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
     target: monaco.languages.typescript.ScriptTarget.ES2020,
