@@ -147,7 +147,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   };
 
   /**
-   * Creates the container used by {@link fork}. Subclasses keep their type in forks.
+   * @internal Creates the container used by {@link fork}. Subclasses keep their type in forks.
    */
   protected createChild(): DIContainer<any> {
     const Ctor = this.constructor as new () => DIContainer<any>;
@@ -157,7 +157,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   }
 
   /**
-   * Calls a factory. Subclasses (the async container) override it to change how factories run.
+   * @internal Calls a factory. Subclasses (the async container) override it to change how factories run.
    */
   protected invokeFactory(
     factory: (...args: any[]) => unknown,
@@ -172,6 +172,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * Resolves a service: returns the cached singleton, creates it, or creates a new transient.
    * Looks in parent containers when the key is not registered here. Throws when nothing is
    * registered under `key`, unless `{ optional: true }` is passed.
+   *
+   * @throws {InjecuteError} `INJECUTE_NOT_REGISTERED` (with "did you mean" suggestions),
+   * `INJECUTE_RESOLUTION_FAILED` when a factory throws (the original error is `cause`),
+   * `INJECUTE_CLASS_NOT_CONSTRUCTED`, `INJECUTE_DISPOSED`.
    *
    * @example
    * ```ts
@@ -260,6 +264,11 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * `factory` is a function or a class. It receives the resolved `dependencies` in order; a class is
    * called with `new`. A dependency on `key` itself receives the previous definition (decoration).
    *
+   * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
+   * {@link construct}.
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` when `key` is registered in this container
+   * (pass `replace: true`), `INJECUTE_CIRCULAR_DEPENDENCY` when the dependencies form a cycle.
+   *
    * @example
    * ```ts
    * app
@@ -284,6 +293,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   /**
    * Registers a service that is created again on every resolution. The container does not keep (or
    * dispose) transient instances.
+   *
+   * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
+   * {@link construct}.
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED`, `INJECUTE_CIRCULAR_DEPENDENCY`.
    *
    * @example
    * ```ts

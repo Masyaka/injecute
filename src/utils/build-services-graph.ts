@@ -4,6 +4,10 @@ import type {
   ServiceProvider,
 } from '../types.ts';
 
+/**
+ * Services by key, each with its direct dependencies; returned by {@link buildServicesGraph} and
+ * rendered by the playground.
+ */
 export type Tree = Record<
   string,
   | {

@@ -156,8 +156,11 @@ export type DependencyInfo =
 
 /** Read-only metadata about a registration. Returned by {@link ServiceProvider.getRegistration}. */
 export interface RegistrationInfo {
+  /** The registered key. */
   readonly key: ServiceKey;
+  /** How the service was registered. */
   readonly kind: RegistrationKind;
+  /** The dependencies passed to the factory, in order. */
   readonly dependencies: readonly DependencyInfo[];
   /** 0 when registered in the container that was asked, 1 for its parent, and so on. */
   readonly depth: number;

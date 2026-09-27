@@ -113,6 +113,7 @@ export interface InjecuteErrorOptions {
  * ```
  */
 export class InjecuteError extends Error {
+  /** `'InjecuteError'` (or the subclass name). */
   override readonly name: string = 'InjecuteError';
   /** Stable identifier of the error. */
   readonly code: InjecuteErrorCode;
@@ -146,6 +147,7 @@ export class InjecuteError extends Error {
 
 /** Thrown when services depend on each other in a cycle; `path` is the cycle. */
 export class CircularDependencyError extends InjecuteError {
+  /** `'CircularDependencyError'`. */
   override readonly name: string = 'CircularDependencyError';
 
   constructor(cycle: readonly ServiceKey[]) {
