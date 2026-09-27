@@ -217,6 +217,26 @@ export type RegistrationKind =
   | 'namespace-entry'
   | 'delegate';
 
+/** Context passed to a {@link Middleware}. */
+export interface MiddlewareContext {
+  /** The container the resolution runs in. */
+  readonly container: IDIContainer<any>;
+  /** Keys being resolved, outermost first; the last one is the current key. */
+  readonly path: readonly ArgumentsKey[];
+  /** Nesting level: 0 for a `get()` call, 1 for its dependencies, and so on. */
+  readonly depth: number;
+}
+
+/**
+ * Wraps resolution. Call `next()` to continue (or `next(otherKey)` to resolve another key) and return
+ * the value. Returning without calling `next` replaces the resolution.
+ */
+export type Middleware = (
+  key: ArgumentsKey,
+  next: (key?: ArgumentsKey) => unknown,
+  context: MiddlewareContext,
+) => unknown;
+
 /** A dependency of a registration, as reported by {@link RegistrationInfo}. */
 export type DependencyInfo =
   | { readonly type: 'key'; readonly key: ArgumentsKey }
@@ -473,7 +493,8 @@ export interface IDIContainer<
   fork<
     T extends TOwnServices & TParentServices = TOwnServices & TParentServices,
   >(options?: {
-    skipResolvers?: boolean;
+    /** Inherit middlewares from this container and its ancestors. Default: `true`. */
+    middlewares?: boolean;
   }): IDIContainer<{}, T>;
 
   /**

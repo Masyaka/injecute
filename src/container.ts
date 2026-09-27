@@ -15,19 +15,11 @@ import {
   optionalDependencySkipKey,
   type RegistrationInfo,
   type RegistrationKind,
+  type Middleware,
+  type MiddlewareContext,
   Resolve,
-  Resolver,
 } from './types.ts';
 import { SET_CACHE_INSTANCE } from './internal.ts';
-
-export type Middleware<
-  TServices extends Record<ArgumentsKey, any>,
-  Key extends keyof TServices = keyof TServices,
-> = (
-  this: DIContainer<TServices>,
-  name: Key,
-  next: Resolver<TServices>,
-) => Resolver<TServices>;
 
 export class CircularDependencyError extends Error {
   constructor(stack: ArgumentsKey[]) {
@@ -100,7 +92,11 @@ export class DIContainer<
   readonly #instances = new Map<Registration, unknown>();
   /** values set with setCacheInstance(); cleared by reset() */
   readonly #overrides = new Map<ArgumentsKey, unknown>();
-  readonly #middlewares: Middleware<any>[] = [];
+  readonly #middlewares: Middleware[] = [];
+  #inheritMiddlewares = true;
+  #middlewareCache: { epoch: number; list: readonly Middleware[] } | undefined;
+  /** Bumped by every use()/unuse() anywhere, so cached effective chains are rebuilt. */
+  static #middlewareEpoch = 0;
   readonly #listeners: Listeners = {
     add: new Set(),
     replace: new Set(),
@@ -300,9 +296,37 @@ export class DIContainer<
     return this as any;
   }
 
-  use(middleware: Middleware<any>): DIContainer<TParentServices, TServices> {
+  /**
+   * Adds a middleware around every resolution started from this container and its forks.
+   *
+   * A middleware receives the key, a `next` function that continues the resolution (optionally with
+   * another key) and a context with the resolution path. The last added middleware runs first.
+   * Middlewares added to a parent later still apply to existing forks.
+   *
+   * @example
+   * ```ts
+   * container.use((key, next, { depth }) => {
+   *   const start = performance.now();
+   *   const value = next();
+   *   console.debug(`${'  '.repeat(depth)}${String(key)}: ${performance.now() - start}ms`);
+   *   return value;
+   * });
+   * ```
+   */
+  use(middleware: Middleware): this {
     this.#middlewares.push(middleware);
-    return this as any;
+    DIContainer.#middlewareEpoch++;
+    return this;
+  }
+
+  /** Removes a middleware added with {@link use}. */
+  unuse(middleware: Middleware): this {
+    const index = this.#middlewares.lastIndexOf(middleware);
+    if (index !== -1) {
+      this.#middlewares.splice(index, 1);
+      DIContainer.#middlewareEpoch++;
+    }
+    return this;
   }
 
   /**
@@ -342,12 +366,11 @@ export class DIContainer<
    * For cases when you don`t want to add service to main container.
    */
   fork<T extends TServices = TServices>(options?: {
-    skipResolvers?: boolean;
+    /** Inherit middlewares from this container and its ancestors. Default: `true`. */
+    middlewares?: boolean;
   }): IDIContainer<Empty, T> {
     const child = this.createChild();
-    if (!options?.skipResolvers) {
-      child.#middlewares.push(...this.#middlewares);
-    }
+    child.#inheritMiddlewares = options?.middlewares ?? true;
     return child as any;
   }
 
@@ -475,6 +498,23 @@ export class DIContainer<
   }
 
   // ---------------------------------------------------------------- internals
+
+  /** Ancestors' middlewares (root first) followed by this container's own, cached until use()/unuse(). */
+  #effectiveMiddlewares(): readonly Middleware[] {
+    const epoch = DIContainer.#middlewareEpoch;
+    if (this.#middlewareCache?.epoch === epoch)
+      return this.#middlewareCache.list;
+    const inherited =
+      this.#inheritMiddlewares && this.#parent
+        ? this.#parent.#effectiveMiddlewares()
+        : [];
+    const list =
+      inherited.length === 0
+        ? this.#middlewares.slice()
+        : [...inherited, ...this.#middlewares];
+    this.#middlewareCache = { epoch, list };
+    return list;
+  }
 
   #eventNotSupported(e: string) {
     const supported = Object.keys(this.#listeners)
@@ -614,12 +654,18 @@ export class DIContainer<
       return value;
     };
     let value: unknown;
-    if (this.#middlewares.length === 0) {
+    const middlewares = this.#effectiveMiddlewares();
+    if (middlewares.length === 0) {
       value = resolveInner(key);
     } else {
-      const chain = this.#middlewares.reduce<(k: ArgumentsKey) => unknown>(
+      const context: MiddlewareContext = {
+        container: this as any,
+        path: [...path, key],
+        depth: path.length,
+      };
+      const chain = middlewares.reduce<(k: ArgumentsKey) => unknown>(
         (next, middleware) => (k) =>
-          middleware.call(this as any, k as any, next as any),
+          middleware(k, (nextKey = k) => next(nextKey), context),
         resolveInner,
       );
       value = chain(key);
