@@ -493,6 +493,8 @@ export interface IDIContainer<
   fork<
     T extends TOwnServices & TParentServices = TOwnServices & TParentServices,
   >(options?: {
+    /** Run and own every resolved service in the fork. Default: `false`. */
+    isolated?: boolean;
     /** Inherit middlewares from this container and its ancestors. Default: `true`. */
     middlewares?: boolean;
   }): IDIContainer<{}, T>;

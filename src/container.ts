@@ -56,6 +56,8 @@ interface Registration {
   /** namespace-entry: the namespace container; namespace: the container itself; delegate: target container */
   readonly container?: DIContainer<any, any>;
   readonly namespace?: string;
+  /** namespace: the callback, re-applied lazily inside isolated forks */
+  readonly extension?: (c: any) => unknown;
   /** the registration this one replaced in the same container */
   readonly previous?: Registration;
 }
@@ -94,6 +96,10 @@ export class DIContainer<
   readonly #overrides = new Map<ArgumentsKey, unknown>();
   readonly #middlewares: Middleware[] = [];
   #inheritMiddlewares = true;
+  /** Isolated forks run (and own) every factory they resolve, including parent-registered ones. */
+  #isolated = false;
+  /** Namespace containers re-created inside this isolated fork, keyed by the namespace registration. */
+  readonly #isolatedNamespaces = new Map<Registration, DIContainer<any, any>>();
   #middlewareCache: { epoch: number; list: readonly Middleware[] } | undefined;
   /** Bumped by every use()/unuse() anywhere, so cached effective chains are rebuilt. */
   static #middlewareEpoch = 0;
@@ -362,15 +368,32 @@ export class DIContainer<
   }
 
   /**
-   * Creates child container.
-   * For cases when you don`t want to add service to main container.
+   * Creates a child container. The child sees every service of this container (and later additions to it);
+   * services added to the child stay in the child.
+   *
+   * - By default a service registered in this container runs **here** and is shared by all forks,
+   *   so overriding one of its dependencies in a fork does not affect it.
+   * - With `isolated: true` the fork runs and caches **every** service it resolves, including ones
+   *   registered here. Overrides in the fork then reach the whole graph, and nothing leaks back.
+   *   Use it for tests and per-tenant variants.
+   *
+   * @example
+   * ```ts
+   * const requestScope = app.fork().addInstance('request', request);
+   *
+   * const testContainer = app.fork({ isolated: true }).addInstance('db', fakeDb, { replace: true });
+   * testContainer.get('userRepository'); // built with fakeDb; app is untouched
+   * ```
    */
   fork<T extends TServices = TServices>(options?: {
+    /** Run and own every resolved service in the fork (see above). Default: `false`. */
+    isolated?: boolean;
     /** Inherit middlewares from this container and its ancestors. Default: `true`. */
     middlewares?: boolean;
   }): IDIContainer<Empty, T> {
     const child = this.createChild();
     child.#inheritMiddlewares = options?.middlewares ?? true;
+    child.#isolated = options?.isolated ?? false;
     return child as any;
   }
 
@@ -408,7 +431,7 @@ export class DIContainer<
     if (!(result instanceof DIContainer)) {
       throw new Error('Namespace extension must return a container.');
     }
-    this.#adoptNamespace(namespace, result);
+    this.#adoptNamespace(namespace, result, extension);
     return this as any;
   }
 
@@ -679,12 +702,39 @@ export class DIContainer<
     return value;
   }
 
+  /**
+   * The container that runs `owner`'s registrations for a resolution started here: the nearest isolated
+   * fork between this container and the owner, otherwise the owner itself.
+   */
+  #executorFor(owner: DIContainer<any, any>): DIContainer<any, any> {
+    let current: DIContainer<any, any> | undefined = this;
+    while (current && current !== owner) {
+      if (current.#isolated) return current;
+      current = current.#parent;
+    }
+    return owner;
+  }
+
+  /** Re-applies a namespace callback inside this isolated fork, once. */
+  #isolatedNamespace(reg: Registration): DIContainer<any, any> {
+    let container = this.#isolatedNamespaces.get(reg);
+    if (!container) {
+      const result = reg.extension!(this.fork());
+      if (!(result instanceof DIContainer)) {
+        throw new Error('Namespace extension must return a container.');
+      }
+      container = result;
+      this.#isolatedNamespaces.set(reg, container);
+    }
+    return container;
+  }
+
   /** Resolution without middlewares: finds the registration and lets the executing container produce it. */
   #resolve(key: ArgumentsKey, path: ArgumentsKey[]): unknown {
     const found = this.#lookup(key);
     if (!found) return NOT_FOUND;
     if ('override' in found) return found.override;
-    return found.owner.#produce(found.reg, [...path, key]);
+    return this.#executorFor(found.owner).#produce(found.reg, [...path, key]);
   }
 
   #produce(reg: Registration, path: ArgumentsKey[]): unknown {
@@ -694,8 +744,19 @@ export class DIContainer<
       case 'alias':
         return this.#get(reg.target!, false, path);
       case 'namespace':
-        return reg.container;
-      case 'namespace-entry':
+        return this === reg.owner
+          ? reg.container
+          : this.#isolatedNamespace(reg);
+      case 'namespace-entry': {
+        if (this === reg.owner)
+          return reg.container!.#get(reg.target!, false, path);
+        const namespace = reg.owner.#registrations.get(reg.namespace!);
+        return this.#isolatedNamespace(namespace!).#get(
+          reg.target!,
+          false,
+          path,
+        );
+      }
       case 'delegate':
         return reg.container!.#get(reg.target!, false, path);
       case 'singleton': {
@@ -735,17 +796,26 @@ export class DIContainer<
         return this.#get(d.key, false, path);
       case 'previous': {
         if (reg?.previous) return this.#produce(reg.previous, path);
-        const parent = this.#parent;
-        if (!parent)
+        // The previous definition lives above the registration's owner.
+        const above = reg ? reg.owner.#parent : undefined;
+        const found = above ? above.#lookup(d.key) : undefined;
+        if (!found) {
           throw new Error(
             `No previous definition for "${describeKey(d.key)}".`,
           );
-        return parent.#get(d.key, false, path);
+        }
+        if ('override' in found) return found.override;
+        const executor = this === reg!.owner ? found.owner : this;
+        return executor.#produce(found.reg, path);
       }
     }
   }
 
-  #adoptNamespace(namespace: string, container: DIContainer<any, any>) {
+  #adoptNamespace(
+    namespace: string,
+    container: DIContainer<any, any>,
+    extension: (c: any) => unknown,
+  ) {
     this.#register(
       {
         key: namespace,
@@ -753,6 +823,7 @@ export class DIContainer<
         owner: this,
         namespace,
         container,
+        extension,
         dependencies: [],
       },
       false,
