@@ -72,6 +72,7 @@ interface InstanceOptions
   replace: boolean | undefined
   dispose: DisposeOption<T> | undefined
 type KeySpec
+type MaybePromises
 type Middleware
 interface MiddlewareContext
   container: ServiceProvider<any>

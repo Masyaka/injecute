@@ -1,6 +1,7 @@
 import { callableOf } from '../internal.ts';
 
-type MaybePromises<T extends readonly unknown[]> = {
+/** Each argument, or a promise of it. */
+export type MaybePromises<T extends readonly unknown[]> = {
   [I in keyof T]: T[I] | PromiseLike<T[I]>;
 };
 

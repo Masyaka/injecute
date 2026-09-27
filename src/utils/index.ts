@@ -7,7 +7,7 @@ export {
   type NamedResolversOf,
   type ResolversTuple,
 } from './resolvers.ts';
-export { defer } from './defer.ts';
+export { defer, type MaybePromises } from './defer.ts';
 export { preload } from './preload.ts';
 export {
   createProxyAccessor,

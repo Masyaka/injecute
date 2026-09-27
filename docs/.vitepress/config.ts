@@ -58,6 +58,8 @@ export default defineConfig({
   lang: 'en-US',
   base: '/injecute/',
   cleanUrls: true,
+  // hand-written sections appended to the generated error pages
+  srcExclude: ['errors/_details/**'],
   lastUpdated: true,
   head: [['meta', { name: 'theme-color', content: '#3c8772' }]],
   markdown: {
@@ -67,6 +69,7 @@ export default defineConfig({
           compilerOptions: {
             paths: { injecute: [src] },
             allowImportingTsExtensions: true,
+            noEmit: true,
             lib: [
               'lib.es2022.d.ts',
               'lib.esnext.disposable.d.ts',
