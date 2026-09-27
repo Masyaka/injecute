@@ -22,7 +22,7 @@ import {
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
 export const firstResult =
-  <TArgs extends any[], TResult extends any>(
+  <TArgs extends any[], TResult>(
     fns: ((...args: TArgs) => TResult)[],
     predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
   ) =>
@@ -115,8 +115,7 @@ export class DIContainer<
   TParentServices extends Record<ArgumentsKey, any> = Empty,
   TServices extends TParentServices & TOwnServices = TParentServices &
     TOwnServices,
-> implements IDIContainer<TParentServices, TServices>
-{
+> implements IDIContainer<TParentServices, TServices> {
   constructor(p?: DIContainerConstructorArguments<TParentServices>) {
     this.#parentContainer = p?.parentContainer;
     this.rebuildMiddlewareStack();
@@ -221,7 +220,7 @@ export class DIContainer<
    * @param instance
    * @param options {{ replace: boolean }}
    */
-  addInstance<K extends ArgumentsKey, TResult extends any>(
+  addInstance<K extends ArgumentsKey, TResult>(
     name: K,
     instance: TResult,
     options?: {
@@ -310,7 +309,7 @@ export class DIContainer<
       beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
       afterResolving: (instance: TResult) => {
         this.setSingletonInstance(name, instance);
-        !optionsIsArray && options?.afterResolving?.(instance);
+        if (!optionsIsArray) options?.afterResolving?.(instance);
       },
       beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
     });
@@ -364,11 +363,7 @@ export class DIContainer<
    * @param serviceName
    * @param options {GetOptions}
    */
-  get<
-    Key extends keyof TServices,
-    O extends GetOptions,
-    T extends any = TServices[Key],
-  >(
+  get<Key extends keyof TServices, O extends GetOptions, T = TServices[Key]>(
     serviceName: Key,
     options?: O,
   ): O['allowUnresolved'] extends true ? T | undefined : T {
@@ -400,7 +395,7 @@ export class DIContainer<
    * @param keys
    * @param callable
    */
-  bind<TResult extends any, Deps extends Dependency<TServices>[]>(
+  bind<TResult, Deps extends Dependency<TServices>[]>(
     keys: [...Deps],
     callable: Callable<DependenciesToTypes<Deps, TServices>, TResult>,
   ): () => TResult {
@@ -455,6 +450,7 @@ export class DIContainer<
     const resultContainer = (
       options.fork ? this.fork() : this
     ) as DIContainer<TServices>;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- walks the parent chain
     let current: DIContainer<any> = this;
 
     while (true) {
@@ -509,9 +505,11 @@ export class DIContainer<
     extension: TExtension,
   ): IDIContainer<
     TOwnServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
-      [K in keyof TNamespaceServices as K extends string
-        ? `${TNamespace}.${K}`
-        : never]: TNamespaceServices[K];
+      [
+        K in keyof TNamespaceServices as K extends string
+          ? `${TNamespace}.${K}`
+          : never
+      ]: TNamespaceServices[K];
     },
     TParentServices
   > {

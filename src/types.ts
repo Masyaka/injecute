@@ -1,7 +1,5 @@
 export type ValueOf<T> = T[keyof T];
-export type Empty = {
-  /*  */
-};
+export type Empty = {/*  */};
 export type Constructor<TParams extends readonly any[], TResult> = {
   new (...params: TParams): TResult;
 };
@@ -17,11 +15,12 @@ export type PromisedProperties<T extends Record<ArgumentsKey, any>> = {
   [K in keyof T]: T[K] extends Promise<any> ? T[K] : Promise<T[K]>;
 };
 
-export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
-  ? InstanceType<TCallable>
-  : TCallable extends Func<any, any>
-  ? ReturnType<TCallable>
-  : unknown;
+export type CallableResult<TCallable> =
+  TCallable extends Constructor<any, any>
+    ? InstanceType<TCallable>
+    : TCallable extends Func<any, any>
+      ? ReturnType<TCallable>
+      : unknown;
 
 export type CallableOf<K, TServices> = K extends keyof TServices
   ? Callable<ValueOf<TServices>[], TServices[K]>
@@ -49,12 +48,8 @@ export type ValuesOfType<O, T> = {
  */
 export type KeyForValueOfType<O, T> = keyof ValuesOfType<O, T>;
 
-export type ArgumentsTypes<C extends Callable<any[], any>> = C extends Callable<
-  infer D,
-  any
->
-  ? D
-  : never;
+export type ArgumentsTypes<C extends Callable<any[], any>> =
+  C extends Callable<infer D, any> ? D : never;
 
 /**
  * Suitable keys of record for function arguments
@@ -78,9 +73,7 @@ export type TypesToKeys<
   : [];
 
 export type Dependency<TServices extends Record<string, any>> =
-  | OptionalDependencySkipKey
-  | keyof TServices
-  | Callable<any, any>;
+  OptionalDependencySkipKey | keyof TServices | Callable<any, any>;
 
 export type DependenciesToTypes<
   Keys extends readonly Dependency<TServices>[],
@@ -93,10 +86,10 @@ export type DependenciesToTypes<
       Head extends () => any
         ? ReturnType<Head>
         : Head extends OptionalDependencySkipKey
-        ? undefined
-        : Head extends ArgumentsKey
-        ? TServices[Head]
-        : never,
+          ? undefined
+          : Head extends ArgumentsKey
+            ? TServices[Head]
+            : never,
       ...DependenciesToTypes<Rest, TServices>,
     ]
   : [];
@@ -107,22 +100,20 @@ export type Resolve<T> = () => T;
 
 export type ResolversMapKeys<
   Keys extends readonly (
-    | readonly [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
+    readonly [ArgumentsKey, ArgumentsKey] | ArgumentsKey
   )[],
 > = Keys extends [
   infer Key,
   ...infer Rest extends readonly (
-    | [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
+    [ArgumentsKey, ArgumentsKey] | ArgumentsKey
   )[],
 ]
   ? [
       Key extends ArgumentsKey
         ? [Key, Key]
         : Key extends [ArgumentsKey, ArgumentsKey]
-        ? Key
-        : never,
+          ? Key
+          : never,
       ...ResolversMapKeys<Rest>,
     ]
   : [];
@@ -163,16 +154,15 @@ export type ContainerOwnServices<C extends IDIContainer<any, any>> =
 export type NamespaceServices<
   C extends IDIContainer<any>,
   N extends keyof ContainerServices<C>,
-> = ContainerServices<C>[N] extends IDIContainer<any>
-  ? ContainerServices<ContainerServices<C>[N]>
-  : `${N extends string ? N : ''} is not a namespace container`;
+> =
+  ContainerServices<C>[N] extends IDIContainer<any>
+    ? ContainerServices<ContainerServices<C>[N]>
+    : `${N extends string ? N : ''} is not a namespace container`;
 
 export type InjecuteOptions<
   TContainerKey,
   Deps extends readonly (
-    | OptionalDependencySkipKey
-    | TContainerKey
-    | Resolve<any>
+    OptionalDependencySkipKey | TContainerKey | Resolve<any>
   )[],
 > = {
   argumentsKey?: TContainerKey | undefined;
@@ -190,9 +180,11 @@ export type WithNamespace<
     > /* should be the TNamespaceServices, but needed to be optimized inferred type */
   >;
 } & {
-  [K in keyof TNamespaceServices as K extends string
-    ? `${TNamespace}.${K}`
-    : never]: TNamespaceServices[K];
+  [
+    K in keyof TNamespaceServices as K extends string
+      ? `${TNamespace}.${K}`
+      : never
+  ]: TNamespaceServices[K];
 };
 
 /**
@@ -275,7 +267,7 @@ export interface IDIContainer<
    * @param instance
    * @param options {{ replace: boolean }}
    */
-  addInstance<K extends ArgumentsKey, TResult extends any>(
+  addInstance<K extends ArgumentsKey, TResult>(
     name: K,
     instance: TResult,
     options?: {
@@ -391,7 +383,7 @@ export interface IDIContainer<
   get<
     Key extends keyof (TOwnServices & TParentServices),
     O extends GetOptions,
-    T extends any = (TOwnServices & TParentServices)[Key],
+    T = (TOwnServices & TParentServices)[Key],
   >(
     serviceName: Key,
     options?: O,
@@ -411,10 +403,9 @@ export interface IDIContainer<
    * @param callable
    */
   bind<
-    TResult extends any,
+    TResult,
     Deps extends readonly (
-      | OptionalDependencySkipKey
-      | keyof (TOwnServices & TParentServices)
+      OptionalDependencySkipKey | keyof (TOwnServices & TParentServices)
     )[],
   >(
     keys: [...Deps],
@@ -551,7 +542,6 @@ export interface IDIContainer<
   >(
     callable: TCallable,
     options?:
-      | InjecuteOptions<keyof (TOwnServices & TParentServices), Deps>
-      | [...Deps],
+      InjecuteOptions<keyof (TOwnServices & TParentServices), Deps> | [...Deps],
   ): CallableResult<TCallable>;
 }

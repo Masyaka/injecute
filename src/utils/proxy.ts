@@ -20,9 +20,11 @@ type KeysOverride<
   Keys extends (keyof TServices | [keyof TServices, ArgumentsKey])[],
   KeysPairs extends ResolversMapKeys<Keys> = ResolversMapKeys<Keys>,
 > = {
-  [K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, string]
-    ? KeysPairs[K][1]
-    : never]: TServices[K extends string
+  [
+    K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, string]
+      ? KeysPairs[K][1]
+      : never
+  ]: TServices[K extends string
     ? 0 extends keyof KeysPairs[K]
       ? KeysPairs[K][0] extends keyof TServices
         ? KeysPairs[K][0]

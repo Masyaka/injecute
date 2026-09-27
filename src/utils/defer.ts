@@ -16,13 +16,13 @@ type MayBePromiseTuple<Tuple extends readonly any[]> = Tuple extends readonly [
  */
 export const defer = <
   Factory extends Func<readonly any[], any>,
-  InitialArgs extends Factory extends Func<infer A, any> ? A : never,
+  InitialArgs extends (Factory extends Func<infer A, any> ? A : never),
   ResultArgs extends MayBePromiseTuple<InitialArgs>,
-  Result extends Factory extends Func<any, infer R>
+  Result extends (Factory extends Func<any, infer R>
     ? R extends Promise<infer PR>
       ? PR
       : R
-    : never,
+    : never),
 >(
   factory: Factory,
 ) => {

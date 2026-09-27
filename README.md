@@ -4,8 +4,8 @@ Lightweight extendable typesafe dependency injection container written in TypeSc
 
 ![Build and tests](https://github.com/Masyaka/injecute/actions/workflows/tests.yml/badge.svg)
 
-
 ## Try it
+
 Check out the [playground](https://masyaka.github.io/injecute/)
 
 ## Key features
@@ -393,7 +393,8 @@ container.use(function (key, next) {
 ## Pitfalls
 
 ### Declaration files
-When you use dynamic containers types, when container services inferred from added entries. 
+
+When you use dynamic containers types, when container services inferred from added entries.
 You must keep container entries adding code in separated files with code which uses inferred container type.
 
 ```
@@ -401,6 +402,7 @@ You must keep container entries adding code in separated files with code which u
 ```
 
 ### Container intermediate usage.
+
 TBD
 
 ```

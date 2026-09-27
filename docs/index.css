@@ -318,17 +318,22 @@ body {
 @keyframes highlight-glow {
   0%,
   100% {
-    box-shadow: 0 8px 20px rgba(255, 107, 53, 0.5),
-      0 0 0 2px rgba(255, 107, 53, 0.3), inset 0 0 10px rgba(255, 107, 53, 0.1);
+    box-shadow:
+      0 8px 20px rgba(255, 107, 53, 0.5),
+      0 0 0 2px rgba(255, 107, 53, 0.3),
+      inset 0 0 10px rgba(255, 107, 53, 0.1);
   }
   33% {
-    box-shadow: 0 10px 25px rgba(255, 107, 53, 0.6),
+    box-shadow:
+      0 10px 25px rgba(255, 107, 53, 0.6),
       0 0 0 2.5px rgba(255, 107, 53, 0.4),
       inset 0 0 15px rgba(255, 107, 53, 0.15);
   }
   66% {
-    box-shadow: 0 12px 30px rgba(255, 107, 53, 0.7),
-      0 0 0 3px rgba(255, 107, 53, 0.5), inset 0 0 20px rgba(255, 107, 53, 0.2);
+    box-shadow:
+      0 12px 30px rgba(255, 107, 53, 0.7),
+      0 0 0 3px rgba(255, 107, 53, 0.5),
+      inset 0 0 20px rgba(255, 107, 53, 0.2);
   }
 }
 
@@ -345,7 +350,8 @@ body {
 /* Add flowing effect to highlighted connections */
 .tree-container-svg svg path.highlighted {
   stroke-dasharray: 5 3 !important;
-  animation: pulse-connection 1.8s ease-in-out infinite,
+  animation:
+    pulse-connection 1.8s ease-in-out infinite,
     connection-flow 1s linear infinite !important;
 }
 
@@ -356,7 +362,8 @@ body {
   opacity: 0.9 !important;
   stroke-dasharray: 8 4 !important;
   filter: drop-shadow(0 0 4px rgba(76, 175, 80, 0.7));
-  animation: namespace-connection-pulse 2s ease-in-out infinite,
+  animation:
+    namespace-connection-pulse 2s ease-in-out infinite,
     connection-flow 1.5s linear infinite !important;
 }
 
@@ -416,11 +423,13 @@ body {
 @keyframes namespace-service-glow {
   0%,
   100% {
-    box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4),
+    box-shadow:
+      0 6px 16px rgba(76, 175, 80, 0.4),
       0 0 0 1px rgba(76, 175, 80, 0.3);
   }
   50% {
-    box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6),
+    box-shadow:
+      0 8px 20px rgba(76, 175, 80, 0.6),
       0 0 0 2px rgba(76, 175, 80, 0.5);
   }
 }
@@ -540,7 +549,10 @@ body {
   justify-content: center;
   transition: all 0.2s ease;
   padding: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .zoom-btn:hover {

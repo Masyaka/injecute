@@ -1,11 +1,9 @@
 import './declarations.d.ts';
 import { codeToServicesGraph, setupPlayground } from './playground.ts';
-import {
-  renderServicesGraph,
-} from './services-graph.ts';
+import { renderServicesGraph } from './services-graph.ts';
 
 // Debounce function
-function debounce(func: Function, wait: number) {
+function debounce(func: (...args: any[]) => void, wait: number) {
   let timeout: NodeJS.Timeout;
   return function executedFunction(...args: any[]) {
     const later = () => {

@@ -5,16 +5,16 @@
 export const construct =
   <
     Constructor extends { new (...args: any[]): any },
-    Instance extends Constructor extends {
+    Instance extends (Constructor extends {
       new (...args: any[]): infer I;
     }
       ? I
-      : never,
-    Args extends Constructor extends {
+      : never),
+    Args extends (Constructor extends {
       new (...args: infer A): any;
     }
       ? A
-      : never,
+      : never),
   >(
     C: Constructor,
   ) =>

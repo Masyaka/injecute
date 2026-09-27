@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { AsyncDIContainer } from '../src/async-container';
 
 describe('async container', () => {
@@ -23,16 +22,14 @@ describe('async container', () => {
         ['syncServiceWithAsyncDeps', 'str'],
       );
     const syncServiceWithAsyncDeps = x.get('syncServiceWithAsyncDeps');
-    expect(syncServiceWithAsyncDeps)
-      .to.have.property('then')
-      .to.be.a('function');
+    expect(syncServiceWithAsyncDeps).toBeInstanceOf(Promise);
     await (syncServiceWithAsyncDeps as any).then((v: any) => {
-      expect(v.number).to.be.a('number');
-      expect(v.str).to.be.a('string');
+      expect(typeof v.number).toBe('number');
+      expect(typeof v.str).toBe('string');
       return x.get('asyncService').then((s: any) => {
-        expect(s.dep.number).to.be.a('number');
-        expect(s.dep.str).to.be.a('string');
-        expect(s.str).to.be.a('string');
+        expect(typeof s.dep.number).toBe('number');
+        expect(typeof s.dep.str).toBe('string');
+        expect(typeof s.str).toBe('string');
       });
     });
   });

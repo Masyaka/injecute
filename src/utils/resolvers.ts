@@ -39,9 +39,11 @@ export const createNamedResolvers = <
   container: C,
   keys: [...Keys],
 ): {
-  [K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, NewKey]
-    ? KeysPairs[K][1]
-    : never]: K extends string
+  [
+    K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, NewKey]
+      ? KeysPairs[K][1]
+      : never
+  ]: K extends string
     ? KeysPairs[K] extends [keyof TServices, NewKey]
       ? Resolve<TServices[KeysPairs[K][0]]>
       : never
@@ -64,7 +66,7 @@ export type NamedResolvers<T extends Record<ArgumentsKey, any>> = {
 export const addNamedResolvers =
   <
     R extends NamedResolvers<any>,
-    S extends R extends NamedResolvers<infer Values> ? Values : never,
+    S extends (R extends NamedResolvers<infer Values> ? Values : never),
   >(
     resolvers: R,
   ) =>

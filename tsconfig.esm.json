@@ -2,11 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
     "module": "ES2022",
-    "moduleResolution": "node",
-    "esModuleInterop": false,
+    "moduleResolution": "Bundler",
+    "types": [],
     "outDir": "./lib/esm",
-    "target": "ES2022",
-    "rewriteRelativeImportExtensions": true
-  }
+    "rootDir": "./src"
+  },
+  "include": [],
+  "files": ["./src/index.ts"]
 }

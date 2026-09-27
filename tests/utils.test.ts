@@ -1,5 +1,4 @@
-import { expect } from 'chai';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   defer,
   construct,
@@ -23,13 +22,13 @@ describe('utils', () => {
     );
 
     it('reads values', () => {
-      expect(accessor.listener).to.be.eq('Listener');
-      expect(accessor.sing).to.be.eq("I'm singing for Listener");
+      expect(accessor.listener).toBe('Listener');
+      expect(accessor.sing).toBe("I'm singing for Listener");
     });
 
     it('throws on write attempt', () => {
       // @ts-expect-error testing
-      expect(() => (accessor.listener = '')).to.throw(
+      expect(() => (accessor.listener = '')).toThrow(
         'Set through proxy is not supported',
       );
     });
@@ -42,12 +41,12 @@ describe('utils', () => {
       const narrowProxy = createProxyAccessor(narrowContainer, {
         keys: ['x', ['z', 'renamedZ']],
       });
-      expect(narrowProxy.x).to.be.eq('singleton x to expose');
-      // @ts-expect-error
-      expect(narrowProxy.y).to.be.undefined;
-      // @ts-expect-error
-      expect(narrowProxy.z).to.be.undefined;
-      expect(narrowProxy.renamedZ).to.be.eq('singleton z to rename');
+      expect(narrowProxy.x).toBe('singleton x to expose');
+      // @ts-expect-error `y` is not exposed by the proxy
+      expect(narrowProxy.y).toBeUndefined();
+      // @ts-expect-error `z` is exposed as `renamedZ`
+      expect(narrowProxy.z).toBeUndefined();
+      expect(narrowProxy.renamedZ).toBe('singleton z to rename');
     });
   });
   describe('preload', () => {
@@ -84,9 +83,9 @@ describe('utils', () => {
         });
 
       preload(container);
-      expect(singletonCalled).to.be.true;
-      expect(transientCalled).to.be.true;
-      expect(instanceCalled).to.be.false;
+      expect(singletonCalled).toBe(true);
+      expect(transientCalled).toBe(true);
+      expect(instanceCalled).toBe(false);
     });
 
     it('works with predicate argument', () => {
@@ -122,9 +121,9 @@ describe('utils', () => {
         });
 
       preload(container, (k) => typeof k === 'string' && k.startsWith('sing'));
-      expect(singletonCalled).to.be.true;
-      expect(transientCalled).to.be.false;
-      expect(instanceCalled).to.be.false;
+      expect(singletonCalled).toBe(true);
+      expect(transientCalled).toBe(false);
+      expect(instanceCalled).toBe(false);
     });
 
     it('works with array keys argument', () => {
@@ -160,9 +159,9 @@ describe('utils', () => {
         });
 
       preload(container, ['transient']);
-      expect(singletonCalled).to.be.false;
-      expect(transientCalled).to.be.true;
-      expect(instanceCalled).to.be.false;
+      expect(singletonCalled).toBe(false);
+      expect(transientCalled).toBe(true);
+      expect(instanceCalled).toBe(false);
     });
   });
 
@@ -177,9 +176,9 @@ describe('utils', () => {
     it('creates instantiation function', () => {
       const create = construct(ClassWithConstructor);
       const instance = create(1, '2');
-      expect(instance).to.be.instanceOf(ClassWithConstructor);
-      expect(instance.field1).to.be.a('number');
-      expect(instance.field2).to.be.a('string');
+      expect(instance).toBeInstanceOf(ClassWithConstructor);
+      expect(typeof instance.field1).toBe('number');
+      expect(typeof instance.field2).toBe('string');
     });
 
     it('works in container', () => {
@@ -192,9 +191,9 @@ describe('utils', () => {
         ]);
 
       const instance = container.get('x');
-      expect(instance).to.be.instanceOf(ClassWithConstructor);
-      expect(instance.field1).to.be.a('number');
-      expect(instance.field2).to.be.a('string');
+      expect(instance).toBeInstanceOf(ClassWithConstructor);
+      expect(typeof instance.field1).toBe('number');
+      expect(typeof instance.field2).toBe('string');
     });
   });
 
@@ -210,7 +209,7 @@ describe('utils', () => {
       const syncFunction = (n: number, s: string) => n + s;
       const deferred = defer(syncFunction);
       const result = await deferred(1, Promise.resolve('2'));
-      expect(result).to.be.eq('12');
+      expect(result).toBe('12');
     });
 
     it('allows to add constructor with promised arguments', async () => {
@@ -223,9 +222,9 @@ describe('utils', () => {
         ]);
 
       const instance = await container.get('x');
-      expect(instance).to.be.instanceOf(ClassWithConstructor);
-      expect(instance.field1).to.be.a('number');
-      expect(instance.field2).to.be.a('string');
+      expect(instance).toBeInstanceOf(ClassWithConstructor);
+      expect(typeof instance.field1).toBe('number');
+      expect(typeof instance.field2).toBe('string');
     });
 
     it('returns promise', async () => {
@@ -234,9 +233,8 @@ describe('utils', () => {
         .addInstance('string', '2')
         .addTransient(
           'deferredString',
-          defer(
-            (num: number, str: string): Promise<string> =>
-              Promise.resolve(str + num),
+          defer((num: number, str: string): Promise<string> =>
+            Promise.resolve(str + num),
           ),
           ['number', 'string'],
         )
@@ -245,7 +243,7 @@ describe('utils', () => {
           (deferredString) =>
             deferredString.then((deferredStringValue) => {
               // @ts-expect-error no promise of promise;
-              expect(deferredStringValue.then).is.undefined;
+              expect(deferredStringValue.then).toBeUndefined();
               return `deferred string was ${deferredStringValue}`;
             }),
           ['deferredString'],
@@ -253,8 +251,8 @@ describe('utils', () => {
 
       const deferredString = await container.get('deferredString');
       const dependedOnDeferred = await container.get('dependedOnDeferred');
-      expect(deferredString).to.be.a.string;
-      expect(dependedOnDeferred).to.be.eq('deferred string was 21');
+      expect(typeof deferredString).toBe('string');
+      expect(dependedOnDeferred).toBe('deferred string was 21');
     });
   });
 
@@ -273,8 +271,8 @@ describe('utils', () => {
         addNamedResolvers(namedResolvers),
       );
 
-      expect(consumer.get('number')).to.be.eq(1);
-      expect(consumer.get('string')).to.be.eq('x');
+      expect(consumer.get('number')).toBe(1);
+      expect(consumer.get('string')).toBe('x');
     });
 
     it('creates resolvers tuple', () => {
@@ -330,24 +328,24 @@ describe('utils', () => {
           ['service'],
         );
 
-      expect(factoryCalls).to.eq(0);
-      expect(container.get('serviceUsageResult')).to.eq('hellohello');
-      expect(factoryCalls).to.eq(1);
-      expect(container.get('serviceUsageResult')).to.eq('hellohello');
-      expect(factoryCalls).to.eq(1);
+      expect(factoryCalls).toBe(0);
+      expect(container.get('serviceUsageResult')).toBe('hellohello');
+      expect(factoryCalls).toBe(1);
+      expect(container.get('serviceUsageResult')).toBe('hellohello');
+      expect(factoryCalls).toBe(1);
       container.reset();
       setCacheInstance(container, 'service', {
         method(p) {
           return p + 1;
         },
       });
-      expect(container.get('serviceUsageResult')).to.eq('hello1');
-      expect(factoryCalls).to.eq(1);
+      expect(container.get('serviceUsageResult')).toBe('hello1');
+      expect(factoryCalls).toBe(1);
       container.reset();
-      expect(container.get('serviceUsageResult')).to.eq('hellohello');
-      expect(factoryCalls).to.eq(2);
-      expect(container.get('serviceUsageResult')).to.eq('hellohello');
-      expect(factoryCalls).to.eq(2);
+      expect(container.get('serviceUsageResult')).toBe('hellohello');
+      expect(factoryCalls).toBe(2);
+      expect(container.get('serviceUsageResult')).toBe('hellohello');
+      expect(factoryCalls).toBe(2);
     });
   });
 });
