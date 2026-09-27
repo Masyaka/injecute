@@ -1,5 +1,4 @@
-import { DIContainer, entryTypeKey } from '../container.ts';
-import { ArgumentsKey, IDIContainer } from '../types.ts';
+import type { ArgumentsKey, IDIContainer, RegistrationInfo } from '../types.ts';
 
 export type Tree = Record<
   string,
@@ -13,82 +12,84 @@ export type Tree = Record<
   | undefined
 >;
 
-// TODO: handle different types of factories, alias must have dependency.
-// depth management, change
-function toTreeNode<C extends DIContainer<any, any>>(
-  this: C,
+const describeKind = (info: RegistrationInfo): string => {
+  let kind: string = info.kind;
+  for (let linked = info.linked; linked; linked = linked.linked) {
+    kind += ' -> ' + linked.kind;
+  }
+  return kind;
+};
+
+/** The registration a namespace entry finally resolves to (its own dependencies are the linked ones). */
+const finalRegistration = (info: RegistrationInfo): RegistrationInfo => {
+  let current = info;
+  while (current.linked) current = current.linked;
+  return current;
+};
+
+function toTreeNode(
+  container: IDIContainer<any, any>,
   key: ArgumentsKey,
   tree: Tree,
   depth = 0,
 ): Tree[string] {
   const stringKey = String(key);
-  const factory = this.getFactory(key);
-  let finalFactory = factory;
-  let factoryType = finalFactory?.[entryTypeKey] || '';
-  while (finalFactory?.linkedFactory) {
-    finalFactory = finalFactory.linkedFactory;
-    factoryType += ' -> ' + finalFactory?.[entryTypeKey] || '';
-  }
-  const renderDependencies = finalFactory?.dependencies || [];
-
+  const info = container.getRegistration(key);
   const keyParts = stringKey.split('.');
+  const dependencies: Tree = {};
+
+  for (const dependency of info ? finalRegistration(info).dependencies : []) {
+    const isFunction = dependency.type === 'function';
+    const k =
+      dependency.type === 'function'
+        ? dependency.name
+        : dependency.type === 'skip'
+          ? undefined
+          : String(dependency.key);
+    if (k === undefined) continue;
+    // Dependencies of namespace services are resolved inside the namespace: find the visible key.
+    for (let i = keyParts.length - 1; i >= 0; i--) {
+      const namespace = keyParts.slice(0, i).join('.');
+      const withNamespace = namespace ? namespace + '.' + k : k;
+      if (isFunction || container.has(withNamespace)) {
+        dependencies[withNamespace] = {
+          depth: depth + 1,
+          namespace,
+          title: isFunction ? 'Function: ' + k : k,
+          factoryType: isFunction ? 'function' : 'dependency',
+          dependencies: {},
+        };
+        break;
+      }
+    }
+  }
 
   const result = {
     depth,
     title: stringKey,
     namespace: keyParts.slice(0, keyParts.length - 1).join('.'),
-    factoryType,
-    dependencies: renderDependencies.reduce((r, d) => {
-      const isFunction = typeof d === 'function';
-      const k = isFunction ? d.name : String(d);
-
-      for (let i = keyParts.length - 1; i >= 0; i--) {
-        const namespace = keyParts.slice(0, i).join('.');
-        const dependencyKeyWithNamespace = namespace ? namespace + '.' + k : k;
-        if (this.has(dependencyKeyWithNamespace)) {
-          r[dependencyKeyWithNamespace] = isFunction
-            ? {
-                depth: depth + 1,
-                namespace,
-                title: 'Function: ' + d.name,
-                factoryType: 'function',
-                dependencies: {},
-              }
-            : {
-                depth: depth + 1,
-                namespace,
-                title: k,
-                factoryType: 'd',
-                dependencies: {},
-              };
-          break;
-        }
-      }
-
-      return r;
-    }, {} as Tree),
+    factoryType: info ? describeKind(info) : '',
+    dependencies,
   };
-
-  tree[stringKey] ??= result;
-  tree[stringKey].depth = Math.max(tree[stringKey].depth, depth);
+  const existing = tree[stringKey];
+  if (existing) {
+    existing.depth = Math.max(existing.depth, depth);
+    return existing;
+  }
+  tree[stringKey] = result;
   return result;
 }
 
-function _buildServicesGraph<C extends DIContainer<any, any>>(this: C) {
-  const result: Tree = {};
-  this.keys.forEach((k) => {
-    const title = String(k);
-    result[title] = toTreeNode.call(this, k, result);
-  });
-  return result;
-}
-
+/**
+ * Builds a plain object describing every service visible from `container` and its direct dependencies.
+ * Used by the playground to render the services graph.
+ */
 export function buildServicesGraph<C extends IDIContainer<any, any>>(
   container: C,
 ): Tree {
-  if (!(container instanceof DIContainer)) {
-    throw new Error('Only DIContainer supported');
+  const result: Tree = {};
+  for (const key of container.keys) {
+    result[String(key)] = toTreeNode(container, key, result);
   }
-  const result = _buildServicesGraph.call(container);
   return result;
 }

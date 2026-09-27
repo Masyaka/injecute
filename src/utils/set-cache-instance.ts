@@ -1,13 +1,6 @@
 import { DIContainer } from '../container.ts';
-import { ContainerServices, IDIContainer } from '../types.ts';
-
-function _setSingletonInstance<
-  C extends DIContainer<any, any>,
-  S extends ContainerServices<C>,
-  K extends keyof S,
->(this: C, key: K, instance: S[K]) {
-  this.setSingletonInstance(key, instance);
-}
+import { SET_CACHE_INSTANCE } from '../internal.ts';
+import type { ContainerServices, IDIContainer } from '../types.ts';
 
 /**
  * Allows to override any container entry until container.reset() used, factories is not touched.
@@ -18,17 +11,14 @@ function _setSingletonInstance<
  * // ... do the testing stuff;
  * container.reset(); // clear cached singletons with mocked 'service'
  * ```
- * @param this
- * @param key
- * @param instance
  */
 export function setCacheInstance<
   C extends IDIContainer<any, any>,
   S extends ContainerServices<C>,
   K extends keyof S,
->(container: C, key: K, instance: S[K]) {
+>(container: C, key: K, instance: S[K]): void {
   if (!(container instanceof DIContainer)) {
     throw new Error('Only DIContainer supported');
   }
-  _setSingletonInstance.call(container, key, instance);
+  container[SET_CACHE_INSTANCE](key, instance);
 }

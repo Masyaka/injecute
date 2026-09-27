@@ -200,25 +200,57 @@ export type Merge<T1, T2> = Flatten<T1 & T2>;
 export type Flatten<T> = { [k in keyof T]: T[k] } & {};
 
 /**
- * How factory was added
+ * How a service was registered.
+ * - `singleton` / `transient`: a factory, created once / on every resolution
+ * - `instance`: a value added with `addInstance`
+ * - `alias`: points to another key (`target`)
+ * - `namespace`: a namespace container added with `namespace()`
+ * - `namespace-entry`: `Namespace.key`, resolved from the namespace container
+ * - `delegate`: a namespace service replaced by the parent container
  */
-export type EntryType =
+export type RegistrationKind =
   | 'singleton'
   | 'transient'
   | 'instance'
-  | 'namespace-container'
   | 'alias'
-  | 'namespace-entry';
+  | 'namespace'
+  | 'namespace-entry'
+  | 'delegate';
+
+/** A dependency of a registration, as reported by {@link RegistrationInfo}. */
+export type DependencyInfo =
+  | { readonly type: 'key'; readonly key: ArgumentsKey }
+  | { readonly type: 'previous'; readonly key: ArgumentsKey }
+  | { readonly type: 'function'; readonly name: string }
+  | { readonly type: 'skip' };
+
+/** Read-only metadata about a registration. Returned by `getRegistration()`. */
+export interface RegistrationInfo {
+  readonly key: ArgumentsKey;
+  readonly kind: RegistrationKind;
+  readonly dependencies: readonly DependencyInfo[];
+  /** 0 when registered in the container that was asked, 1 for its parent, and so on. */
+  readonly depth: number;
+  /** Alias target, or the key inside the namespace container. */
+  readonly target?: ArgumentsKey;
+  /** The namespace name, for `namespace` and `namespace-entry` registrations. */
+  readonly namespace?: string;
+  /** For `namespace-entry` and `delegate`: the registration it resolves to. */
+  readonly linked?: RegistrationInfo;
+}
 
 export type Events<C extends IDIContainer<any>> = {
-  add: { key: ArgumentsKey; replace: boolean; container: C };
+  add: {
+    key: ArgumentsKey;
+    replace: boolean;
+    container: C;
+    kind: RegistrationKind;
+  };
   replace: {
     key: ArgumentsKey;
     container: C;
-    replaced: {
-      callable: Callable<any, any>;
-      type: EntryType;
-    };
+    /** The registration that was replaced. */
+    previous: RegistrationInfo;
   };
   reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };
   get: { key: ArgumentsKey; value: any; container: C };
@@ -250,6 +282,11 @@ export interface IDIContainer<
   has(name: keyof (TOwnServices & TParentServices) | string): boolean;
 
   getParent(): IDIContainer<TParentServices> | undefined;
+
+  /**
+   * Read-only metadata of the registration visible under `key` (own or inherited), or `undefined`.
+   */
+  getRegistration(key: ArgumentsKey): RegistrationInfo | undefined;
 
   /**
    * keys of current container with parent keys if exists
@@ -436,20 +473,8 @@ export interface IDIContainer<
   fork<
     T extends TOwnServices & TParentServices = TOwnServices & TParentServices,
   >(options?: {
-    skipMiddlewares?: boolean;
     skipResolvers?: boolean;
   }): IDIContainer<{}, T>;
-
-  /**
-   * Moves all factories, but not caches from parent containers to current level.
-   * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
-   */
-  flatten(options?: {
-    fork?: boolean;
-    onKeyIntersection?: <K extends keyof (TOwnServices & TParentServices)>(
-      k: K,
-    ) => Resolve<(TOwnServices & TParentServices)[K]>;
-  }): IDIContainer<TOwnServices & TParentServices>;
 
   /**
    * Adopts callback result container services.

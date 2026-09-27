@@ -21,6 +21,11 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       // `{}` is the idiomatic "no services yet" service map.
       '@typescript-eslint/no-empty-object-type': 'off',
+      // Walking the parent chain starts from `this`.
+      '@typescript-eslint/no-this-alias': [
+        'error',
+        { allowedNames: ['current', 'level'] },
+      ],
       '@typescript-eslint/no-unused-vars': [
         'error',
         {

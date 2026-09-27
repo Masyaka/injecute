@@ -460,7 +460,7 @@ describe('injecute container', () => {
       expect(replacedInstance1 === replacedInstance2).toBe(true);
     });
 
-    it('should not allow to depend on self key without replace option', () => {
+    it('should not allow to re-register an own key without replace option', () => {
       const container = new DIContainer().addTransient('service', () => ({
         name: 'initial service',
       }));
@@ -469,6 +469,16 @@ describe('injecute container', () => {
           'service',
           (initialService) => ({ name: 'replaced service', initialService }),
           ['service'],
+        ),
+      ).toThrow(/already registered/);
+    });
+
+    it('should not allow a self dependency when there is no previous definition', () => {
+      expect(() =>
+        new DIContainer().addSingleton(
+          'service',
+          ((self: unknown) => ({ self })) as any,
+          ['service'] as any,
         ),
       ).toThrow(CircularDependencyError);
     });
