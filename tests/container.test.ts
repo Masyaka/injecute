@@ -4,9 +4,9 @@ import {
   CircularDependencyError,
   DIContainer,
   IDIContainer,
-  optionalDependencySkipKey,
+  optional,
+  type ServiceProvider,
 } from '../src/index.ts';
-import { construct } from '../src/index.ts';
 
 describe('injecute container', () => {
   describe('DI container general', () => {
@@ -190,7 +190,11 @@ describe('injecute container', () => {
             .businessMethod(41),
         ).toBe(42);
 
-        expect(container.get('Domain.Context').get('Generic.value')).toBe('23');
+        // At runtime a namespace provider also sees the parent's services (typed: only its own).
+        const domainContext = container.get(
+          'Domain.Context',
+        ) as ServiceProvider<any>;
+        expect(domainContext.get('Generic.value')).toBe('23');
       });
       it('replaces namespace entry when parent container replaces entry', () => {
         let c = 0;
@@ -228,10 +232,12 @@ describe('injecute container', () => {
         expect(container.get('NS.service')).toBe('over-replaced-3');
         expect(container.get('NS').get('service')).toBe('over-replaced-4');
 
-        container.get('NS').addTransient('service', () => 'final-replacement', {
-          replace: true,
-          dependencies: [],
-        });
+        // `get('NS')` is typed read-only; the namespace container itself can still register.
+        (container.get('NS') as unknown as DIContainer<any>).addTransient(
+          'service',
+          () => 'final-replacement',
+          { replace: true, dependencies: [] },
+        );
         expect(container.get('NS.service')).toBe('final-replacement');
         expect(container.get('NS').get('service')).toBe('final-replacement');
       });
@@ -417,7 +423,7 @@ describe('injecute container', () => {
 
     it('should allow to override parent service using parent service', () => {
       const parent = new DIContainer().addTransient('s', () => ({ x: 1 }), []);
-      const child = new DIContainer({ parentContainer: parent }).extend((c) => {
+      const child = parent.fork().extend((c) => {
         return c.addTransient(
           's',
           () => {
@@ -507,42 +513,30 @@ describe('injecute container', () => {
         }));
       expect(container.get('x')).toHaveProperty('name', undefined);
     });
-    it('will allow to not provide optional dependency key', () => {
+    it('passes undefined for optional dependencies that are not registered', () => {
       class SrvWithOptionalConstructorArgument {
         constructor(public readonly val: undefined | string = undefined) {}
       }
 
       const c = new DIContainer().addSingleton(
         's',
-        construct(SrvWithOptionalConstructorArgument),
-        ['undefined'],
+        SrvWithOptionalConstructorArgument,
+        [optional('missing')],
       );
       expect(c.get('s')).toBeInstanceOf(SrvWithOptionalConstructorArgument);
+      expect(c.get('s').val).toBeUndefined();
     });
 
-    it('will not allow to add service with optional dependency key', () => {
-      const addSingletonUndefinedKey = () =>
-        new DIContainer().addSingleton(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-          [],
-        );
-      expect(addSingletonUndefinedKey).toThrow();
+    it('passes optional dependencies that are registered', () => {
+      const c = new DIContainer()
+        .addInstance('name', 'value')
+        .addSingleton('s', (name) => ({ name }), [optional('name')]);
+      expect(c.get('s').name).toBe('value');
+    });
 
-      const addInstanceUndefinedKey = () =>
-        new DIContainer().addInstance(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-        );
-      expect(addInstanceUndefinedKey).toThrow();
-
-      const addTransientUndefinedKey = () =>
-        new DIContainer().addTransient(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-          [],
-        );
-      expect(addTransientUndefinedKey).toThrow();
+    it('accepts "undefined" as an ordinary key (0.x reserved it)', () => {
+      const c = new DIContainer().addInstance('undefined', 1);
+      expect(c.get('undefined')).toBe(1);
     });
 
     it('will restrict adding to container without explicit keys providing (type-level only)', () => {

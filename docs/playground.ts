@@ -7,7 +7,8 @@ import injecuteIndex from '../lib/index.d.ts?raw';
 import injecuteTypes from '../lib/types.d.ts?raw';
 import injecuteContainer from '../lib/container.d.ts?raw';
 import injecuteBuildServicesGraph from '../lib/utils/build-services-graph.d.ts?raw';
-import DIContainer, {
+import {
+  DIContainer,
   construct,
   createProxyAccessor,
   defer,
@@ -20,7 +21,7 @@ const initialCode = `
 
 
 
-    import DIContainer, { construct, IDIContainer } from "injecute";
+    import { DIContainer, construct, type ServiceRegistry } from "injecute";
 
     interface UserMessageTransport {
       sendUserMessage(userId: number, content: string): void;
@@ -81,7 +82,7 @@ const initialCode = `
     type Database = any;
 
     // Nested namespace example: Domain.Blog with sub-namespace Domain.Blog.Comments
-    function addBlogServices<T extends { db: Database, userMessageTransport: UserMessageTransport }>(container: IDIContainer<T>) {
+    function addBlogServices(container: ServiceRegistry<{ db: Database; userMessageTransport: UserMessageTransport }>) {
       return container
         .addSingleton('blogRepository', construct(BlogRepository), ['db'])
         .addSingleton('blogService', construct(BlogService), ['userMessageTransport', 'blogRepository'])

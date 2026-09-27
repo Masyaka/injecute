@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DIContainer, type Middleware } from '../src/index.ts';
 
-// TODO(S3.1): chain methods return DIContainer; drop these casts.
-const owner = (c: unknown) => c as DIContainer<any>;
-
 const recorder = () => {
   const seen: string[] = [];
   const middleware: Middleware = (key, next) => {
@@ -25,7 +22,7 @@ describe('middlewares', () => {
     const { seen, middleware } = recorder();
     const root = new DIContainer().addInstance('a', 1);
     const child = root.fork();
-    owner(root).use(middleware);
+    root.use(middleware);
     child.get('a');
     expect(seen).toEqual(['a']);
   });
@@ -41,7 +38,7 @@ describe('middlewares', () => {
     const { seen, middleware } = recorder();
     const c = new DIContainer().use(middleware).addInstance('a', 1);
     c.get('a');
-    owner(c).unuse(middleware);
+    c.unuse(middleware);
     c.get('a');
     expect(seen).toEqual(['a']);
   });
@@ -55,7 +52,7 @@ describe('middlewares', () => {
         return next();
       };
     const root = new DIContainer().use(tag('root1')).use(tag('root2'));
-    const child = owner(root.fork()).use(tag('child')).addInstance('a', 1);
+    const child = root.fork().use(tag('child')).addInstance('a', 1);
     child.get('a');
     expect(order).toEqual(['child', 'root2', 'root1']);
   });
@@ -91,7 +88,7 @@ describe('middlewares', () => {
 
   it('works with arrow functions and exposes the container on the context', () => {
     let seenContainer: unknown;
-    const c = owner(new DIContainer().addInstance('a', 1));
+    const c = new DIContainer().addInstance('a', 1);
     c.use((_key, next, { container }) => {
       seenContainer = container;
       return next();
@@ -105,7 +102,7 @@ describe('middlewares', () => {
     const root = new DIContainer()
       .addInstance('config', 1)
       .addSingleton('db', (config) => ({ config }), ['config']);
-    const child = owner(root.fork()).use(middleware);
+    const child = root.fork().use(middleware);
     child.get('db');
     // `db` runs in the root (it is cached there and shared), so its dependency is resolved there too.
     expect(seen).toEqual(['db']);

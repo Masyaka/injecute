@@ -29,7 +29,7 @@ describe('utils', () => {
     it('throws on write attempt', () => {
       // @ts-expect-error testing
       expect(() => (accessor.listener = '')).toThrow(
-        'Set through proxy is not supported',
+        'The proxy accessor is read-only.',
       );
     });
 

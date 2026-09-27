@@ -65,7 +65,8 @@
     "check:package": "publint --strict && attw --pack . --profile esm-only",
     "test:smoke": "node tests/smoke/run.mjs",
     "test:types-consumer": "node tests/types-consumer/run.mjs",
-    "test:browser": "playwright test -c tests/browser/playwright.config.ts"
+    "test:browser": "playwright test -c tests/browser/playwright.config.ts",
+    "bench:types": "node scripts/type-perf.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",

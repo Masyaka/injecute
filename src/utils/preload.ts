@@ -1,33 +1,31 @@
-import { ArgumentsKey, ContainerServices, IDIContainer } from '../types.ts';
+import type {
+  ContainerServices,
+  ServiceKey,
+  ServiceProvider,
+} from '../types.ts';
 
 /**
- * Use for warm up listed or predicated services.
- * Can be useful to check services for right configuration.
- * @example ```
- * preload(container, (k) => k.startsWith('Feature.Domain.'))
- * ```
+ * Resolves services up front, for example at startup, so configuration errors surface immediately.
+ * Without `keys` it resolves every visible service; pass a list of keys or a predicate to narrow it.
  *
- * @param container
- * @param keys
+ * @example
+ * ```ts
+ * preload(app); // everything
+ * preload(app, ['db', 'cache']);
+ * preload(app, (key) => String(key).startsWith('Billing.'));
+ * ```
  */
-export const preload = <
-  C extends IDIContainer<any>,
-  S extends ContainerServices<C>,
-  K extends keyof S,
->(
+export function preload<C extends ServiceProvider>(
   container: C,
-  keys?: K[] | ((k: K) => boolean),
-): void => {
-  let toPreload: ArgumentsKey[];
-  if (keys === undefined) {
-    toPreload = container.keys;
-  } else if (Array.isArray(keys)) {
-    toPreload = keys;
-  } else {
-    toPreload = (container.keys as K[]).filter(keys);
-  }
-
-  for (const key of toPreload) {
-    container.get(key);
-  }
-};
+  keys?:
+    readonly (keyof ContainerServices<C>)[] | ((key: ServiceKey) => boolean),
+): void {
+  const selected =
+    keys === undefined
+      ? container.keys
+      : typeof keys === 'function'
+        ? container.keys.filter(keys)
+        : keys;
+  const provider = container as unknown as ServiceProvider<any>;
+  for (const key of selected) provider.get(key);
+}

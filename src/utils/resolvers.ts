@@ -1,80 +1,91 @@
-import {
-  ArgumentsKey,
+import type {
   ContainerServices,
-  IDIContainer,
-  Resolve,
-  ResolversMapKeys,
+  ServiceKey,
+  ServiceProvider,
+  ServiceRegistry,
 } from '../types.ts';
+import {
+  type ExposedName,
+  type KeySpec,
+  type SpecKey,
+  specPair,
+} from './keys.ts';
 
-export type ResolversTuple<
-  TServices extends Record<string, any>,
-  Keys extends readonly (keyof TServices)[],
-> = Keys extends [
-  infer Key extends keyof TServices,
-  ...infer Rest extends readonly any[],
-]
-  ? [Resolve<TServices[Key]>, ...ResolversTuple<TServices, Rest>]
-  : [];
-export const createResolversTuple = <
-  C extends IDIContainer<any>,
-  TServices extends ContainerServices<C>,
-  const Keys extends (keyof TServices)[],
->(
-  container: C,
-  keys: [...Keys],
-): ResolversTuple<TServices, Keys> => {
-  return keys.map((k) => container.createResolver(k)) as ResolversTuple<
-    TServices,
-    Keys
-  >;
+/** A tuple of resolver functions, one per key. */
+export type ResolversTuple<S, Keys extends readonly (keyof S)[]> = {
+  -readonly [I in keyof Keys]: () => S[Keys[I]];
 };
 
-export const createNamedResolvers = <
-  C extends IDIContainer<any>,
-  TServices extends ContainerServices<C>,
-  NewKey extends ArgumentsKey,
-  Keys extends (keyof TServices | [keyof TServices, NewKey])[],
-  KeysPairs extends ResolversMapKeys<Keys>,
->(
-  container: C,
-  keys: [...Keys],
-): {
+/** An object of resolver functions, named by the exposed names. */
+export type NamedResolversOf<S, Keys extends readonly unknown[]> = {
   [
-    K in keyof KeysPairs as KeysPairs[K] extends [keyof TServices, NewKey]
-      ? KeysPairs[K][1]
-      : never
-  ]: K extends string
-    ? KeysPairs[K] extends [keyof TServices, NewKey]
-      ? Resolve<TServices[KeysPairs[K][0]]>
-      : never
-    : never;
-} => {
-  return keys.reduce((r: any, c) => {
-    if (Array.isArray(c)) {
-      r[c[1]] = container.createResolver(c[0]);
-    } else {
-      r[c] = container.createResolver(c);
+    I in keyof Keys as I extends `${number}` ? ExposedName<Keys[I], S> : never
+  ]: () => S[SpecKey<Keys[I], S>];
+};
+
+/** Resolver functions by service key. */
+export type NamedResolvers<T> = { [K in keyof T]: () => T[K] };
+
+/**
+ * Returns one resolver function per key, in order.
+ *
+ * @example
+ * ```ts
+ * const [getUsers, getMailer] = createResolversTuple(app, ['users', 'mailer']);
+ * ```
+ */
+export function createResolversTuple<
+  C extends ServiceProvider,
+  const Keys extends readonly (keyof ContainerServices<C>)[],
+>(container: C, keys: Keys): ResolversTuple<ContainerServices<C>, Keys> {
+  const provider = container as unknown as ServiceProvider<any>;
+  return keys.map((key) => provider.createResolver(key)) as any;
+}
+
+/**
+ * Returns an object of resolver functions, named by key or by `[key, name]` pairs.
+ *
+ * @example
+ * ```ts
+ * const resolvers = createNamedResolvers(app, ['users', ['mailer', 'getMailer']]);
+ * resolvers.users();
+ * resolvers.getMailer();
+ * ```
+ */
+export function createNamedResolvers<
+  C extends ServiceProvider,
+  const Keys extends readonly KeySpec<ContainerServices<C>>[],
+>(container: C, keys: Keys): NamedResolversOf<ContainerServices<C>, Keys> {
+  const provider = container as unknown as ServiceProvider<any>;
+  const result: Record<ServiceKey, () => unknown> = {};
+  for (const spec of keys) {
+    const [key, name] = specPair(spec);
+    result[name] = provider.createResolver(key);
+  }
+  return result as any;
+}
+
+/**
+ * Turns resolver functions (e.g. from another container) into a module that registers them as
+ * transient services. Use it with `extend()` to share services between independent containers.
+ *
+ * @example
+ * ```ts
+ * const shared = createNamedResolvers(core, ['db', 'logger']);
+ * const feature = new DIContainer().extend(addNamedResolvers(shared));
+ * feature.get('db'); // resolved by `core`
+ * ```
+ */
+export function addNamedResolvers<T extends object>(
+  resolvers: NamedResolvers<T>,
+): (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<T, T> {
+  return (registry) => {
+    for (const key of Reflect.ownKeys(resolvers)) {
+      const resolve = (resolvers as Record<ServiceKey, () => unknown>)[key]!;
+      (registry as ServiceRegistry<any, any>).addTransient(key, () =>
+        resolve(),
+      );
     }
-    return r;
-  }, {});
-};
-
-export type NamedResolvers<T extends Record<ArgumentsKey, any>> = {
-  [K in keyof T]: Resolve<T[K]>;
-};
-
-export const addNamedResolvers =
-  <
-    R extends NamedResolvers<any>,
-    S extends (R extends NamedResolvers<infer Values> ? Values : never),
-  >(
-    resolvers: R,
-  ) =>
-  <T extends Record<ArgumentsKey, any>>(
-    c: IDIContainer<T>,
-  ): IDIContainer<T & S> => {
-    Object.entries(resolvers).forEach(([k, r]) => {
-      c.addTransient(k as any, r);
-    });
-    return c as IDIContainer<T & S>;
+    return registry as unknown as ServiceRegistry<T, T>;
   };
+}

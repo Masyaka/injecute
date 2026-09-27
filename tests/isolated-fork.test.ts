@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { construct, DIContainer } from '../src/index.ts';
-
-// TODO(S3.1): chain methods return DIContainer; drop these casts.
-const owner = (c: unknown) => c as DIContainer<any>;
+import { DIContainer } from '../src/index.ts';
 
 class Repo {
   constructor(readonly db: string) {}
@@ -11,7 +8,7 @@ class Repo {
 const createApp = () =>
   new DIContainer()
     .addInstance('db', 'realDb')
-    .addSingleton('repo', construct(Repo), ['db'])
+    .addSingleton('repo', Repo, ['db'])
     .addTransient('report', (repo) => `report(${repo.db})`, ['repo']);
 
 describe('fork({ isolated: true })', () => {
@@ -47,8 +44,9 @@ describe('fork({ isolated: true })', () => {
   it('sees registrations added to the parent later', () => {
     const app = createApp();
     const test = app.fork({ isolated: true });
-    owner(app).addInstance('late', 42);
-    expect(owner(test).get('late')).toBe(42);
+    app.addInstance('late', 42);
+    // the fork's type was fixed when it was created; the registration is visible at runtime
+    expect(test.get('late' as never)).toBe(42);
   });
 
   it('forks of an isolated fork share its instances', () => {
@@ -61,14 +59,12 @@ describe('fork({ isolated: true })', () => {
   it('re-creates namespaces inside the isolated fork', () => {
     const app = new DIContainer()
       .addInstance('db', 'realDb')
-      .namespace('Users', (users) =>
-        users.addSingleton('repo', construct(Repo), ['db']),
-      );
+      .namespace('Users', (users) => users.addSingleton('repo', Repo, ['db']));
     const test = app
       .fork({ isolated: true })
       .addInstance('db', 'mockDb', { replace: true });
     expect(test.get('Users.repo').db).toBe('mockDb');
-    expect(owner(test).get('Users').get('repo').db).toBe('mockDb');
+    expect(test.get('Users').get('repo').db).toBe('mockDb');
     expect(app.get('Users.repo').db).toBe('realDb');
   });
 
@@ -84,7 +80,7 @@ describe('fork({ isolated: true })', () => {
   it('inherits middlewares', () => {
     const seen: unknown[] = [];
     const app = createApp();
-    owner(app).use((key, next) => {
+    app.use((key, next) => {
       seen.push(key);
       return next();
     });

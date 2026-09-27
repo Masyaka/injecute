@@ -39,7 +39,12 @@ describe('core resolution model', () => {
     it('accepts an extension that returns a child of the container', () => {
       const c = new DIContainer()
         .addInstance('a', 1)
-        .extend((c) => c.fork().addInstance('b', 2));
+        // registries cannot fork (typed), but a module may return a child at runtime
+        .extend((c) =>
+          (c as unknown as DIContainer<{ a: number }>)
+            .fork()
+            .addInstance('b', 2),
+        );
       expect(c.get('b')).toBe(2);
       expect(c.get('a')).toBe(1);
     });

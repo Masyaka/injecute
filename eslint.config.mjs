@@ -11,6 +11,7 @@ export default tseslint.config(
       'docs/.vitepress/dist/**',
       'coverage/**',
       'handoffs/**',
+      'tests/types/fixtures/**',
     ],
   },
   js.configs.recommended,

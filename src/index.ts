@@ -10,15 +10,15 @@
  *
  * @example Register and resolve services
  * ```ts
- * import { construct, DIContainer } from 'injecute';
+ * import { DIContainer } from 'injecute';
  *
  * class UserRepository {
- *   constructor(private readonly dbUrl: string) {}
+ *   constructor(readonly dbUrl: string) {}
  * }
  *
  * const container = new DIContainer()
  *   .addInstance('dbUrl', 'postgres://localhost/app')
- *   .addSingleton('users', construct(UserRepository), ['dbUrl']);
+ *   .addSingleton('users', UserRepository, ['dbUrl']);
  *
  * const users = container.get('users'); // typed as UserRepository
  * ```
@@ -27,8 +27,7 @@
  *
  * @module
  */
-export * from './types.ts';
-export * from './container.ts';
+export type * from './types.ts';
+export { DIContainer, CircularDependencyError } from './container.ts';
+export { optional } from './dependencies.ts';
 export * from './utils/index.ts';
-import { DIContainer } from './container.ts';
-export default DIContainer;

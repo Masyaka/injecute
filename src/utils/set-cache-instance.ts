@@ -1,24 +1,27 @@
 import { DIContainer } from '../container.ts';
 import { SET_CACHE_INSTANCE } from '../internal.ts';
-import type { ContainerServices, IDIContainer } from '../types.ts';
 
 /**
- * Allows to override any container entry until container.reset() used, factories is not touched.
- * use case: Designed to replace some entries for testing
- * @example ```
- * container.reset(); // clear cached singletons, all services will use new 'service'
- * setCacheInstance(container, 'service', mockObject); // replace 'service' with mock
- * // ... do the testing stuff;
- * container.reset(); // clear cached singletons with mocked 'service'
+ * Overrides the cached value of `key` in `container` until the next `reset()`, without touching the
+ * registration. Resolutions through this container (and its forks) return `value`.
+ *
+ * For tests, prefer an isolated fork with a replacement, which cannot leak:
+ * `app.fork({ isolated: true }).addInstance('db', fakeDb, { replace: true })`.
+ *
+ * @example
+ * ```ts
+ * setCacheInstance(app, 'clock', fixedClock);
+ * // ... test
+ * app.reset();
  * ```
  */
-export function setCacheInstance<
-  C extends IDIContainer<any, any>,
-  S extends ContainerServices<C>,
-  K extends keyof S,
->(container: C, key: K, instance: S[K]): void {
+export function setCacheInstance<S extends object, K extends keyof S>(
+  container: DIContainer<S>,
+  key: K,
+  value: S[K],
+): void {
   if (!(container instanceof DIContainer)) {
-    throw new Error('Only DIContainer supported');
+    throw new Error('setCacheInstance() needs a DIContainer.');
   }
-  container[SET_CACHE_INSTANCE](key, instance);
+  container[SET_CACHE_INSTANCE](key, value);
 }

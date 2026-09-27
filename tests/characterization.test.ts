@@ -85,11 +85,11 @@ describe('characterization (kept behaviour)', () => {
       expect(() => c.get('missing')).toThrow(/missing/);
     });
 
-    // changes in S3.1: the option is renamed to `optional`
-    it('returns undefined for unregistered keys with allowUnresolved', () => {
+    // changed in S3.1: `allowUnresolved` is now `optional`
+    it('returns undefined for unregistered keys with { optional: true }', () => {
       const c = new DIContainer();
       // @ts-expect-error unknown key
-      expect(c.get('missing', { allowUnresolved: true })).toBeUndefined();
+      expect(c.get('missing', { optional: true })).toBeUndefined();
     });
 
     it('resolves parent services from a child', () => {

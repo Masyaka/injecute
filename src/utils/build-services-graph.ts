@@ -1,4 +1,8 @@
-import type { ArgumentsKey, IDIContainer, RegistrationInfo } from '../types.ts';
+import type {
+  RegistrationInfo,
+  ServiceKey,
+  ServiceProvider,
+} from '../types.ts';
 
 export type Tree = Record<
   string,
@@ -28,8 +32,8 @@ const finalRegistration = (info: RegistrationInfo): RegistrationInfo => {
 };
 
 function toTreeNode(
-  container: IDIContainer<any, any>,
-  key: ArgumentsKey,
+  container: ServiceProvider,
+  key: ServiceKey,
   tree: Tree,
   depth = 0,
 ): Tree[string] {
@@ -41,12 +45,7 @@ function toTreeNode(
   for (const dependency of info ? finalRegistration(info).dependencies : []) {
     const isFunction = dependency.type === 'function';
     const k =
-      dependency.type === 'function'
-        ? dependency.name
-        : dependency.type === 'skip'
-          ? undefined
-          : String(dependency.key);
-    if (k === undefined) continue;
+      dependency.type === 'function' ? dependency.name : String(dependency.key);
     // Dependencies of namespace services are resolved inside the namespace: find the visible key.
     for (let i = keyParts.length - 1; i >= 0; i--) {
       const namespace = keyParts.slice(0, i).join('.');
@@ -84,9 +83,7 @@ function toTreeNode(
  * Builds a plain object describing every service visible from `container` and its direct dependencies.
  * Used by the playground to render the services graph.
  */
-export function buildServicesGraph<C extends IDIContainer<any, any>>(
-  container: C,
-): Tree {
+export function buildServicesGraph(container: ServiceProvider): Tree {
   const result: Tree = {};
   for (const key of container.keys) {
     result[String(key)] = toTreeNode(container, key, result);

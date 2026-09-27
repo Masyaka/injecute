@@ -113,3 +113,19 @@ jobs:
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run build
       - run: npm run test:browser
+
+  type-perf:
+    name: Type-check cost (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # A 300-registration chain: ~1.04M instantiations today.
+      - run: npm run bench:types
+        env:
+          TYPE_PERF_BUDGET: '1500000'
