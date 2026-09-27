@@ -52,15 +52,13 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^4.3.20",
+    "@types/d3": "^7.4.3",
     "chai": "^4.5.0",
+    "d3": "^7.9.0",
     "monaco-editor": "^0.52.2",
     "prettier": "^2.8.8",
-    "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",
-    "vitest": "^3.2.4",
-    "@types/d3": "^7.4.3",
-    "d3": "^7.9.0"
-  },
-  "dependencies": {}
+    "vitest": "^3.2.4"
+  }
 }

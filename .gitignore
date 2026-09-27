@@ -5,3 +5,6 @@ lib
 .vscode
 .DS_Store
 docs/dist
+
+# Local planning / agent handoff notes
+handoffs
