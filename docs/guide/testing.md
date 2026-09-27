@@ -12,6 +12,8 @@ everything resolved through it uses the replacement; the app container is untouc
 
 <<< @/../examples/testing.ts#isolated-fork
 
+[Open in the playground](../playground?example=testing)
+
 `await using` disposes whatever the test created, even when an assertion throws.
 
 ## Override one cached value: `setCacheInstance`

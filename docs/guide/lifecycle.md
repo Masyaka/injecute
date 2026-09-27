@@ -10,6 +10,8 @@ the container as disposed.
 
 <<< @/../examples/lifecycle.ts#dispose
 
+[Open in the playground](../playground?example=lifecycle)
+
 ## What the container owns
 
 - **Singletons it created.** Each is disposed with its registration's `dispose` function, or with

@@ -1,27 +1,12 @@
-# Injecute Playground
+# Playground internals
 
-A sophisticated interactive playground for visualizing dependency injection containers and their service dependency trees in real-time.
-
-## Flow Overview
-
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Monaco Editor │ -> │ TypeScript       │ -> │ Tree Renderer   │
-│                 │    │ Compiler         │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         ^                       │                       │
-         │                       v                       v
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ User Types Code │    │ JavaScript       │    │ Visual Tree     │
-│ (debounce)      │    │ Evaluation       │    │ Display         │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-```
-
-### Rendering Pipeline
-
-1. **Code Input**: User types TypeScript code in Monaco Editor
-2. **Debouncing**: 1000ms delay prevents excessive re-rendering while typing
-3. **Compilation**: TypeScript code is compiled to JavaScript using typescript
-4. **Evaluation**: Compiled code is evaluated to extract the DIContainer variable `container`
-5. **Graph Building**: Uses the `buildServicesGraph` utility from injecute library
-6. **Tree Rendering**: Custom `renderServicesTree` function creates HTML visualization
+- `../Playground.vue`: the page component (toolbar, editor, graph / trace / console tabs).
+- `editor.ts`: Monaco with every `lib/**/*.d.ts` loaded, so the editor's types match the build. The
+  JavaScript to run is emitted by Monaco's own TypeScript worker.
+- `runner.worker.ts`: runs the emitted code in a fresh Web Worker per run (no DOM access, terminated
+  after 3 s). `import … from 'injecute'` is rewritten to the library bundled into the worker. It finds
+  the container (default export, `app`, `container`, any exported container, or a `create*()` result),
+  resolves every service with a tracing middleware and posts back plain data (`protocol.ts`).
+- `services-graph.ts`: the d3 graph. Service keys come from user code, so tooltip HTML escapes them.
+- `share.ts`: code in the URL hash (`#code=…`, lz-string), `?example=<name>` loads a file from
+  `examples/`.

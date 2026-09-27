@@ -1,5 +1,9 @@
 import * as d3 from 'd3';
-import type { Tree } from '../src/utils/build-services-graph.ts';
+
+/** Service keys come from user code (and shared links): never put them into HTML unescaped. */
+const escapeHtml = (value: unknown): string =>
+  String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+import type { Tree } from '../../../../src/utils/build-services-graph.ts';
 
 interface PackNode {
   id: string;
@@ -83,7 +87,7 @@ function buildPackData(graph: Tree): PackNode {
     const prefix = key + '.';
     const hasChildren = Object.keys(graph).some((k) => k.startsWith(prefix));
     const isNamespaceContainer =
-      entry.factoryType === 'namespace-container' || hasChildren;
+      entry.factoryType.startsWith('namespace') || hasChildren;
 
     const namespaceServices: string[] = [];
 
@@ -594,16 +598,16 @@ function setupClickHandlers(
     }
 
     // Build tooltip
-    let tooltipContent = `<div class="tooltip-title">${d.data.id}</div>`;
+    let tooltipContent = `<div class="tooltip-title">${escapeHtml(d.data.id)}</div>`;
     tooltipContent += `<div class="tooltip-section">
       <div class="tooltip-label">Factory Type</div>
-      <div>${d.data.factoryType || 'Unknown'}</div>
+      <div>${escapeHtml(d.data.factoryType || 'Unknown')}</div>
     </div>`;
 
     if (namespaceServices.length > 0) {
       tooltipContent += `<div class="tooltip-section">
         <div class="tooltip-label">Namespace Services (${namespaceServices.length})</div>
-        <div class="dependency-list">${namespaceServices.slice(0, 8).join(', ')}${namespaceServices.length > 8 ? '...' : ''}</div>
+        <div class="dependency-list">${escapeHtml(namespaceServices.slice(0, 8).join(', '))}${namespaceServices.length > 8 ? '...' : ''}</div>
       </div>`;
       tooltipContent += `<div class="tooltip-section">
         <div class="tooltip-label">🎯 Click Effect</div>
@@ -613,14 +617,14 @@ function setupClickHandlers(
       if (dependencies.length > 0) {
         tooltipContent += `<div class="tooltip-section">
           <div class="tooltip-label">Dependencies (${dependencies.length})</div>
-          <div class="dependency-list" style="color: #ff6b35;">${dependencies.slice(0, 8).join(', ')}${dependencies.length > 8 ? '...' : ''}</div>
+          <div class="dependency-list" style="color: #ff6b35;">${escapeHtml(dependencies.slice(0, 8).join(', '))}${dependencies.length > 8 ? '...' : ''}</div>
         </div>`;
       }
 
       if (dependents.length > 0) {
         tooltipContent += `<div class="tooltip-section">
           <div class="tooltip-label">Used By (${dependents.length})</div>
-          <div class="dependency-list" style="color: #c586c0;">${dependents.slice(0, 8).join(', ')}${dependents.length > 8 ? '...' : ''}</div>
+          <div class="dependency-list" style="color: #c586c0;">${escapeHtml(dependents.slice(0, 8).join(', '))}${dependents.length > 8 ? '...' : ''}</div>
         </div>`;
       }
 
@@ -760,10 +764,10 @@ function setupClickHandlers(
       }
 
       // Build tooltip
-      let tooltipContent = `<div class="tooltip-title">${d.data.id}</div>`;
+      let tooltipContent = `<div class="tooltip-title">${escapeHtml(d.data.id)}</div>`;
       tooltipContent += `<div class="tooltip-section">
       <div class="tooltip-label">Factory Type</div>
-      <div>${d.data.factoryType || 'Unknown'}</div>
+      <div>${escapeHtml(d.data.factoryType || 'Unknown')}</div>
     </div>`;
       tooltipContent += `<div class="tooltip-section">
       <div class="tooltip-label">Depth Level</div>
@@ -773,7 +777,7 @@ function setupClickHandlers(
       if (namespaceServices.length > 0) {
         tooltipContent += `<div class="tooltip-section">
         <div class="tooltip-label">Namespace Services (${namespaceServices.length})</div>
-        <div class="dependency-list">${namespaceServices.slice(0, 8).join(', ')}${namespaceServices.length > 8 ? '...' : ''}</div>
+        <div class="dependency-list">${escapeHtml(namespaceServices.slice(0, 8).join(', '))}${namespaceServices.length > 8 ? '...' : ''}</div>
       </div>`;
         tooltipContent += `<div class="tooltip-section">
         <div class="tooltip-label">💡 Tip</div>
@@ -783,14 +787,14 @@ function setupClickHandlers(
         if (dependencies.length > 0) {
           tooltipContent += `<div class="tooltip-section">
           <div class="tooltip-label">Dependencies (${dependencies.length})</div>
-          <div class="dependency-list" style="color: #ff6b35;">${dependencies.slice(0, 8).join(', ')}${dependencies.length > 8 ? '...' : ''}</div>
+          <div class="dependency-list" style="color: #ff6b35;">${escapeHtml(dependencies.slice(0, 8).join(', '))}${dependencies.length > 8 ? '...' : ''}</div>
         </div>`;
         }
 
         if (dependents.length > 0) {
           tooltipContent += `<div class="tooltip-section">
           <div class="tooltip-label">Used By (${dependents.length})</div>
-          <div class="dependency-list" style="color: #c586c0;">${dependents.slice(0, 8).join(', ')}${dependents.length > 8 ? '...' : ''}</div>
+          <div class="dependency-list" style="color: #c586c0;">${escapeHtml(dependents.slice(0, 8).join(', '))}${dependents.length > 8 ? '...' : ''}</div>
         </div>`;
         }
 

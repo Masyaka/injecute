@@ -24,6 +24,8 @@ registered. An **event listener** only observes. Reach for events first.
 
 <<< @/../examples/middleware/tracing.ts#tracing
 
+[Open in the playground](../playground?example=middleware/tracing)
+
 ## Fallbacks and dynamic keys
 
 <<< @/../examples/middleware/fallback.ts#fallback

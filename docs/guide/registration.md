@@ -12,6 +12,8 @@ to the factory in the same order.
 
 <<< @/../examples/registration.ts#lifetimes
 
+[Open in the playground](../playground?example=registration)
+
 | Method                             | Created             | Cached          | Disposed by `dispose()`               |
 | ---------------------------------- | ------------------- | --------------- | ------------------------------------- |
 | `addSingleton(key, factory, deps)` | on first use        | yes             | yes (see [Lifecycle](./lifecycle.md)) |

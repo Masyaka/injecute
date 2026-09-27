@@ -1,52 +1,142 @@
-.main-container {
+.playground {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: calc(100vh - var(--vp-nav-height) - 40px);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  height: calc(100vh - var(--vp-nav-height) - 32px);
+  min-height: 560px;
+  padding: 12px 16px;
+  gap: 8px;
 }
 
-#container {
-  flex: 1;
-  min-height: 400px;
-  border-bottom: 2px solid #3c3c3c;
+.playground-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
-#services-tree-container {
+.playground-toolbar select,
+.playground-toolbar button,
+.playground-tabs button {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  cursor: pointer;
+}
+
+.playground-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.playground-status {
+  color: var(--vp-c-text-2);
+}
+
+.playground-body {
   flex: 1;
-  padding: 20px;
-  background: #252526;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .playground {
+    height: auto;
+  }
+  .playground-body {
+    grid-template-columns: 1fr;
+  }
+  .playground-editor {
+    height: 420px;
+  }
+  .playground-output {
+    min-height: 420px;
+  }
+}
+
+.playground-editor {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.playground-output {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+  background: var(--vp-c-bg-alt);
+}
+
+.playground-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.playground-tabs button.active {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+}
+
+.playground-error {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-danger-soft);
+  font-size: 13px;
+}
+
+.playground-error pre {
+  margin: 4px 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+
+.playground-graph {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.playground-trace,
+.playground-console {
+  flex: 1;
+  margin: 0;
+  padding: 8px 12px;
   overflow: auto;
-  min-height: 200px;
+  font-size: 12px;
+  font-family: var(--vp-font-family-mono);
+  list-style: none;
 }
 
-#services-tree-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: #569cd6;
-  border-bottom: 1px solid #3c3c3c;
-  padding-bottom: 8px;
+.playground-trace li {
+  display: flex;
+  gap: 8px;
+  line-height: 1.8;
 }
 
-#services-tree {
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 14px;
-  line-height: 1.5;
+.playground-trace .ms {
+  color: var(--vp-c-text-3);
 }
 
-#services-tree-input {
-  width: 100%;
-  border: none;
-  outline: none;
-  resize: none;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 14px;
-  line-height: 1.5;
+.playground-trace .failed {
+  color: var(--vp-c-danger-1);
+}
+
+.playground-trace .empty {
+  color: var(--vp-c-text-3);
+}
+
+.playground-console {
+  white-space: pre-wrap;
 }
 
 .tree-node {
@@ -79,6 +169,7 @@
 
 /* SVG Tree Styles */
 #tree-container-svg {
+  background: #1e1e1e;
   border: 1px solid #404040;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.1);

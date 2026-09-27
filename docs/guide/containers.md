@@ -12,6 +12,8 @@ parent registers later. What you add to the child stays in the child.
 
 <<< @/../examples/containers.ts#fork
 
+[Open in the playground](../playground?example=containers)
+
 A service registered in the parent **runs in the parent** and is shared by all forks. That is what you
 want for request scopes: the database pool is created once, the request stays per request.
 

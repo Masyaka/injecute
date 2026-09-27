@@ -38,6 +38,8 @@ works [without a build step](./no-build.md).
 
 <<< @/../examples/getting-started.ts#example
 
+[Open in the playground](../playground?example=getting-started)
+
 What happened:
 
 - `addInstance('dbUrl', …)` registers an existing value.

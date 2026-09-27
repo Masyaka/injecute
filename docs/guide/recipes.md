@@ -9,6 +9,8 @@ description: Request scopes, configuration-driven implementations, feature modul
 
 <<< @/../examples/recipes/request-scope.ts#request-scope
 
+[Open in the playground](../playground?example=recipes/request-scope)
+
 The same shape works in any framework: create the fork in the handler (or a framework middleware),
 add the request, and resolve the handler's services from the fork.
 
