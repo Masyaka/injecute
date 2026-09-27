@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import type { Tree } from '../src/utils/build-services-graph';
+import type { Tree } from '../src/utils/build-services-graph.ts';
 
 interface PackNode {
   id: string;

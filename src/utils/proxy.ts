@@ -4,7 +4,7 @@ import {
   Flatten,
   IDIContainer,
   ResolversMapKeys,
-} from '../types';
+} from '../types.ts';
 
 export type ProxyAccessorOptions<
   Services extends Record<ArgumentsKey, any>,

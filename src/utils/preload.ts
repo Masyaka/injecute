@@ -1,4 +1,4 @@
-import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
+import { ArgumentsKey, ContainerServices, IDIContainer } from '../types.ts';
 
 /**
  * Use for warm up listed or predicated services.

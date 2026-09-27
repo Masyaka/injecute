@@ -1,5 +1,5 @@
-import { DIContainer, entryTypeKey } from '../container';
-import { ArgumentsKey, IDIContainer } from '../types';
+import { DIContainer, entryTypeKey } from '../container.ts';
+import { ArgumentsKey, IDIContainer } from '../types.ts';
 
 export type Tree = Record<
   string,

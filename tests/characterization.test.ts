@@ -3,7 +3,7 @@
  * Tests tagged `changes in S<step>` document behaviour that a later 1.0 step changes on purpose.
  */
 import { describe, expect, it } from 'vitest';
-import { buildServicesGraph, construct, DIContainer } from '../src';
+import { buildServicesGraph, construct, DIContainer } from '../src/index.ts';
 
 describe('characterization (kept behaviour)', () => {
   describe('bind', () => {

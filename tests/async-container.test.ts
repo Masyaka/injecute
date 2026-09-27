@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AsyncDIContainer } from '../src/async-container';
+import { AsyncDIContainer } from '../src/async-container.ts';
 
 describe('async container', () => {
   it('do basic required async stuff', async () => {

@@ -1,44 +1,18 @@
 {
   "name": "injecute",
   "version": "0.18.0",
-  "description": "Lightweight extendable typesafe dependency injection container",
+  "description": "Lightweight, type-safe, decorator-free dependency injection container for TypeScript",
+  "type": "module",
   "repository": {
+    "type": "git",
     "url": "git+https://github.com/Masyaka/injecute.git"
   },
-  "scripts": {
-    "clean": "rm -rf ./lib",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
-    "build:esm": "tsc -p ./tsconfig.esm.json",
-    "build:cjs": "tsc -p ./tsconfig.cjs.json",
-    "typecheck": "tsc -p ./tsconfig.json",
-    "lint": "eslint .",
-    "format": "prettier . --write",
-    "format:check": "prettier . --check",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
-    "changeset": "changeset",
-    "docs:build": "vite build docs/ --base ./",
-    "docs:dev": "vite docs/",
-    "prepack": "npm run build"
+  "homepage": "https://masyaka.github.io/injecute/",
+  "bugs": {
+    "url": "https://github.com/Masyaka/injecute/issues"
   },
-  "types": "./lib/cjs/index.d.ts",
-  "main": "./lib/cjs/index.js",
-  "files": [
-    "lib/**/*"
-  ],
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./lib/esm/index.d.ts",
-        "default": "./lib/esm/index.js"
-      },
-      "require": {
-        "types": "./lib/cjs/index.d.ts",
-        "default": "./lib/cjs/index.js"
-      }
-    }
-  },
+  "license": "MIT",
+  "author": "Masyaka",
   "keywords": [
     "di",
     "dic",
@@ -53,8 +27,39 @@
     "functional",
     "fp"
   ],
-  "author": "Masyaka",
-  "license": "MIT",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf ./lib",
+    "build": "npm run clean && tsc -p ./tsconfig.build.json",
+    "typecheck": "tsc -p ./tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
+    "changeset": "changeset",
+    "docs:build": "vite build docs/ --base ./",
+    "docs:dev": "vite docs/",
+    "prepack": "npm run build"
+  },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",

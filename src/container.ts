@@ -18,7 +18,7 @@ import {
   ValueOf,
   optionalDependencySkipKey,
   type Dependency,
-} from './types';
+} from './types.ts';
 
 const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
 export const firstResult =

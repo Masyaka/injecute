@@ -2,11 +2,11 @@ import * as monaco from 'monaco-editor';
 import ts from 'typescript';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
-import injecuteUtils from '../lib/cjs/utils/index.d.ts?raw';
-import injecuteIndex from '../lib/cjs/index.d.ts?raw';
-import injecuteTypes from '../lib/cjs/types.d.ts?raw';
-import injecuteContainer from '../lib/cjs/container.d.ts?raw';
-import injecuteBuildServicesGraph from '../lib/cjs/utils/build-services-graph.d.ts?raw';
+import injecuteUtils from '../lib/utils/index.d.ts?raw';
+import injecuteIndex from '../lib/index.d.ts?raw';
+import injecuteTypes from '../lib/types.d.ts?raw';
+import injecuteContainer from '../lib/container.d.ts?raw';
+import injecuteBuildServicesGraph from '../lib/utils/build-services-graph.d.ts?raw';
 import DIContainer, {
   construct,
   createProxyAccessor,

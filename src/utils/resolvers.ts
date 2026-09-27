@@ -4,7 +4,7 @@ import {
   IDIContainer,
   Resolve,
   ResolversMapKeys,
-} from '../types';
+} from '../types.ts';
 
 export type ResolversTuple<
   TServices extends Record<string, any>,

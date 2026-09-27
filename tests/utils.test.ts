@@ -8,8 +8,8 @@ import {
   createResolversTuple,
   addNamedResolvers,
   DIContainer,
-} from '../src';
-import { setCacheInstance } from '../src/utils/set-cache-instance';
+} from '../src/index.ts';
+import { setCacheInstance } from '../src/utils/set-cache-instance.ts';
 
 describe('utils', () => {
   describe('proxy', () => {

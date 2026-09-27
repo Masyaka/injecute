@@ -1,5 +1,5 @@
-import { DIContainer } from '../container';
-import { ContainerServices, IDIContainer } from '../types';
+import { DIContainer } from '../container.ts';
+import { ContainerServices, IDIContainer } from '../types.ts';
 
 function _setSingletonInstance<
   C extends DIContainer<any, any>,

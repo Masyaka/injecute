@@ -1,5 +1,5 @@
-export * from './types';
-export * from './container';
-export * from './utils';
-import { DIContainer } from './container';
+export * from './types.ts';
+export * from './container.ts';
+export * from './utils/index.ts';
+import { DIContainer } from './container.ts';
 export default DIContainer;

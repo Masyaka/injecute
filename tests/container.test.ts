@@ -5,8 +5,8 @@ import {
   DIContainer,
   IDIContainer,
   optionalDependencySkipKey,
-} from '../src';
-import { construct } from '../src';
+} from '../src/index.ts';
+import { construct } from '../src/index.ts';
 
 describe('injecute container', () => {
   describe('DI container general', () => {

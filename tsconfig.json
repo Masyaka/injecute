@@ -5,6 +5,8 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
     "types": ["node"],
     "noEmit": true,
     "skipLibCheck": true,

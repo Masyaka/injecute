@@ -1,5 +1,5 @@
-import { DIContainer } from './container';
-import { ArgumentsKey, Callable, Empty, Func } from './types';
+import { DIContainer } from './container.ts';
+import { ArgumentsKey, Callable, Empty, Func } from './types.ts';
 
 export class AsyncDIContainer<
   TOwnServices extends Record<ArgumentsKey, any> = Empty,
