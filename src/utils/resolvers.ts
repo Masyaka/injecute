@@ -70,7 +70,9 @@ export const addNamedResolvers =
   >(
     resolvers: R,
   ) =>
-  <T extends Record<ArgumentsKey, any>>(c: IDIContainer<T>) => {
+  <T extends Record<ArgumentsKey, any>>(
+    c: IDIContainer<T>,
+  ): IDIContainer<T & S> => {
     Object.entries(resolvers).forEach(([k, r]) => {
       c.addTransient(k as any, r);
     });

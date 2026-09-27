@@ -25,7 +25,7 @@ export const defer = <
     : never),
 >(
   factory: Factory,
-) => {
+): ((...dependencies: ResultArgs) => Promise<Result>) => {
   return async (...dependencies: ResultArgs): Promise<Result> =>
     Promise.all(dependencies).then((r) => factory(...(r as InitialArgs)));
 };

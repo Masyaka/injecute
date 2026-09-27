@@ -54,11 +54,14 @@
     "format:check": "prettier . --check",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run check:versions",
     "changeset": "changeset",
     "docs:build": "vite build docs/ --base ./",
     "docs:dev": "vite docs/",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "check:versions": "node scripts/sync-jsr-version.mjs --check",
+    "check:jsr": "deno publish --dry-run --allow-dirty",
+    "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",

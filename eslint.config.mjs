@@ -32,6 +32,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/**/*.mjs', '*.config.*'],
+    languageOptions: {
+      globals: { process: 'readonly', console: 'readonly' },
+    },
+  },
+  {
     files: ['tests/**/*.ts', '**/*.test.ts', '**/*.test-d.ts'],
     plugins: { vitest },
     rules: {

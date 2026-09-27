@@ -17,7 +17,7 @@ export const preload = <
 >(
   container: C,
   keys?: K[] | ((k: K) => boolean),
-) => {
+): void => {
   let toPreload: ArgumentsKey[];
   if (keys === undefined) {
     toPreload = container.keys;

@@ -133,13 +133,15 @@ export class DIContainer<
     produce: new Set(),
   };
   readonly #parentContainer: IDIContainer<TParentServices> | undefined;
-  getParent() {
+  getParent(): IDIContainer<TParentServices> | undefined {
     return this.#parentContainer;
   }
   readonly #factories: MapOf<{
     [key in keyof TServices]?: Factory<TServices, key>;
   }> = new Map();
-  getFactory<K extends keyof TServices>(k: K) {
+  getFactory<K extends keyof TServices>(
+    k: K,
+  ): Factory<TServices, K> | undefined {
     return this.#factories.get(k);
   }
   readonly #singletonInstances: MapOf<{
@@ -175,7 +177,7 @@ export class DIContainer<
     handler: (
       e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
     ) => void,
-  ) {
+  ): this {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].add(handler);
       return this;
@@ -190,7 +192,7 @@ export class DIContainer<
     handler: (
       e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
     ) => void,
-  ) {
+  ): this {
     if (e in this.eventHandlers) {
       this.eventHandlers[e].delete(handler);
       return this;
@@ -445,7 +447,7 @@ export class DIContainer<
         k: K,
       ) => Resolve<TServices[K]>;
     } = { fork: true },
-  ) {
+  ): DIContainer<TServices> {
     // todo: Add tests
     const resultContainer = (
       options.fork ? this.fork() : this
@@ -628,13 +630,15 @@ export class DIContainer<
   protected applyCallable<D extends any[]>(
     callable: Callable<D, any>,
     dependencies: D,
-  ) {
+  ): any {
     const dependenciesInstances: any =
       this.mapDependenciesToInstances(dependencies);
     return callable(...dependenciesInstances) as any;
   }
 
-  protected mapDependenciesToInstances(dependencies: Dependency<TServices>[]) {
+  protected mapDependenciesToInstances(
+    dependencies: Dependency<TServices>[],
+  ): unknown[] {
     return dependencies.map((d) => {
       if (d === optionalDependencySkipKey) {
         return undefined;
@@ -663,7 +667,7 @@ export class DIContainer<
     }
   }
 
-  protected applyFactory(factory: Factory<any, any>) {
+  protected applyFactory(factory: Factory<any, any>): any {
     factory.beforeResolving?.();
     const result = this.injecute(
       factory.callable as Callable<any, any>,
