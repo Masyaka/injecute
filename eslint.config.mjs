@@ -39,6 +39,11 @@ export default tseslint.config(
     },
   },
   {
+    // Examples show results as `expression; // result` lines in the docs.
+    files: ['examples/**/*.ts'],
+    rules: { '@typescript-eslint/no-unused-expressions': 'off' },
+  },
+  {
     files: ['scripts/**/*.mjs', 'tests/**/*.mjs', '*.config.*'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },

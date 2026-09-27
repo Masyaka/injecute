@@ -10,8 +10,11 @@
     "types": ["node"],
     "noEmit": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "injecute": ["./src/index.ts"]
+    }
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "examples"],
   "exclude": ["tests/types/fixtures"]
 }
