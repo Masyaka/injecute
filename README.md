@@ -10,7 +10,7 @@ Type-safe dependency injection for TypeScript, without decorators.
   with every registration, so `get()` and factory parameters are inferred, and a typo in a key is a
   compile error ("Did you mean …?").
 - **No decorators, no reflection.** Your classes and functions stay free of container code.
-- **Scopes that behave.** `fork()` for request scopes, `fork({ isolated: true })` for tests.
+- **Scopes that behave.** `fork()` for child containers, `fork({ isolated: true })` for tests.
 - **Owns what it creates.** `dispose()` and `await using` release singletons in reverse creation order.
 - **Errors that say how to fix it**, with stable codes and a docs page each.
 - **Runs everywhere.** ES module for Node.js ≥ 22, Deno, Bun and browsers. No runtime dependencies.

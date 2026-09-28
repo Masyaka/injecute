@@ -1,6 +1,6 @@
 ---
 title: Containers, forks and modules
-description: Request scopes with fork(), isolated forks for tests, modules with extend(), and namespaces.
+description: Forks, isolated forks for tests, modules with extend(), and namespaces.
 ---
 
 # Containers, forks and modules
@@ -14,8 +14,17 @@ parent registers later. What you add to the child stays in the child.
 
 [Open in the playground](../playground?example=containers)
 
-A service registered in the parent **runs in the parent** and is shared by all forks. That is what you
-want for request scopes: the database pool is created once, the request stays per request.
+A service registered in the parent **runs in the parent** and is shared by all forks: the database pool
+is created once, and what a fork adds stays in the fork. Parent services can't depend on what a fork
+adds.
+
+::: tip Before you fork per request
+Forks per request make the container structure harder to follow: each service must be registered in the
+right layer, and request state pulls the services that use it into the fork. Request data (the trace id,
+the tenant, the user) fits a [context accessor](./request-context.md), and state a request owns usually
+fits an argument, a factory with `using` or one instance per context. See
+[Per-request state](./request-state.md).
+:::
 
 It also means that overriding a dependency in a fork does not change parent services that already
 depend on it. For that, use an isolated fork.
@@ -56,9 +65,10 @@ receives a fork of the container, so it can use every service registered there.
 
 ## Which one to use
 
-| You want to…                                                       | Use                        |
-| ------------------------------------------------------------------ | -------------------------- |
-| add request-specific services next to shared ones                  | `fork()`                   |
-| replace a dependency for everything, without touching the original | `fork({ isolated: true })` |
-| split registrations by feature                                     | modules with `extend()`    |
-| group services under a name, e.g. `Billing.*`                      | `namespace()`              |
+| You want to…                                                       | Use                                         |
+| ------------------------------------------------------------------ | ------------------------------------------- |
+| give services the trace id, tenant or user of the current request  | a [context accessor](./request-context.md)  |
+| keep state that belongs to one request, like a transaction         | see [Per-request state](./request-state.md) |
+| replace a dependency for everything, without touching the original | `fork({ isolated: true })`                  |
+| split registrations by feature                                     | modules with `extend()`                     |
+| group services under a name, e.g. `Billing.*`                      | `namespace()`                               |

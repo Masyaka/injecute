@@ -1,4 +1,5 @@
 // Runs every file in examples/ (the code the docs embed) and checks what the docs say it does.
+import { DIContainer } from 'injecute';
 import { describe, expect, it } from 'vitest';
 
 describe('examples', () => {
@@ -135,10 +136,96 @@ describe('examples', () => {
   });
 
   it('recipes: request scope', async () => {
-    const { handle } = await import('../examples/recipes/request-scope.ts');
-    expect(await handle({ headers: { 'x-user-id': '7' } })).toBe(
-      'hello user 7',
+    const { placeOrder, log } =
+      await import('../examples/recipes/request-scope.ts');
+    await placeOrder('book', 1);
+    await expect(placeOrder('pen', 0)).rejects.toThrow('at least 1');
+    expect(log).toEqual([
+      'tx1: insert book',
+      'tx1: charge 10 via stripe',
+      'tx1: commit',
+      'tx2: insert pen',
+      'tx2: rollback',
+    ]);
+  });
+
+  it('recipes: unit of work', async () => {
+    const { app, log } = await import('../examples/recipes/unit-of-work.ts');
+    expect(() => app.get('checkout').placeOrder('pen', 0)).toThrow(
+      'at least 1',
     );
+    expect(log).toEqual([
+      'tx1: insert book',
+      'tx1: commit',
+      'tx2: insert pen',
+      'tx2: rollback',
+    ]);
+  });
+
+  it('request context: host', async () => {
+    const { lines } = await import('../examples/request-context/app.ts');
+    const { app, handle, consume } =
+      await import('../examples/request-context/server.ts');
+    lines.length = 0;
+    const results = await Promise.all([
+      handle({ headers: { 'x-trace-id': 't1', 'x-tenant-id': 'acme' } }),
+      handle({ headers: { 'x-trace-id': 't2', 'x-tenant-id': 'globex' } }),
+      consume({ id: '7', tenantId: 'initech', item: 'pen' }),
+    ]);
+    expect(results).toEqual(['acme: book', 'globex: book', 'initech: pen']);
+    expect([...lines].sort()).toEqual([
+      '[job-7 initech] order placed: pen',
+      '[t1 acme] order placed: book',
+      '[t2 globex] order placed: book',
+    ]);
+    app.get('logger').info('outside a request');
+    expect(lines.at(-1)).toBe('[- -] outside a request');
+  });
+
+  it('request context: the host must register the context', async () => {
+    const { addOrders } = await import('../examples/request-context/app.ts');
+    // @ts-expect-error `context` is not registered
+    expect(() => new DIContainer().extend(addOrders).get('orders')).toThrow(
+      /No service registered for "context"/,
+    );
+  });
+
+  it('request context: pitfalls', async () => {
+    const { fromCaptured, fromAccessor, lazy, eager } =
+      await import('../examples/request-context/pitfalls.ts');
+    expect(fromCaptured).toEqual(['a', 'a']);
+    expect(fromAccessor).toEqual(['a', 'b']);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(lazy.get('pool').checks[0]).toBe('a');
+    expect(eager.get('pool').checks[0]).toBeUndefined();
+    expect(eager.get('pool').checks.length).toBeGreaterThan(0);
+    await Promise.all([lazy.dispose(), eager.dispose()]);
+  });
+
+  it('request context: one instance per request', async () => {
+    const { app, handle, Database } =
+      await import('../examples/request-context/per-request.ts');
+    const db = app.get('db');
+    expect(db).toBeInstanceOf(Database);
+    expect(db.queries).toBe(3); // the example's two requests
+    expect(handle(['2', '2'])).toEqual(['user 2', 'user 2']);
+    expect(db.queries).toBe(4);
+    expect(() => app.get('profiles').name('1')).toThrow(/No request context/);
+  });
+
+  it('request context: strategy per tenant', async () => {
+    const { sent } = await import('../examples/request-context/strategy.ts');
+    expect(sent).toEqual([
+      'ses → ops@acme.example',
+      'smtp → ops@globex.example',
+    ]);
+  });
+
+  it('request context: testing', async () => {
+    const { lines } = await import('../examples/request-context/app.ts');
+    const { placed } = await import('../examples/request-context/testing.ts');
+    expect(placed).toBe('acme: book');
+    expect(lines).toContain('[test-1 acme] order placed: book');
   });
 
   it('recipes: config aliases', async () => {

@@ -12,7 +12,7 @@
     "Register classes directly; use construct(MyClass) only for classes compiled to ES5 or bound classes.",
     "Build the container in one chain (or assign each add* result): every add* returns the container with a larger type.",
     "Type modules as plain functions over ServiceRegistry<{ ...what they need }> and apply them with app.extend(module). Consumers take ServiceProvider<{ ... }>.",
-    "Use app.fork() for request scopes and app.fork({ isolated: true }).addInstance(key, fake, { replace: true }) in tests.",
+    "Give services request data (trace id, tenant, user) through a context accessor backed by AsyncLocalStorage, registered first: addInstance('context', { current: () => storage.getStore() }). For per-request state prefer arguments, a factory with using (a unit of work) or one instance per context over app.fork() per request; use app.fork({ isolated: true }).addInstance(key, fake, { replace: true }) in tests.",
     "Optional dependencies are optional('key'); get(key, { optional: true }) returns undefined for a missing key.",
     "Middlewares are (key, next, { container, path, depth }) => next(); add them with use() on the root container.",
     "Errors are InjecuteError with a stable code (INJECUTE_*); branch on error.code. Factory errors are wrapped as INJECUTE_RESOLUTION_FAILED with the original in error.cause.",

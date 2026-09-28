@@ -72,6 +72,8 @@ app.addSingleton('server', createServer, ['adress']);
 ## Next steps
 
 - [Registering services](./registration.md): lifetimes, optional dependencies, aliases, decoration.
-- [Containers, forks and modules](./containers.md): request scopes, isolated forks for tests, modules.
+- [Containers, forks and modules](./containers.md): forks, isolated forks for tests, modules.
+- [Request context](./request-context.md): the trace id, tenant and user of the current request in every service.
+- [Per-request state](./request-state.md): transactions, caches and per-tenant implementations without forks.
 - [Lifecycle and dispose](./lifecycle.md): releasing connections with `dispose()` and `await using`.
 - [Roles](../concepts/roles.md): which part of your code gets which view of the container.

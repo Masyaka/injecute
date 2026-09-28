@@ -1,18 +1,33 @@
 ---
 title: Recipes
-description: Request scopes, configuration-driven implementations, feature modules, sharing services between containers.
+description: A unit of work per operation, a fork per request, configuration-driven implementations, feature modules, sharing services between containers.
 ---
 
 # Recipes
 
-## A container per request
+## A unit of work per operation
+
+A service creates what one operation owns with a factory, and `using` releases it:
+
+<<< @/../examples/recipes/unit-of-work.ts#unit-of-work
+
+[Open in the playground](../playground?example=recipes/unit-of-work)
+
+More patterns for state that belongs to one request, and a table for choosing between them, are in
+[Per-request state](./request-state.md).
+
+## A fork per request
+
+When several per-request services share instances and depend on the app's services, a fork wires them
+and disposes them together:
 
 <<< @/../examples/recipes/request-scope.ts#request-scope
 
 [Open in the playground](../playground?example=recipes/request-scope)
 
-The same shape works in any framework: create the fork in the handler (or a framework middleware),
-add the request, and resolve the handler's services from the fork.
+Fork the root in one place (the handler or a framework hook) and dispose the fork at the end. Try the
+[alternatives](./request-state.md) first: forks per request make the container structure harder to
+follow.
 
 ## Choosing implementations from configuration
 

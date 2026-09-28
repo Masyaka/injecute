@@ -1,6 +1,6 @@
 ---
 name: injecute
-description: Writes, reviews and debugs TypeScript code that uses the injecute dependency injection container (DIContainer, addSingleton, fork, extend, ServiceRegistry, ServiceProvider). Use when a project depends on injecute, when wiring services, modules or request scopes, when writing tests that override container services, or when fixing INJECUTE_* errors.
+description: Writes, reviews and debugs TypeScript code that uses the injecute dependency injection container (DIContainer, addSingleton, fork, extend, ServiceRegistry, ServiceProvider). Use when a project depends on injecute, when wiring services, modules, request context (AsyncLocalStorage) or per-request forks, when writing tests that override container services, or when fixing INJECUTE_* errors.
 license: MIT
 metadata:
   library-version: '1.x'
@@ -96,11 +96,36 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     `Billing` for the namespace's provider.
 13. `ContainerServices<typeof app>` is the service map of a container type.
 
-**Scopes, tests and cleanup**
+**Request context, scopes, tests and cleanup**
 
-14. `app.fork()` is a child container (a request scope): it sees the parent's services and shares the
-    parent's singletons; what it registers stays in the fork.
-15. In tests, override with an isolated fork. Every service it resolves is built inside the fork, so the
+14. Request data that services read (trace id, tenant, user) goes in a **context accessor**, not a fork.
+    The app defines the type (`interface ContextAccessor<T> { current(): T | undefined }`) and its
+    modules declare it: `ServiceRegistry<{ context: ContextAccessor<RequestContext> }>`. The host
+    registers it first, backed by `AsyncLocalStorage`, runs each request in `storage.run(context, …)`
+    and creates the singletons at startup with `await preload(app)`:
+
+    ```ts
+    const storage = new AsyncLocalStorage<RequestContext>();
+    const app = new DIContainer()
+      .addInstance('context', { current: () => storage.getStore() })
+      .extend(addOrders); // type error if the module needs a service the host lacks
+    ```
+
+    Services call `context.current()` when they use it. Never register the context value as a
+    singleton, read it in a factory or constructor, or keep it in a field: the first request's context
+    would stick. Use `run()`, not `enterWith()`.
+
+15. For state that belongs to one request, try these before a fork per request, in this order: pass it
+    as an argument; register a factory and let the caller own the instance with `using`
+    (`using work = unitOfWork.begin()`, a unit of work for a transaction); read it from the context
+    accessor; keep one instance per context in a singleton (a `WeakMap` keyed by the context object, for
+    caches and DataLoaders); pick a per-tenant implementation in a singleton by the context (Strategy).
+    Forks per request make the container structure hard to follow.
+16. `app.fork()` is a child container: it sees the parent's services and shares the parent's singletons;
+    what it registers stays in the fork, and parent services can't depend on it. Fork per request only
+    for a group of services that share per-request instances and depend on the app's services; fork the
+    root in one place and dispose it: `await using scope = app.fork().addSingleton('tx', …)`.
+17. In tests, override with an isolated fork. Every service it resolves is built inside the fork, so the
     override reaches the whole graph and `app` is untouched:
 
     ```ts
@@ -110,33 +135,33 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     test.get('users'); // built with fakeDb
     ```
 
-16. `await app.dispose()` (or `await using`) disposes the singletons the container created, in reverse
+18. `await app.dispose()` (or `await using`) disposes the singletons the container created, in reverse
     creation order, via `[Symbol.asyncDispose]` / `[Symbol.dispose]` or the `dispose` option. Transient
     services are not kept, so they can't have a `dispose` option.
-17. `reset()` clears cached instances (`reset({ keys: ['db'] })` for some).
+19. `reset()` clears cached instances (`reset({ keys: ['db'] })` for some).
 
 **Middlewares and events**
 
-18. A middleware is `(key, next, { container, path, depth }) => value`. Call `next()` to continue (or
+20. A middleware is `(key, next, { container, path, depth }) => value`. Call `next()` to continue (or
     `next(otherKey)`) and return its result. Arrow functions are fine; there is no `this`.
-19. Add middlewares on the root with `use()`; forks inherit them live. `fork({ middlewares: false })`
+21. Add middlewares on the root with `use()`; forks inherit them live. `fork({ middlewares: false })`
     opts out; `unuse(middleware)` removes one.
-20. `addEventListener('produce' | 'get' | 'add' | 'replace' | 'reset' | 'dispose', listener)` observes a
+22. `addEventListener('produce' | 'get' | 'add' | 'replace' | 'reset' | 'dispose', listener)` observes a
     container.
 
 **Async**
 
-21. In a `DIContainer`, a factory may return a promise; dependents then receive the promise. Wrap a
+23. In a `DIContainer`, a factory may return a promise; dependents then receive the promise. Wrap a
     factory with `defer(factory)` to await its promised arguments; `get()` of that service returns a
     promise. A rejected singleton is retried on the next `get()`; `dispose()` releases resolved values.
-22. When much of the graph is async, use `new AsyncDIContainer()`: factories receive resolved
+24. When much of the graph is async, use `new AsyncDIContainer()`: factories receive resolved
     dependencies, a factory returning `Promise<T>` registers `T`, and every `get()` returns a promise.
     Its modules take `AsyncServiceRegistry<{ … }>`, consumers `AsyncServiceProvider<{ … }>`; the sync
     `ServiceRegistry` / `ServiceProvider` types don't accept it. `await preload(app)` at startup.
 
 **Errors**
 
-23. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
+25. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
     Branch on `error.code`, never on the message. Errors thrown by factories arrive wrapped as
     `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`.
 

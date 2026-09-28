@@ -1,30 +1,68 @@
 import { DIContainer } from 'injecute';
 
-interface Request {
-  headers: Record<string, string | undefined>;
+export const log: string[] = [];
+
+class Transaction {
+  #committed = false;
+  constructor(readonly id: number) {}
+  query(sql: string): void {
+    log.push(`tx${this.id}: ${sql}`);
+  }
+  commit(): void {
+    this.#committed = true;
+    log.push(`tx${this.id}: commit`);
+  }
+  [Symbol.dispose](): void {
+    if (!this.#committed) log.push(`tx${this.id}: rollback`);
+  }
 }
 
-class Users {
-  find(id: string) {
-    return { id, name: `user ${id}` };
+class Database {
+  #next = 1;
+  begin(): Transaction {
+    return new Transaction(this.#next++);
+  }
+}
+
+class Gateway {
+  readonly name = 'stripe';
+}
+
+class OrderRepository {
+  constructor(private readonly tx: Transaction) {}
+  insert(item: string): void {
+    this.tx.query(`insert ${item}`);
+  }
+}
+
+class Payments {
+  constructor(
+    private readonly tx: Transaction,
+    private readonly gateway: Gateway,
+  ) {}
+  charge(amount: number): void {
+    this.tx.query(`charge ${amount} via ${this.gateway.name}`);
   }
 }
 
 // #region request-scope
-const app = new DIContainer().addSingleton('users', Users);
+const app = new DIContainer()
+  .addSingleton('db', Database)
+  .addSingleton('gateway', Gateway);
 
-// One fork per request: request-specific services stay in the fork and are disposed with it.
-export async function handle(request: Request): Promise<string> {
+// Several services share one transaction and also need the app's services: the fork wires them,
+// and disposes the transaction at the end (rolled back unless committed).
+export async function placeOrder(item: string, quantity: number) {
   await using scope = app
     .fork()
-    .addInstance('request', request)
-    .addSingleton(
-      'currentUser',
-      (request, users) =>
-        users.find(request.headers['x-user-id'] ?? 'anonymous'),
-      ['request', 'users'],
-    );
-  return `hello ${scope.get('currentUser').name}`;
+    .addSingleton('tx', (db) => db.begin(), ['db'])
+    .addSingleton('orders', OrderRepository, ['tx'])
+    .addSingleton('payments', Payments, ['tx', 'gateway']);
+
+  scope.get('orders').insert(item);
+  if (quantity < 1) throw new Error('quantity must be at least 1');
+  scope.get('payments').charge(quantity * 10);
+  scope.get('tx').commit();
 }
 // #endregion request-scope
 

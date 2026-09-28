@@ -568,9 +568,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    *   registered here. Overrides in the fork then reach the whole graph, and nothing leaks back.
    *   Use it for tests and per-tenant variants.
    *
+   * Services registered here can't depend on what a fork adds. Before forking per request, consider
+   * the alternatives in the "Per-request state" guide: an argument, a factory with `using`, a context
+   * accessor for request data (trace id, tenant, user), or one instance per context. A fork per request
+   * fits a group of services that share per-request instances and depend on this container's services.
+   *
    * @example
    * ```ts
-   * const requestScope = app.fork().addInstance('request', request);
+   * await using requestScope = app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
    *
    * const testContainer = app.fork({ isolated: true }).addInstance('db', fakeDb, { replace: true });
    * testContainer.get('users'); // built with fakeDb; app is untouched
@@ -623,8 +628,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    *
    * @example
    * ```ts
-   * await using scope = app.fork().addInstance('request', request);
-   * // ... scope and its singletons are disposed at the end of the block
+   * await using scope = app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
+   * // ... scope and its singletons (the transaction) are disposed at the end of the block
    * ```
    */
   dispose(): Promise<void> {

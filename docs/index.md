@@ -20,7 +20,7 @@ features:
   - title: No decorators, no reflection
     details: Your classes and functions stay free of container code. Dependencies are a list of keys next to the registration.
   - title: Scopes that behave
-    details: '`fork()` for request scopes, `fork({ isolated: true })` for tests: overrides reach the whole graph and nothing leaks back.'
+    details: '`fork()` for child containers, `fork({ isolated: true })` for tests: overrides reach the whole graph and nothing leaks back.'
   - title: Owns what it creates
     details: '`dispose()` and `await using` release singletons in reverse creation order.'
   - title: Errors that say how to fix it

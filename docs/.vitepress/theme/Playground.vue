@@ -16,10 +16,11 @@ import type { Editor } from './playground/editor.ts';
 import type { RunError, RunResult, TraceEntry } from './playground/protocol.ts';
 import './playground/playground.css';
 
-const examples = import.meta.glob('../../../examples/**/*.ts', {
-  query: '?raw',
-  import: 'default',
-}) as Record<string, () => Promise<string>>;
+// request-context/ needs node:async_hooks and relative imports, which the worker can't run
+const examples = import.meta.glob(
+  ['../../../examples/**/*.ts', '!../../../examples/request-context/**'],
+  { query: '?raw', import: 'default' },
+) as Record<string, () => Promise<string>>;
 const exampleNames = Object.keys(examples)
   .map((path) => path.replace(/^.*\/examples\//, '').replace(/\.ts$/, ''))
   .sort();
