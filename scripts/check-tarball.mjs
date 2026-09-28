@@ -25,7 +25,6 @@ const required = [
   'lib/docs/errors/not-registered.md',
   'lib/docs/migration/0.x-to-1.0.md',
   'skills/injecute/SKILL.md',
-  'skills/injecute-migrate-to-v1/SKILL.md',
 ];
 const forbidden = [
   /(^|\/)(AGENTS|CLAUDE)\.md$/,

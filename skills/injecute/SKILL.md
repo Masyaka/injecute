@@ -20,7 +20,7 @@ Look at `injecute` in `package.json`.
   (an index) and `node_modules/injecute/lib/docs/`. Read the relevant page before using an API you
   are unsure about; the type declarations (`node_modules/injecute/lib/index.d.ts`) have TSDoc on every
   export.
-- **0.x**: the API differs (see the `injecute-migrate-to-v1` skill). Don't apply 1.x patterns to 0.x code.
+- **0.x**: the API differs; to upgrade, follow `lib/docs/migration/0.x-to-1.0.md` (online: https://masyaka.github.io/injecute/migration/0.x-to-1.0). Don't apply 1.x patterns to 0.x code.
 
 Online docs: https://masyaka.github.io/injecute/ (`/llms.txt`, `/llms-full.txt`).
 

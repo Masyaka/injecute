@@ -1,6 +1,6 @@
 ---
 title: Using injecute with AI agents
-description: Point coding agents at the docs of the installed version, install the Agent Skills, and use llms.txt or Context7.
+description: Point coding agents at the docs of the installed version, install the Agent Skill, and use llms.txt or Context7.
 ---
 
 # Using injecute with AI agents
@@ -18,7 +18,7 @@ Every release contains:
 | `lib/docs/`                      | The guides, concepts, error codes and the migration guide, as Markdown |
 | `lib/index.d.ts`                 | The type declarations, with TSDoc and an example on every export       |
 | `src/`                           | The TypeScript sources (declaration maps point here)                   |
-| `skills/`                        | The Agent Skills below                                                 |
+| `skills/`                        | The Agent Skill below                                                  |
 | `CHANGELOG.md`                   | Changes per version                                                    |
 
 Tell your agent to read them. Add this to your project's `AGENTS.md` (or `CLAUDE.md`):
@@ -34,14 +34,13 @@ in tests, and branch on `InjecuteError.code`.
 
 An index that is always in context works better than docs the agent has to decide to look up.
 
-## Agent Skills
+## Agent Skill
 
-Two [Agent Skills](https://agentskills.io) come with the package and the repository:
+The `injecute` [Agent Skill](https://agentskills.io) comes with the package and the repository. It has
+the rules for writing, reviewing and debugging injecute code. Upgrading from 0.x? Point the agent at the
+[migration guide](../migration/0.x-to-1.0.md).
 
-- **`injecute`**: the rules for writing, reviewing and debugging injecute code.
-- **`injecute-migrate-to-v1`**: a step-by-step migration of a codebase from 0.x, with search patterns.
-
-Install them in Claude Code from the plugin marketplace in the repository:
+Install it in Claude Code from the plugin marketplace in the repository:
 
 ```sh
 /plugin marketplace add Masyaka/injecute

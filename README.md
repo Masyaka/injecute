@@ -60,7 +60,7 @@ Upgrading from 0.x? Read the [migration guide](https://masyaka.github.io/injecut
 ## Using injecute with AI coding agents
 
 The package ships its documentation as Markdown (`node_modules/injecute/llms.txt` and `lib/docs/`) and
-two Agent Skills (`skills/`). Add this to your project's `AGENTS.md` (or `CLAUDE.md`) so agents read the
+an Agent Skill (`skills/injecute`). Add this to your project's `AGENTS.md` (or `CLAUDE.md`) so agents read the
 docs of the version you have installed:
 
 ```md

@@ -21,7 +21,7 @@
 - [TypeScript](./lib/docs/guide/typescript.md): How injecute types containers, how to type modules and consumers, and what the errors look like.
 - [Without a build step](./lib/docs/guide/no-build.md): Use injecute directly in browsers, Deno and Bun, from npm, JSR or a CDN.
 - [Recipes](./lib/docs/guide/recipes.md): Request scopes, configuration-driven implementations, feature modules.
-- [Using injecute with AI agents](./lib/docs/guide/ai-agents.md): The docs in this package, the Agent Skills, llms.txt and Context7.
+- [Using injecute with AI agents](./lib/docs/guide/ai-agents.md): The docs in this package, the Agent Skill, llms.txt and Context7.
 
 ## Concepts
 
@@ -38,5 +38,4 @@
 ## Optional
 
 - [Agent Skill: injecute](./skills/injecute/SKILL.md): How to write code with injecute.
-- [Agent Skill: injecute-migrate-to-v1](./skills/injecute-migrate-to-v1/SKILL.md): Step-by-step migration of a codebase from 0.x.
 - [Website](https://masyaka.github.io/injecute/llms.txt): The same docs online, plus the API reference and a playground.

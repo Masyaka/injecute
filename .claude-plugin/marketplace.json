@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "injecute",
-  "description": "Agent Skills for injecute, the type-safe dependency injection container for TypeScript.",
+  "description": "An Agent Skill for injecute, the type-safe dependency injection container for TypeScript.",
   "owner": {
     "name": "Masyaka",
     "url": "https://github.com/Masyaka"
@@ -10,13 +10,13 @@
     {
       "name": "injecute",
       "source": "./",
-      "description": "Skills for writing code with injecute 1.x and for migrating a codebase from 0.x.",
+      "description": "A skill for writing, reviewing and debugging code that uses injecute 1.x.",
       "homepage": "https://masyaka.github.io/injecute/",
       "repository": "https://github.com/Masyaka/injecute",
       "license": "MIT",
       "keywords": ["dependency-injection", "typescript", "di", "injecute"],
       "category": "development",
-      "skills": ["./skills/injecute", "./skills/injecute-migrate-to-v1"]
+      "skills": ["./skills/injecute"]
     }
   ]
 }
