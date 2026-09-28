@@ -147,7 +147,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # A 300-registration chain: ~1.04M instantiations today.
+      # A 300-registration chain: ~0.84M instantiations today; 16 nested namespaces: ~0.54M;
+      # 150 extend()/namespace() calls: ~0.51M (fails outright if the types hit the depth limit).
       - run: npm run bench:types
         env:
-          TYPE_PERF_BUDGET: '1500000'
+          TYPE_PERF_BUDGET: '1000000'
+          TYPE_PERF_NAMESPACE_BUDGET: '800000'
+          TYPE_PERF_BOUNDARY_BUDGET: '750000'

@@ -93,8 +93,12 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
 11. Code that only resolves services takes a `ServiceProvider<{ users: UserRepository }>`. Use plain
     `ServiceProvider` (no type argument) to accept any container.
 12. `namespace('Billing', (c) => c.addSingleton(...))` registers `Billing.key` for each service and
-    `Billing` for the namespace's provider.
-13. `ContainerServices<typeof app>` is the service map of a container type.
+    `Billing` for the namespace's provider (`app.get('Billing')`). In `ContainerServices`, `Billing` is a
+    `Namespace` marker; `NamespaceServices<typeof app, 'Billing'>` is the namespace's service map.
+13. `ContainerServices<typeof app>` is the service map of a container type. End the composition root
+    with `.seal()`: no more registrations in it (forks stay open), and its type is one flat, faster
+    service map. A package that exports a container also names the map,
+    `interface AppServices extends ContainerServices<typeof built> {}`, so its `.d.ts` refers to it.
 
 **Request context, scopes, tests and cleanup**
 

@@ -1,53 +1,55 @@
-value addNamedResolvers: <T extends object>(resolvers: NamedResolvers<T>) => (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<T, T>
+value addNamedResolvers: <T extends object>(resolvers: NamedResolvers<T>) => (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<{}, T>
 type ArgumentsKey
 interface AsyncDIContainer
-  addSingleton: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>> | undefined) => AsyncDIContainer<S & { [P in K]: Awaited<Produced<F>>; }>
-  addTransient: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D]> | undefined) => AsyncDIContainer<S & { [P in K]: Awaited<Produced<F>>; }>
-  addInstance: <K extends ServiceKey, T>(key: K, value: T, options?: InstanceOptions<Awaited<T>> | undefined) => AsyncDIContainer<S & { [P in K]: Awaited<T>; }>
-  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => AsyncDIContainer<S & { [P in K]: S[T]; }>
-  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, NA> | AsyncDIContainer<NA> : { 'injecute: extension requires services that are not registered': Exclude<keyof Req, keyof S>; }) => AsyncDIContainer<S & { [P in N]: import("./types.ts").AsyncServiceProvider<NA>; } & { [K in keyof NA as K extends string | number ? `${N}.${K}` : never]: NA[K]; }>
-  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, EA> | AsyncDIContainer<EA> : { 'injecute: extension requires services that are not registered': Exclude<keyof Req, keyof S>; }) => AsyncDIContainer<S & EA>
+  addSingleton: <K extends ServiceKey, F extends Factory<D, {}, S>, D extends Dependency<{}, S>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R> | undefined) => AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>>; }, R>>
+  addTransient: <K extends ServiceKey, F extends Factory<D, {}, S>, D extends Dependency<{}, S>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D], R> | undefined) => AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>>; }, R>>
+  addInstance: <K extends ServiceKey, T, const R extends boolean = false>(key: K, value: T, options?: InstanceOptions<Awaited<T>, R> | undefined) => AsyncDIContainer<Registered<S, { [P in K]: Awaited<T>; }, R>>
+  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => AsyncDIContainer<S & { [P in K]: ResolveDependency<T, {}, S>; }>
+  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, NA> : { 'injecute: extension requires services that are not registered': Exclude<keyof Req, keyof S>; }) => AsyncDIContainer<S & { [K in keyof AsyncNamespacedServices<N, NA>]: AsyncNamespacedServices<N, NA>[K]; }>
+  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, EA> : { 'injecute: extension requires services that are not registered': Exclude<keyof Req, keyof S>; }) => AsyncDIContainer<S & { [K in keyof EA]: EA[K]; }>
   use: (middleware: Middleware) => AsyncDIContainer<S>
   unuse: (middleware: Middleware) => AsyncDIContainer<S>
   addEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => AsyncDIContainer<S>
   removeEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => AsyncDIContainer<S>
+  seal: () => SealedAsyncDIContainer<{ [K in keyof S]: S[K]; }>
   fork: (options?: ForkOptions) => AsyncDIContainer<S>
   reset: (options?: ResetOptions<S>) => AsyncDIContainer<S>
   dispose: () => Promise<void>
   [Symbol.asyncDispose]: () => Promise<void>
-  injecute: <D extends Dependency<S>[], R>(factory: ((...args: import("./types.ts").ResolveDependencies<D, S>) => R) | (new (...args: import("./types.ts").ResolveDependencies<D, S>) => R), dependencies: [...D]) => Promise<Awaited<R>>
-  bind: <D extends Dependency<S>[], R>(dependencies: [...D], factory: ((...args: import("./types.ts").ResolveDependencies<D, S>) => R) | (new (...args: import("./types.ts").ResolveDependencies<D, S>) => R)) => () => Promise<Awaited<R>>
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => Promise<O extends { optional: true; } ? S[K] | undefined : S[K]>
+  injecute: <D extends Dependency<{}, S>[], R>(factory: ((...args: import("./types.ts").ResolveDependencies<D, {}, S>) => R) | (new (...args: import("./types.ts").ResolveDependencies<D, {}, S>) => R), dependencies: [...D]) => Promise<Awaited<R>>
+  bind: <D extends Dependency<{}, S>[], R>(dependencies: [...D], factory: ((...args: import("./types.ts").ResolveDependencies<D, {}, S>) => R) | (new (...args: import("./types.ts").ResolveDependencies<D, {}, S>) => R)) => () => Promise<Awaited<R>>
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => Promise<O extends { optional: true; } ? import("./types.ts").ServiceType<S, K> | undefined : import("./types.ts").ServiceType<S, K>>
   has: (key: ServiceKey, options?: import("./types.ts").HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => Promise<S[K]>
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<S[K], (...args: any[]) => any>>>>
+  createResolver: <K extends keyof S>(key: K) => () => Promise<import("./types.ts").ServiceType<S, K>>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<import("./types.ts").ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<import("./types.ts").ServiceType<S, K>, (...args: any[]) => any>>>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => import("./types.ts").AsyncServiceProvider | undefined
   getRegistration: (key: ServiceKey) => import("./types.ts").RegistrationInfo | undefined
+interface AsyncNamespace
 type AsyncNamespacedServices
 interface AsyncServiceProvider
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => Promise<O extends { optional: true; } ? S[K] | undefined : S[K]>
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => Promise<O extends { optional: true; } ? ServiceType<S, K> | undefined : ServiceType<S, K>>
   has: (key: ServiceKey, options?: HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => Promise<S[K]>
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<S[K], (...args: any[]) => any>>>>
+  createResolver: <K extends keyof S>(key: K) => () => Promise<ServiceType<S, K>>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => AsyncServiceProvider | undefined
   getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
 interface AsyncServiceRegistry
-  addSingleton: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>) => AsyncServiceRegistry<S & { [P in K]: Awaited<Produced<F>>; }, A & { [P in K]: Awaited<Produced<F>>; }>
-  addTransient: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D]>) => AsyncServiceRegistry<S & { [P in K]: Awaited<Produced<F>>; }, A & { [P in K]: Awaited<Produced<F>>; }>
-  addInstance: <K extends ServiceKey, T>(key: K, value: T, options?: InstanceOptions<Awaited<T>>) => AsyncServiceRegistry<S & { [P in K]: Awaited<T>; }, A & { [P in K]: Awaited<T>; }>
-  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => AsyncServiceRegistry<S & { [P in K]: S[T]; }, A & { [P in K]: S[T]; }>
-  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, NA> | AsyncDIContainer<NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => AsyncServiceRegistry<S & AsyncNamespacedServices<N, NA>, A & AsyncNamespacedServices<N, NA>>
-  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, EA> | AsyncDIContainer<EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => AsyncServiceRegistry<S & EA, A & EA>
-  injecute: <D extends Dependency<S>[], R>(factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R), dependencies: [...D]) => Promise<Awaited<R>>
-  bind: <D extends Dependency<S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R)) => () => Promise<Awaited<R>>
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => Promise<O extends { optional: true; } ? S[K] | undefined : S[K]>
+  addSingleton: <K extends ServiceKey, F extends Factory<D, S, A>, D extends Dependency<S, A>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>) => AsyncServiceRegistry<S, Registered<A, { [P in K]: Awaited<Produced<F>>; }, R>>
+  addTransient: <K extends ServiceKey, F extends Factory<D, S, A>, D extends Dependency<S, A>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D], R>) => AsyncServiceRegistry<S, Registered<A, { [P in K]: Awaited<Produced<F>>; }, R>>
+  addInstance: <K extends ServiceKey, T, const R extends boolean = false>(key: K, value: T, options?: InstanceOptions<Awaited<T>, R>) => AsyncServiceRegistry<S, Registered<A, { [P in K]: Awaited<T>; }, R>>
+  addAlias: <K extends ServiceKey, T extends keyof S | keyof A>(key: K, target: T) => AsyncServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A>; }>
+  namespace: <const N extends string, NA extends object, Req extends object = S & A>(name: N, extension: [S & A] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof (S & A)>; }) => AsyncServiceRegistry<S, A & { [K in keyof AsyncNamespacedServices<N, NA>]: AsyncNamespacedServices<N, NA>[K]; }>
+  extend: <EA extends object, Req extends object = S & A>(extension: [S & A] extends [Req] ? (registry: AsyncServiceRegistry<Req, {}>) => AsyncServiceRegistry<any, EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof (S & A)>; }) => AsyncServiceRegistry<S, A & { [K in keyof EA]: EA[K]; }>
+  injecute: <D extends Dependency<S, A>[], R>(factory: ((...args: ResolveDependencies<D, S, A>) => R) | (new (...args: ResolveDependencies<D, S, A>) => R), dependencies: [...D]) => Promise<Awaited<R>>
+  bind: <D extends Dependency<S, A>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, S, A>) => R) | (new (...args: ResolveDependencies<D, S, A>) => R)) => () => Promise<Awaited<R>>
+  get: <K extends keyof RegistryServices<S, A>, O extends GetOptions = {}>(key: K, options?: O | undefined) => Promise<O extends { optional: true; } ? ServiceType<RegistryServices<S, A>, K> | undefined : ServiceType<RegistryServices<S, A>, K>>
   has: (key: ServiceKey, options?: HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => Promise<S[K]>
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<S[K], (...args: any[]) => any>>>>
+  createResolver: <K extends keyof RegistryServices<S, A>>(key: K) => () => Promise<ServiceType<RegistryServices<S, A>, K>>
+  call: <K extends keyof RegistryServices<S, A>>(key: K, args: Parameters<Extract<ServiceType<RegistryServices<S, A>, K>, (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<ServiceType<RegistryServices<S, A>, K>, (...args: any[]) => any>>>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => AsyncServiceProvider | undefined
@@ -55,7 +57,7 @@ interface AsyncServiceRegistry
 value buildServicesGraph: (container: ServiceProvider | AsyncServiceProvider) => Tree
 class CircularDependencyError
   name: string
-  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
+  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
   path: readonly ServiceKey[]
   docs: string
 value construct: <A extends unknown[], I>(Class: new (...args: A) => I) => (...args: A) => I
@@ -68,39 +70,40 @@ interface ContainerEvents
   dispose: { container: ServiceProvider<any>; }
 type ContainerServices
 value createNamedResolvers: <C extends ServiceProvider, const Keys extends readonly KeySpec<ContainerServices<C>>[]>(container: C, keys: Keys) => NamedResolversOf<ContainerServices<C>, Keys>
-value createProxyAccessor: <C extends ServiceProvider, const Keys extends readonly KeySpec<ContainerServices<C>>[] | undefined = undefined>(container: C, options?: ProxyAccessorOptions<Keys>) => Keys extends readonly unknown[] ? ProxyAccessor<ContainerServices<C>, Keys> : Readonly<ContainerServices<C>>
+value createProxyAccessor: <C extends ServiceProvider, const Keys extends readonly KeySpec<ContainerServices<C>>[] | undefined = undefined>(container: C, options?: ProxyAccessorOptions<Keys>) => Keys extends readonly unknown[] ? ProxyAccessor<ContainerServices<C>, Keys> : { readonly [K in keyof ContainerServices<C>]: ServiceType<ContainerServices<C>, K>; }
 value createResolversTuple: <C extends ServiceProvider, const Keys extends readonly (keyof ContainerServices<C>)[]>(container: C, keys: Keys) => ResolversTuple<ContainerServices<C>, Keys>
 value defer: <A extends unknown[], R>(factory: ((...args: A) => R) | (new (...args: A) => R)) => (...dependencies: MaybePromises<A>) => Promise<Awaited<R>>
 type DependenciesToTypes
 type Dependency
 type DependencyInfo
 class DIContainer
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => O extends { optional: true; } ? S[K] | undefined : S[K]
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => O extends { optional: true; } ? ServiceType<S, K> | undefined : ServiceType<S, K>
   has: (key: ServiceKey, options?: HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => S[K]
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<S[K], (...args: any[]) => any>>
+  createResolver: <K extends keyof S>(key: K) => () => ServiceType<S, K>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => ServiceProvider | undefined
   getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
-  addSingleton: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>) => DIContainer<S & { [P in K]: Produced<F>; }>
-  addTransient: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D]>) => DIContainer<S & { [P in K]: Produced<F>; }>
-  addInstance: <K extends ServiceKey, T>(key: K, value: T, options?: InstanceOptions<Awaited<T>>) => DIContainer<S & { [P in K]: T; }>
-  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => DIContainer<S & { [P in K]: S[T]; }>
-  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA> | DIContainer<NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => DIContainer<S & NamespacedServices<N, NA>>
-  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA> | DIContainer<EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => DIContainer<S & EA>
-  injecute: <D extends Dependency<S>[], R>(factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R), dependencies: [...D]) => R
-  bind: <D extends Dependency<S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R)) => () => R
+  addSingleton: <K extends ServiceKey, F extends Factory<D, {}, S>, D extends Dependency<{}, S>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>) => DIContainer<Registered<S, { [P in K]: Produced<F>; }, R>>
+  addTransient: <K extends ServiceKey, F extends Factory<D, {}, S>, D extends Dependency<{}, S>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D], R>) => DIContainer<Registered<S, { [P in K]: Produced<F>; }, R>>
+  addInstance: <K extends ServiceKey, T, const R extends boolean = false>(key: K, value: T, options?: InstanceOptions<Awaited<T>, R>) => DIContainer<Registered<S, { [P in K]: T; }, R>>
+  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => DIContainer<S & { [P in K]: ResolveDependency<T, {}, S>; }>
+  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => DIContainer<S & { [K in keyof NamespacedServices<N, NA>]: NamespacedServices<N, NA>[K]; }>
+  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => DIContainer<S & { [K in keyof EA]: EA[K]; }>
+  injecute: <D extends Dependency<{}, S>[], R>(factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R), dependencies: [...D]) => R
+  bind: <D extends Dependency<{}, S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R)) => () => R
   use: (middleware: Middleware) => DIContainer<S>
   unuse: (middleware: Middleware) => DIContainer<S>
   addEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => DIContainer<S>
   removeEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => DIContainer<S>
+  seal: () => SealedDIContainer<{ [K in keyof S]: S[K]; }>
   fork: (options?: ForkOptions) => DIContainer<S>
   reset: (options?: ResetOptions<S>) => DIContainer<S>
   dispose: () => Promise<void>
   [Symbol.asyncDispose]: () => Promise<void>
 type DisposeOption
-value errorCodes: { readonly INJECUTE_NOT_REGISTERED: { readonly title: "No service is registered under this key"; readonly hint: "Register it (addSingleton / addTransient / addInstance) before resolving it, check the key for typos, or pass { optional: true } to get undefined instead."; }; readonly INJECUTE_ALREADY_REGISTERED: { readonly title: "The key is already registered in this container"; readonly hint: "Pass { replace: true } to replace the registration, or use another key. A child container (fork) may register a key its parent has without replace."; }; readonly INJECUTE_CIRCULAR_DEPENDENCY: { readonly title: "Services depend on each other in a cycle"; readonly hint: "Break the cycle: extract the shared part into its own service, or resolve one side lazily with a function dependency (() => container.get(key))."; }; readonly INJECUTE_NO_PREVIOUS_DEFINITION: { readonly title: "A service depends on itself but there is nothing to decorate"; readonly hint: "A dependency on the key being registered resolves its previous definition (the replaced one, or the parent one). Register the original service first."; }; readonly INJECUTE_INVALID_FACTORY: { readonly title: "The factory is not a function or class"; readonly hint: "Pass a function that creates the service, a class, or use addInstance() for a ready value."; }; readonly INJECUTE_INVALID_DEPENDENCY: { readonly title: "A dependency is not a key, optional(key) or a function"; readonly hint: "Dependencies are service keys, optional(key), or functions that return the value."; }; readonly INJECUTE_CLASS_NOT_CONSTRUCTED: { readonly title: "A class was called without new"; readonly hint: "Classes compiled to ES5 (Babel for old browsers, TypeScript target: es5) and bound classes cannot be detected. Register them with construct(MyClass)."; }; readonly INJECUTE_RESOLUTION_FAILED: { readonly title: "A factory threw (or its promise rejected) while creating a service"; readonly hint: "The original error is in `cause`; `path` shows which service needed it."; }; readonly INJECUTE_NOT_A_FUNCTION: { readonly title: "call() was used on a service that is not a function"; readonly hint: "Only function services can be called with call(); use get() for other services."; }; readonly INJECUTE_NAMESPACE_CONFLICT: { readonly title: "The namespace name is already used by a service"; readonly hint: "Choose another namespace name, or remove the service with that key."; }; readonly INJECUTE_NAMESPACE_RESULT: { readonly title: "A namespace callback returned something other than a new container"; readonly hint: "Return the registry the callback received (after adding services), a fork of it, or a new DIContainer."; }; readonly INJECUTE_EXTENSION_RESULT: { readonly title: "An extension returned a container that is not this one or its child"; readonly hint: "A module function must return the registry it received (after adding services) or a fork of it."; }; readonly INJECUTE_DISPOSED: { readonly title: "The container is disposed"; readonly hint: "Create a new container (or fork) instead of using one after dispose()."; }; readonly INJECUTE_DISPOSE_FAILED: { readonly title: "Some services failed to dispose"; readonly hint: "Every other service was still disposed. The failures are in `cause` (an AggregateError)."; }; readonly INJECUTE_INVALID_OPTION: { readonly title: "An option is not supported here"; readonly hint: "Transient services are not kept by the container, so they cannot have a dispose option."; }; readonly INJECUTE_UNKNOWN_EVENT: { readonly title: "Unknown event name"; readonly hint: "Supported events: add, replace, reset, get, produce, dispose."; }; readonly INJECUTE_READ_ONLY: { readonly title: "The object is read-only"; readonly hint: "Proxy accessors only read services. Register or replace services on the container."; }; }
+value errorCodes: { readonly INJECUTE_NOT_REGISTERED: { readonly title: "No service is registered under this key"; readonly hint: "Register it (addSingleton / addTransient / addInstance) before resolving it, check the key for typos, or pass { optional: true } to get undefined instead."; }; readonly INJECUTE_ALREADY_REGISTERED: { readonly title: "The key is already registered in this container"; readonly hint: "Pass { replace: true } to replace the registration, or use another key. A child container (fork) may register a key its parent has without replace."; }; readonly INJECUTE_CIRCULAR_DEPENDENCY: { readonly title: "Services depend on each other in a cycle"; readonly hint: "Break the cycle: extract the shared part into its own service, or resolve one side lazily with a function dependency (() => container.get(key))."; }; readonly INJECUTE_NO_PREVIOUS_DEFINITION: { readonly title: "A service depends on itself but there is nothing to decorate"; readonly hint: "A dependency on the key being registered resolves its previous definition (the replaced one, or the parent one). Register the original service first."; }; readonly INJECUTE_INVALID_FACTORY: { readonly title: "The factory is not a function or class"; readonly hint: "Pass a function that creates the service, a class, or use addInstance() for a ready value."; }; readonly INJECUTE_INVALID_DEPENDENCY: { readonly title: "A dependency is not a key, optional(key) or a function"; readonly hint: "Dependencies are service keys, optional(key), or functions that return the value."; }; readonly INJECUTE_CLASS_NOT_CONSTRUCTED: { readonly title: "A class was called without new"; readonly hint: "Classes compiled to ES5 (Babel for old browsers, TypeScript target: es5) and bound classes cannot be detected. Register them with construct(MyClass)."; }; readonly INJECUTE_RESOLUTION_FAILED: { readonly title: "A factory threw (or its promise rejected) while creating a service"; readonly hint: "The original error is in `cause`; `path` shows which service needed it."; }; readonly INJECUTE_NOT_A_FUNCTION: { readonly title: "call() was used on a service that is not a function"; readonly hint: "Only function services can be called with call(); use get() for other services."; }; readonly INJECUTE_NAMESPACE_CONFLICT: { readonly title: "The namespace name is already used by a service"; readonly hint: "Choose another namespace name, or remove the service with that key."; }; readonly INJECUTE_NAMESPACE_RESULT: { readonly title: "A namespace callback returned something other than a new container"; readonly hint: "Return the registry the callback received (after adding services), a fork of it, or a new DIContainer."; }; readonly INJECUTE_EXTENSION_RESULT: { readonly title: "An extension returned a container that is not this one or its child"; readonly hint: "A module function must return the registry it received (after adding services) or a fork of it."; }; readonly INJECUTE_SEALED: { readonly title: "The container is sealed"; readonly hint: "Register every service before seal(). To add services later (per request, per test), register them in a fork: app.fork().addInstance(...)."; }; readonly INJECUTE_DISPOSED: { readonly title: "The container is disposed"; readonly hint: "Create a new container (or fork) instead of using one after dispose()."; }; readonly INJECUTE_DISPOSE_FAILED: { readonly title: "Some services failed to dispose"; readonly hint: "Every other service was still disposed. The failures are in `cause` (an AggregateError)."; }; readonly INJECUTE_INVALID_OPTION: { readonly title: "An option is not supported here"; readonly hint: "Transient services are not kept by the container, so they cannot have a dispose option."; }; readonly INJECUTE_UNKNOWN_EVENT: { readonly title: "Unknown event name"; readonly hint: "Supported events: add, replace, reset, get, produce, dispose."; }; readonly INJECUTE_READ_ONLY: { readonly title: "The object is read-only"; readonly hint: "Proxy accessors only read services. Register or replace services on the container."; }; }
 type ExposedName
 type Factory
 interface ForkOptions
@@ -113,7 +116,7 @@ interface HasOptions
 type IDIContainer
 class InjecuteError
   name: string
-  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
+  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
   path: readonly ServiceKey[]
   docs: string
 type InjecuteErrorCode
@@ -121,7 +124,7 @@ interface InjecuteErrorOptions
   path: readonly ServiceKey[] | undefined
   cause: unknown
 interface InstanceOptions
-  replace: boolean | undefined
+  replace: R | undefined
   dispose: DisposeOption<T> | undefined
 type KeySpec
 type MaybePromises
@@ -132,6 +135,7 @@ interface MiddlewareContext
   depth: number
 type NamedResolvers
 type NamedResolversOf
+interface Namespace
 type NamespacedServices
 type NamespaceServices
 value optional: <const K extends ServiceKey>(key: K) => OptionalDependency<K>
@@ -142,6 +146,7 @@ type ProxyAccessor
 interface ProxyAccessorOptions
   keys: Keys | undefined
   optional: boolean | undefined
+type Registered
 interface RegistrationInfo
   key: ServiceKey
   kind: RegistrationKind
@@ -153,41 +158,86 @@ interface RegistrationInfo
 type RegistrationKind
 interface RegistrationOptions
   dependencies: D | undefined
-  replace: boolean | undefined
+  replace: R | undefined
+type RegistryServices
 interface ResetOptions
   keys: readonly (keyof S)[] | undefined
   resetParent: boolean | undefined
 type ResolveDependencies
 type ResolveDependency
 type ResolversTuple
+interface SealedAsyncDIContainer
+  use: (middleware: Middleware) => SealedAsyncDIContainer<S>
+  unuse: (middleware: Middleware) => SealedAsyncDIContainer<S>
+  addEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => SealedAsyncDIContainer<S>
+  removeEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => SealedAsyncDIContainer<S>
+  reset: (options?: ResetOptions<S>) => SealedAsyncDIContainer<S>
+  [Symbol.asyncDispose]: () => Promise<void>
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => Promise<O extends { optional: true; } ? ServiceType<S, K> | undefined : ServiceType<S, K>>
+  dispose: () => Promise<void>
+  fork: (options?: ForkOptions) => AsyncDIContainer<S>
+  injecute: <D extends Dependency<{}, S>[], R>(factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R), dependencies: [...D]) => Promise<Awaited<R>>
+  bind: <D extends Dependency<{}, S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R)) => () => Promise<Awaited<R>>
+  has: (key: ServiceKey, options?: HasOptions) => boolean
+  createResolver: <K extends keyof S>(key: K) => () => Promise<ServiceType<S, K>>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => Promise<Awaited<ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>>>
+  keys: readonly ServiceKey[]
+  ownKeys: readonly ServiceKey[]
+  getParent: () => AsyncServiceProvider | undefined
+  getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
+interface SealedDIContainer
+  use: (middleware: Middleware) => SealedDIContainer<S>
+  unuse: (middleware: Middleware) => SealedDIContainer<S>
+  addEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => SealedDIContainer<S>
+  removeEventListener: <E extends keyof ContainerEvents>(event: E, handler: (event: ContainerEvents[E]) => void) => SealedDIContainer<S>
+  reset: (options?: ResetOptions<S>) => SealedDIContainer<S>
+  [Symbol.asyncDispose]: () => Promise<void>
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => O extends { optional: true; } ? ServiceType<S, K> | undefined : ServiceType<S, K>
+  dispose: () => Promise<void>
+  fork: (options?: ForkOptions) => DIContainer<S>
+  injecute: <D extends Dependency<{}, S>[], R>(factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R), dependencies: [...D]) => R
+  bind: <D extends Dependency<{}, S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, {}, S>) => R) | (new (...args: ResolveDependencies<D, {}, S>) => R)) => () => R
+  has: (key: ServiceKey, options?: HasOptions) => boolean
+  createResolver: <K extends keyof S>(key: K) => () => ServiceType<S, K>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>
+  keys: readonly ServiceKey[]
+  ownKeys: readonly ServiceKey[]
+  getParent: () => ServiceProvider | undefined
+  getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
 type ServiceKey
 interface ServiceProvider
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => O extends { optional: true; } ? S[K] | undefined : S[K]
+  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O) => O extends { optional: true; } ? ServiceType<S, K> | undefined : ServiceType<S, K>
   has: (key: ServiceKey, options?: HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => S[K]
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<S[K], (...args: any[]) => any>>
+  createResolver: <K extends keyof S>(key: K) => () => ServiceType<S, K>
+  call: <K extends keyof S>(key: K, args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => ServiceProvider | undefined
   getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
 interface ServiceRegistry
-  addSingleton: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>) => ServiceRegistry<S & { [P in K]: Produced<F>; }, A & { [P in K]: Produced<F>; }>
-  addTransient: <K extends ServiceKey, F extends Factory<D, S>, D extends Dependency<S>[] = []>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D]>) => ServiceRegistry<S & { [P in K]: Produced<F>; }, A & { [P in K]: Produced<F>; }>
-  addInstance: <K extends ServiceKey, T>(key: K, value: T, options?: InstanceOptions<Awaited<T>>) => ServiceRegistry<S & { [P in K]: T; }, A & { [P in K]: T; }>
-  addAlias: <K extends ServiceKey, T extends keyof S>(key: K, target: T) => ServiceRegistry<S & { [P in K]: S[T]; }, A & { [P in K]: S[T]; }>
-  namespace: <const N extends string, NA extends object, Req extends object = S>(name: N, extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA> | DIContainer<NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => ServiceRegistry<S & NamespacedServices<N, NA>, A & NamespacedServices<N, NA>>
-  extend: <EA extends object, Req extends object = S>(extension: [S] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA> | DIContainer<EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof S>; }) => ServiceRegistry<S & EA, A & EA>
-  injecute: <D extends Dependency<S>[], R>(factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R), dependencies: [...D]) => R
-  bind: <D extends Dependency<S>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, S>) => R) | (new (...args: ResolveDependencies<D, S>) => R)) => () => R
-  get: <K extends keyof S, O extends GetOptions = {}>(key: K, options?: O | undefined) => O extends { optional: true; } ? S[K] | undefined : S[K]
+  addSingleton: <K extends ServiceKey, F extends Factory<D, S, A>, D extends Dependency<S, A>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>) => ServiceRegistry<S, Registered<A, { [P in K]: Produced<F>; }, R>>
+  addTransient: <K extends ServiceKey, F extends Factory<D, S, A>, D extends Dependency<S, A>[] = [], const R extends boolean = false>(key: K, factory: F, dependencies?: [...D] | RegistrationOptions<[...D], R>) => ServiceRegistry<S, Registered<A, { [P in K]: Produced<F>; }, R>>
+  addInstance: <K extends ServiceKey, T, const R extends boolean = false>(key: K, value: T, options?: InstanceOptions<Awaited<T>, R>) => ServiceRegistry<S, Registered<A, { [P in K]: T; }, R>>
+  addAlias: <K extends ServiceKey, T extends keyof S | keyof A>(key: K, target: T) => ServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A>; }>
+  namespace: <const N extends string, NA extends object, Req extends object = S & A>(name: N, extension: [S & A] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof (S & A)>; }) => ServiceRegistry<S, A & { [K in keyof NamespacedServices<N, NA>]: NamespacedServices<N, NA>[K]; }>
+  extend: <EA extends object, Req extends object = S & A>(extension: [S & A] extends [Req] ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA> : { "injecute: extension requires services that are not registered": Exclude<keyof Req, keyof (S & A)>; }) => ServiceRegistry<S, A & { [K in keyof EA]: EA[K]; }>
+  injecute: <D extends Dependency<S, A>[], R>(factory: ((...args: ResolveDependencies<D, S, A>) => R) | (new (...args: ResolveDependencies<D, S, A>) => R), dependencies: [...D]) => R
+  bind: <D extends Dependency<S, A>[], R>(dependencies: [...D], factory: ((...args: ResolveDependencies<D, S, A>) => R) | (new (...args: ResolveDependencies<D, S, A>) => R)) => () => R
+  get: <K extends keyof RegistryServices<S, A>, O extends GetOptions = {}>(key: K, options?: O | undefined) => O extends { optional: true; } ? ServiceType<RegistryServices<S, A>, K> | undefined : ServiceType<RegistryServices<S, A>, K>
   has: (key: ServiceKey, options?: HasOptions) => boolean
-  createResolver: <K extends keyof S>(key: K) => () => S[K]
-  call: <K extends keyof S>(key: K, args: Parameters<Extract<S[K], (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<S[K], (...args: any[]) => any>>
+  createResolver: <K extends keyof RegistryServices<S, A>>(key: K) => () => ServiceType<RegistryServices<S, A>, K>
+  call: <K extends keyof RegistryServices<S, A>>(key: K, args: Parameters<Extract<ServiceType<RegistryServices<S, A>, K>, (...args: any[]) => any>>, thisArg?: unknown) => ReturnType<Extract<ServiceType<RegistryServices<S, A>, K>, (...args: any[]) => any>>
   keys: readonly ServiceKey[]
   ownKeys: readonly ServiceKey[]
   getParent: () => ServiceProvider | undefined
   getRegistration: (key: ServiceKey) => RegistrationInfo | undefined
-value setCacheInstance: <S extends object, K extends keyof S>(container: DIContainer<S>, key: K, value: S[K]) => void
+type ServicesInNamespace
+type ServiceType
+value setCacheInstance: <S extends object, K extends keyof S>(container: DIContainer<S> | SealedDIContainer<S>, key: K, value: ServiceType<S, K>) => void
+interface SingletonFactoryOptions
+  dispose: DisposeOption<Awaited<Produced<F>>> | undefined
+  dependencies: D | undefined
+  replace: R | undefined
 interface SingletonOptions
   dispose: DisposeOption<T> | undefined
   dependencies: D | undefined

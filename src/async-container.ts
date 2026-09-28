@@ -12,9 +12,12 @@ import type {
   Middleware,
   Produced,
   RegistrationOptions,
+  ResolveDependency,
   ResetOptions,
   ServiceKey,
-  SingletonOptions,
+  SingletonFactoryOptions,
+  Registered,
+  SealedAsyncDIContainer,
 } from './types.ts';
 
 /** Runs `run`, turning a synchronous throw into a rejected promise. */
@@ -89,64 +92,73 @@ const AsyncDIContainerClass = class AsyncDIContainer extends DIContainer<any> {
  */
 export interface AsyncDIContainer<
   S extends object = {},
-> extends AsyncServiceRegistry<S, S> {
+> extends AsyncServiceRegistry<{}, S> {
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, S>,
-    D extends Dependency<S>[] = [],
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>,
-  ): AsyncDIContainer<S & { [P in K]: Awaited<Produced<F>> }>;
+    dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
+  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>> }, R>>;
 
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, S>,
-    D extends Dependency<S>[] = [],
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | RegistrationOptions<[...D]>,
-  ): AsyncDIContainer<S & { [P in K]: Awaited<Produced<F>> }>;
+    dependencies?: [...D] | RegistrationOptions<[...D], R>,
+  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>> }, R>>;
 
-  addInstance<K extends ServiceKey, T>(
+  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
     key: K,
     value: T,
-    options?: InstanceOptions<Awaited<T>>,
-  ): AsyncDIContainer<S & { [P in K]: Awaited<T> }>;
+    options?: InstanceOptions<Awaited<T>, R>,
+  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<T> }, R>>;
 
   addAlias<K extends ServiceKey, T extends keyof S>(
     key: K,
     target: T,
-  ): AsyncDIContainer<S & { [P in K]: S[T] }>;
+  ): AsyncDIContainer<S & { [P in K]: ResolveDependency<T, {}, S> }>;
 
   namespace<const N extends string, NA extends object, Req extends object = S>(
     name: N,
     extension: [S] extends [Req]
       ? (
           registry: AsyncServiceRegistry<Req, {}>,
-        ) => AsyncServiceRegistry<any, NA> | AsyncDIContainer<NA>
+        ) => AsyncServiceRegistry<any, NA>
       : {
           'injecute: extension requires services that are not registered': Exclude<
             keyof Req,
             keyof S
           >;
         },
-  ): AsyncDIContainer<S & AsyncNamespacedServices<N, NA>>;
+  ): AsyncDIContainer<
+    S & {
+      [K in keyof AsyncNamespacedServices<N, NA>]: AsyncNamespacedServices<
+        N,
+        NA
+      >[K];
+    }
+  >;
 
   extend<EA extends object, Req extends object = S>(
     extension: [S] extends [Req]
       ? (
           registry: AsyncServiceRegistry<Req, {}>,
-        ) => AsyncServiceRegistry<any, EA> | AsyncDIContainer<EA>
+        ) => AsyncServiceRegistry<any, EA>
       : {
           'injecute: extension requires services that are not registered': Exclude<
             keyof Req,
             keyof S
           >;
         },
-  ): AsyncDIContainer<S & EA>;
+  ): AsyncDIContainer<S & { [K in keyof EA]: EA[K] }>;
 
   /**
    * Adds a middleware around every resolution started from this container and its forks. In an async
@@ -171,6 +183,11 @@ export interface AsyncDIContainer<
     event: E,
     handler: (event: ContainerEvents[E]) => void,
   ): this;
+
+  /**
+   * Seals the container: no more registrations in it; forks stay open. See `DIContainer.seal()`.
+   */
+  seal(): SealedAsyncDIContainer<{ [K in keyof S]: S[K] }>;
 
   /** Creates a child container; see `DIContainer.fork()`. Forks of an async container are async. */
   fork(options?: ForkOptions): AsyncDIContainer<S>;

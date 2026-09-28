@@ -53,6 +53,18 @@ same container (with `replace: true`), or the parent's one in a [fork](./contain
 
 <<< @/../examples/registration.ts#decorate
 
+With `replace: true` the service's type becomes the new one, also when it changes (a `string` replaced
+by a `number` is a `number` afterwards). Pass it in a fork too when the override changes the type:
+
+```ts
+const scope = app
+  .fork({ isolated: true })
+  .addInstance('port', 0, { replace: true }); // port: number
+```
+
+Without `replace: true`, and when a module replaces a service of the container it is applied to, the
+old and the new type are intersected; that is fine while the type stays the same (the usual decorator).
+
 ## Classes that cannot be detected
 
 The container recognises native classes (including subclasses, proxied classes and built-ins like `Map`).

@@ -3,6 +3,7 @@ import type {
   ServiceKey,
   ServiceProvider,
   ServiceRegistry,
+  ServiceType,
 } from '../types.ts';
 import {
   type ExposedName,
@@ -13,14 +14,14 @@ import {
 
 /** A tuple of resolver functions, one per key. */
 export type ResolversTuple<S, Keys extends readonly (keyof S)[]> = {
-  -readonly [I in keyof Keys]: () => S[Keys[I]];
+  -readonly [I in keyof Keys]: () => ServiceType<S, Keys[I]>;
 };
 
 /** An object of resolver functions, named by the exposed names. */
 export type NamedResolversOf<S, Keys extends readonly unknown[]> = {
   [
     I in keyof Keys as I extends `${number}` ? ExposedName<Keys[I], S> : never
-  ]: () => S[SpecKey<Keys[I], S>];
+  ]: () => ServiceType<S, SpecKey<Keys[I], S>>;
 };
 
 /** Resolver functions by service key. */
@@ -78,7 +79,7 @@ export function createNamedResolvers<
  */
 export function addNamedResolvers<T extends object>(
   resolvers: NamedResolvers<T>,
-): (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<T, T> {
+): (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<{}, T> {
   return (registry) => {
     for (const key of Reflect.ownKeys(resolvers)) {
       const resolve = (resolvers as Record<ServiceKey, () => unknown>)[key]!;
@@ -86,6 +87,6 @@ export function addNamedResolvers<T extends object>(
         resolve(),
       );
     }
-    return registry as unknown as ServiceRegistry<T, T>;
+    return registry as unknown as ServiceRegistry<{}, T>;
   };
 }

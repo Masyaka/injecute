@@ -33,4 +33,23 @@ listUsers(app);
 type AppServices = ContainerServices<typeof app>; // { db: Database } & { users: … }
 // #endregion container
 
-export { app, listUsers, type AppServices };
+// #region name-services
+// The composition root registers everything...
+const root = new DIContainer().addSingleton('db', Database).extend(addUsers);
+
+// ...and names the result once.
+interface RootServices extends ContainerServices<typeof root> {}
+const container: DIContainer<RootServices> = root;
+
+// Code built on `container` refers to the name: this fork is DIContainer<RootServices & { requestId: string }>.
+const requestScope = container.fork().addInstance('requestId', 'req-1');
+// #endregion name-services
+
+export {
+  app,
+  listUsers,
+  container,
+  requestScope,
+  type AppServices,
+  type RootServices,
+};

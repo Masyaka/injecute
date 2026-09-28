@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AsyncDIContainer } from '../src/async-container.ts';
-import { DIContainer } from '../src/index.ts';
+import { DIContainer, type ServiceRegistry } from '../src/index.ts';
 
 describe('core resolution model', () => {
   describe('values are looked up by presence, not by value (C1)', () => {
@@ -40,10 +40,14 @@ describe('core resolution model', () => {
       const c = new DIContainer()
         .addInstance('a', 1)
         // registries cannot fork (typed), but a module may return a child at runtime
-        .extend((c) =>
-          (c as unknown as DIContainer<{ a: number }>)
-            .fork()
-            .addInstance('b', 2),
+        .extend(
+          (c) =>
+            (c as unknown as DIContainer<{ a: number }>)
+              .fork()
+              .addInstance('b', 2) as unknown as ServiceRegistry<
+              { a: number; b: number },
+              { b: number }
+            >,
         );
       expect(c.get('b')).toBe(2);
       expect(c.get('a')).toBe(1);

@@ -31,10 +31,14 @@ import type {
   RegistrationOptions,
   ResetOptions,
   ResolveDependencies,
+  ResolveDependency,
   ServiceKey,
   ServiceProvider,
   ServiceRegistry,
-  SingletonOptions,
+  ServiceType,
+  SingletonFactoryOptions,
+  Registered,
+  SealedDIContainer,
 } from './types.ts';
 
 /** Internal: a dependency after normalization. */
@@ -118,7 +122,7 @@ type Listeners = {
  * ```
  */
 export class DIContainer<S extends object = {}> implements ServiceRegistry<
-  S,
+  {},
   S
 > {
   #parent: DIContainer<any> | undefined;
@@ -136,6 +140,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   /** Creation order across all containers, so dispose() can run dependents first. */
   static #sequence = 0;
   #disposed = false;
+  /** Set by seal(): no more registrations in this container (forks stay open). */
+  #sealed = false;
   #disposing: Promise<void> | undefined;
   /** Namespace containers re-created inside this isolated fork, keyed by the namespace registration. */
   readonly #isolatedNamespaces = new Map<Registration, DIContainer<any>>();
@@ -191,7 +197,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   get<K extends keyof S, O extends GetOptions = {}>(
     key: K,
     options?: O,
-  ): O extends { optional: true } ? S[K] | undefined : S[K] {
+  ): O extends { optional: true }
+    ? ServiceType<S, K> | undefined
+    : ServiceType<S, K> {
     this.#assertNotDisposed();
     return this.#get(key, options?.optional ?? false, []) as any;
   }
@@ -203,7 +211,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   }
 
   /** Returns a function that resolves `key` when called. */
-  createResolver<K extends keyof S>(key: K): () => S[K] {
+  createResolver<K extends keyof S>(key: K): () => ServiceType<S, K> {
     return () => this.get(key);
   }
 
@@ -218,9 +226,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    */
   call<K extends keyof S>(
     key: K,
-    args: Parameters<Extract<S[K], (...args: any[]) => any>>,
+    args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
     thisArg: unknown = undefined,
-  ): ReturnType<Extract<S[K], (...args: any[]) => any>> {
+  ): ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>> {
     const value = this.get(key);
     if (typeof value !== 'function') {
       throw new InjecuteError(
@@ -288,13 +296,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    */
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, S>,
-    D extends Dependency<S>[] = [],
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>,
-  ): DIContainer<S & { [P in K]: Produced<F> }> {
+    dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
+  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
     this.#addFactory('singleton', key, factory, dependencies);
     return this as any;
   }
@@ -314,13 +323,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    */
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, S>,
-    D extends Dependency<S>[] = [],
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | RegistrationOptions<[...D]>,
-  ): DIContainer<S & { [P in K]: Produced<F> }> {
+    dependencies?: [...D] | RegistrationOptions<[...D], R>,
+  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
     this.#addFactory('transient', key, factory, dependencies);
     return this as any;
   }
@@ -333,11 +343,12 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * app.addInstance('config', loadConfig());
    * ```
    */
-  addInstance<K extends ServiceKey, T>(
+  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
     key: K,
     value: T,
-    options?: InstanceOptions<Awaited<T>>,
-  ): DIContainer<S & { [P in K]: T }> {
+    options?: InstanceOptions<Awaited<T>, R>,
+  ): DIContainer<Registered<S, { [P in K]: T }, R>> {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     const dispose = options?.dispose ?? false;
     this.#register(
       { key, kind: 'instance', owner: this, dependencies: [], value, dispose },
@@ -358,7 +369,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   addAlias<K extends ServiceKey, T extends keyof S>(
     key: K,
     target: T,
-  ): DIContainer<S & { [P in K]: S[T] }> {
+  ): DIContainer<S & { [P in K]: ResolveDependency<T, {}, S> }> {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     this.#register(
       {
         key,
@@ -377,6 +389,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * `name` for a read-only provider of the namespace. The extension receives a fork of this container,
    * so it can use every service registered here; its own registrations stay in the namespace.
    *
+   * In the service map, `name` is a {@link Namespace} marker; `get(name)` is typed as a
+   * {@link ServiceProvider} of the namespace's services.
+   *
    * @example
    * ```ts
    * app.namespace('Billing', (billing) =>
@@ -388,16 +403,17 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   namespace<const N extends string, NA extends object, Req extends object = S>(
     name: N,
     extension: [S] extends [Req]
-      ? (
-          registry: ServiceRegistry<Req, {}>,
-        ) => ServiceRegistry<any, NA> | DIContainer<NA>
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA>
       : {
           'injecute: extension requires services that are not registered': Exclude<
             keyof Req,
             keyof S
           >;
         },
-  ): DIContainer<S & NamespacedServices<N, NA>> {
+  ): DIContainer<
+    S & { [K in keyof NamespacedServices<N, NA>]: NamespacedServices<N, NA>[K] }
+  > {
+    this.#assertNotSealed(`Namespace "${name}" cannot be added`);
     if (this.has(name)) {
       throw new InjecuteError(
         'INJECUTE_NAMESPACE_CONFLICT',
@@ -434,18 +450,20 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * const app = new DIContainer().addSingleton('db', createDb).extend(addBilling);
    * ```
    */
+  // The module's additions are flattened into one object, so the service map grows by one member per
+  // module instead of one per registration. Flattening the whole map instead would nest with every
+  // call and hit TypeScript's depth limit after about 90 calls (scripts/type-perf.mjs checks 150).
   extend<EA extends object, Req extends object = S>(
     extension: [S] extends [Req]
-      ? (
-          registry: ServiceRegistry<Req, {}>,
-        ) => ServiceRegistry<any, EA> | DIContainer<EA>
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA>
       : {
           'injecute: extension requires services that are not registered': Exclude<
             keyof Req,
             keyof S
           >;
         },
-  ): DIContainer<S & EA> {
+  ): DIContainer<S & { [K in keyof EA]: EA[K] }> {
+    this.#assertNotSealed('extend() cannot add services');
     const run = extension as unknown as (registry: unknown) => unknown;
     const result = run.call(this, this);
     let current: unknown = result;
@@ -467,10 +485,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * const handler = app.injecute((users, logger) => createHandler(users, logger), ['users', 'logger']);
    * ```
    */
-  injecute<D extends Dependency<S>[], R>(
+  injecute<D extends Dependency<{}, S>[], R>(
     factory:
-      | ((...args: ResolveDependencies<D, S>) => R)
-      | (new (...args: ResolveDependencies<D, S>) => R),
+      | ((...args: ResolveDependencies<D, {}, S>) => R)
+      | (new (...args: ResolveDependencies<D, {}, S>) => R),
     dependencies: [...D],
   ): R {
     const deps = normalizeDependencies(dependencies, undefined);
@@ -487,11 +505,11 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * sendReport();
    * ```
    */
-  bind<D extends Dependency<S>[], R>(
+  bind<D extends Dependency<{}, S>[], R>(
     dependencies: [...D],
     factory:
-      | ((...args: ResolveDependencies<D, S>) => R)
-      | (new (...args: ResolveDependencies<D, S>) => R),
+      | ((...args: ResolveDependencies<D, {}, S>) => R)
+      | (new (...args: ResolveDependencies<D, {}, S>) => R),
   ): () => R {
     return () => this.injecute(factory, dependencies);
   }
@@ -556,6 +574,35 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     if (!(event in this.#listeners)) throw this.#eventNotSupported(event);
     this.#listeners[event].delete(handler);
     return this;
+  }
+
+  /**
+   * Seals the container: no more services can be registered in it (`add*`, `namespace` and `extend`
+   * throw `INJECUTE_SEALED`); resolving, middlewares, events, `reset()` and `dispose()` keep working, and
+   * forks of a sealed container are open for registrations. Call it once the composition root is
+   * complete, then fork it per request or test.
+   *
+   * The returned type has no registration methods, and its service map is one object type instead of
+   * an intersection of every registration, so code built on it (forks, request scopes) typechecks
+   * faster and shows readable types.
+   *
+   * @throws {InjecuteError} `INJECUTE_DISPOSED`.
+   *
+   * @example
+   * ```ts
+   * export const app = new DIContainer()
+   *   .addSingleton('db', createDb)
+   *   .addSingleton('users', UserRepository, ['db'])
+   *   .seal();
+   *
+   * app.get('users');
+   * const scope = app.fork().addInstance('requestId', id); // forks stay open
+   * ```
+   */
+  seal(): SealedDIContainer<{ [K in keyof S]: S[K] }> {
+    this.#assertNotDisposed();
+    this.#sealed = true;
+    return this as any;
   }
 
   /**
@@ -750,6 +797,15 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     }
   }
 
+  #assertNotSealed(what: string) {
+    if (this.#sealed) {
+      throw new InjecuteError(
+        'INJECUTE_SEALED',
+        `${what}: the container is sealed.`,
+      );
+    }
+  }
+
   /** This container plus the namespace containers it owns (and theirs), up to this container. */
   #ownedContainers(): DIContainer<any>[] {
     const result: DIContainer<any>[] = [this];
@@ -841,6 +897,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
       | unknown[]
       | undefined,
   ) {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     if (typeof factory !== 'function') {
       throw new InjecuteError(
         'INJECUTE_INVALID_FACTORY',

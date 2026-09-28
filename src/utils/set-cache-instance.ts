@@ -1,6 +1,7 @@
 import { DIContainer } from '../container.ts';
 import { InjecuteError } from '../errors.ts';
 import { SET_CACHE_INSTANCE } from '../internal.ts';
+import type { SealedDIContainer, ServiceType } from '../types.ts';
 
 /**
  * Overrides the cached value of `key` in `container` until the next `reset()`, without touching the
@@ -17,9 +18,9 @@ import { SET_CACHE_INSTANCE } from '../internal.ts';
  * ```
  */
 export function setCacheInstance<S extends object, K extends keyof S>(
-  container: DIContainer<S>,
+  container: DIContainer<S> | SealedDIContainer<S>,
   key: K,
-  value: S[K],
+  value: ServiceType<S, K>,
 ): void {
   if (!(container instanceof DIContainer)) {
     throw new InjecuteError(

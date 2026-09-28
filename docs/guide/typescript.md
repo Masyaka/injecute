@@ -35,9 +35,44 @@ needs. See [Roles](../concepts/roles.md) for why modules get a `ServiceRegistry`
 
 ## Long registration chains
 
-Each registration adds to the container type. A chain of 300 registrations takes about a second to
-typecheck; split big containers into [modules](./containers.md#modules), which also keeps each file
-readable.
+Each registration adds to the container type, and one long chain gets slower to typecheck the longer it
+is: 300 `addSingleton` calls in a single chain take about 0.6 s. Split big containers into
+[modules](./containers.md#modules) that declare only what they need
+(`ServiceRegistry<{ db: Database }>`). A module's registrations are checked against its own small
+service map, so the same 300 registrations as 10 modules take about 0.2 s, and each file stays
+readable. In the container's type, each module's services are one object, so hovers stay short too.
+
+## Seal the composition root
+
+A container's type is an intersection of every registration (`{ db: … } & { users: … } & …`). Once the
+composition root is complete, [`seal()`](./containers.md#sealing-the-composition-root) turns it into
+one object type and removes the registration methods:
+
+<<< @/../examples/containers.ts#seal
+
+- **Faster typechecking.** Forks, request scopes and tests built on the sealed root typecheck about
+  25% faster, because TypeScript looks services up in one object instead of scanning every
+  registration.
+- **Readable hovers and errors**: `{ dbUrl: string; db: Database; users: UserRepository }` instead of
+  hundreds of `{ key: … } &` members.
+
+### Exporting a container from a package
+
+When a library or shared package exports a container, TypeScript writes its whole service map into
+the `.d.ts` file, and writes it again for every exported fork or derived container. Give the map a
+name with an interface; TypeScript refers to interfaces by name:
+
+<<< @/../examples/typescript.ts#name-services
+
+Everything built on `container` then refers to `RootServices`: for a 300-service app that also exports
+a request scope, the `.d.ts` is about half the size, and forks built on it typecheck as fast as on a
+sealed container. Seal it too if nothing should register in it any more:
+`const container: SealedDIContainer<RootServices> = root.seal()`.
+
+Namespaces don't multiply the map: it holds each namespaced service once, under its full key
+(`Billing.invoices`), and a `Namespace` marker under the namespace name. `get('Billing')` turns the
+marker into a `ServiceProvider` of the namespace's services; `NamespaceServices<typeof app, 'Billing'>`
+is the same service map as a type.
 
 ## Supported versions
 

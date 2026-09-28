@@ -51,4 +51,28 @@ withNamespace.get('Reports.daily'); // { users, kind: 'daily' }
 withNamespace.get('Reports').get('timezone'); // "UTC"
 // #endregion namespaces
 
-export { app, requestScope, testScope, withBilling, withNamespace, Database };
+// #region seal
+// Register everything, then seal the composition root.
+const root = new DIContainer()
+  .addInstance('dbUrl', 'postgres://prod')
+  .addSingleton('db', Database, ['dbUrl'])
+  .addSingleton('users', UserRepository, ['db'])
+  .seal();
+
+root.get('users'); // resolves as before
+// root.addInstance('flag', true); // type error, and INJECUTE_SEALED at runtime
+
+// Per request or per test, fork it: forks are open for registrations.
+const perRequest = root.fork().addInstance('requestId', 'req-2');
+// #endregion seal
+
+export {
+  app,
+  requestScope,
+  testScope,
+  withBilling,
+  withNamespace,
+  root,
+  perRequest,
+  Database,
+};

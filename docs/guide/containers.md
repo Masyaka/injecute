@@ -61,7 +61,21 @@ receives a fork of the container, so it can use every service registered there.
 
 <<< @/../examples/containers.ts#namespaces
 
-`get('Reports')` returns a read-only provider of the namespace.
+`get('Reports')` returns a read-only provider of the namespace. In the container's service map
+(`ContainerServices<typeof app>`), `Reports` is a `Namespace` marker next to the `Reports.*` keys;
+`NamespaceServices<typeof app, 'Reports'>` gives the namespace's services.
+
+## Sealing the composition root
+
+`seal()` ends the registrations of a container: afterwards `add*`, `namespace()` and `extend()` throw
+`INJECUTE_SEALED`, and its type has no registration methods. Resolving, middlewares, events, `reset()`
+and `dispose()` keep working, and forks are open, so request scopes and tests fork the sealed root.
+
+<<< @/../examples/containers.ts#seal
+
+A sealed container's type is also cheaper for TypeScript: its service map is one object instead of an
+intersection of every registration, so forks and request scopes built on it typecheck faster and show
+readable types (see [TypeScript](./typescript.md#seal-the-composition-root)).
 
 ## Which one to use
 

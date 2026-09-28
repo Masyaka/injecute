@@ -33,6 +33,8 @@ describe('examples', () => {
       testScope,
       withBilling,
       withNamespace,
+      root,
+      perRequest,
       Database,
     } = await import('../examples/containers.ts');
     expect(requestScope.get('users')).toBe(app.get('users'));
@@ -41,6 +43,11 @@ describe('examples', () => {
     expect(withBilling.get('invoices').db).toBeInstanceOf(Database);
     expect(withNamespace.get('Reports.daily').kind).toBe('daily');
     expect(withNamespace.get('Reports').get('timezone')).toBe('UTC');
+    expect(perRequest.get('users')).toBe(root.get('users'));
+    expect(perRequest.get('requestId')).toBe('req-2');
+    expect(() =>
+      (root as unknown as DIContainer).addInstance('flag', true),
+    ).toThrow(/sealed/);
   });
 
   it('lifecycle', async () => {
@@ -100,9 +107,12 @@ describe('examples', () => {
   });
 
   it('typescript', async () => {
-    const { app, listUsers } = await import('../examples/typescript.ts');
+    const { app, listUsers, container, requestScope } =
+      await import('../examples/typescript.ts');
     expect(listUsers(app)).toEqual([]);
     expect(app.get('users').list()).toEqual([]);
+    expect(requestScope.get('users')).toBe(container.get('users'));
+    expect(requestScope.get('requestId')).toBe('req-1');
   });
 
   it('errors', async () => {

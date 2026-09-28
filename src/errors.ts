@@ -54,6 +54,10 @@ export const errorCodes = {
       'An extension returned a container that is not this one or its child',
     hint: 'A module function must return the registry it received (after adding services) or a fork of it.',
   },
+  INJECUTE_SEALED: {
+    title: 'The container is sealed',
+    hint: 'Register every service before seal(). To add services later (per request, per test), register them in a fork: app.fork().addInstance(...).',
+  },
   INJECUTE_DISPOSED: {
     title: 'The container is disposed',
     hint: 'Create a new container (or fork) instead of using one after dispose().',

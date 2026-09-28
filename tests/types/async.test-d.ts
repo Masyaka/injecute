@@ -5,6 +5,7 @@ import {
   DIContainer,
   optional,
   preload,
+  type AsyncNamespace,
   type AsyncServiceProvider,
   type AsyncServiceRegistry,
   type ContainerServices,
@@ -97,6 +98,27 @@ expectTypeOf<NamespaceServices<typeof withBilling, 'Audit'>>().toEqualTypeOf<{
   log: string[];
 }>();
 
+// nested async namespaces resolve to async providers at every level
+const nestedAsync = app.namespace('Outer', (outer) =>
+  outer.namespace('Inner', (inner) =>
+    inner.addInstance('leaf', Promise.resolve(1)),
+  ),
+);
+expectTypeOf<
+  ContainerServices<typeof nestedAsync>['Outer.Inner']
+>().toEqualTypeOf<AsyncNamespace>();
+expectTypeOf(nestedAsync.get('Outer.Inner.leaf')).toEqualTypeOf<
+  Promise<number>
+>();
+expectTypeOf(nestedAsync.get('Outer')).toEqualTypeOf<
+  Promise<AsyncServiceProvider<{ Inner: AsyncNamespace; 'Inner.leaf': number }>>
+>();
+void nestedAsync.get('Outer').then((outer) =>
+  outer.get('Inner').then((inner) => {
+    expectTypeOf(inner.get('leaf')).toEqualTypeOf<Promise<number>>();
+  }),
+);
+
 // a module can't configure or own the container
 app.extend((c) => {
   // @ts-expect-error modules cannot add middlewares
@@ -124,9 +146,32 @@ const syncApp = new DIContainer().addInstance(
 // @ts-expect-error an async module on a sync container
 syncApp.extend(addBilling);
 
+// ---- registering a key again replaces its type
+expectTypeOf(
+  app
+    .addSingleton('url', async (url) => url.length, {
+      replace: true,
+      dependencies: ['url'],
+    })
+    .get('url'),
+).toEqualTypeOf<Promise<number>>();
+
+// ---- seal()
+const sealedAsync = app.seal();
+expectTypeOf(sealedAsync.get('repo')).toEqualTypeOf<Promise<Repo>>();
+// @ts-expect-error a sealed container registers nothing
+sealedAsync.addInstance('x', 1);
+expectTypeOf(sealedAsync.fork().addInstance('x', 1).get('x')).toEqualTypeOf<
+  Promise<number>
+>();
+expectTypeOf(sealedAsync.fork()).toExtend<
+  AsyncServiceProvider<{ db: Database }>
+>();
+
 // ---- assignability: async and sync views don't mix
 type AppServices = ContainerServices<typeof app>;
-expectTypeOf(app).toExtend<AsyncServiceRegistry<AppServices, AppServices>>();
+// a container is a registry that was given nothing and added everything
+expectTypeOf(app).toExtend<AsyncServiceRegistry<{}, AppServices>>();
 expectTypeOf(app).toExtend<AsyncServiceProvider<{ db: Database }>>();
 expectTypeOf(app).not.toExtend<ServiceProvider<{ db: Database }>>();
 expectTypeOf(app).not.toExtend<ServiceRegistry<{ db: Database }>>();

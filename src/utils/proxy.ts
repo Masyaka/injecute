@@ -2,6 +2,7 @@ import type {
   ContainerServices,
   ServiceKey,
   ServiceProvider,
+  ServiceType,
 } from '../types.ts';
 import { InjecuteError } from '../errors.ts';
 import {
@@ -23,7 +24,7 @@ export interface ProxyAccessorOptions<Keys> {
 export type ProxyAccessor<S, Keys extends readonly unknown[]> = {
   readonly [
     I in keyof Keys as I extends `${number}` ? ExposedName<Keys[I], S> : never
-  ]: S[SpecKey<Keys[I], S>];
+  ]: ServiceType<S, SpecKey<Keys[I], S>>;
 };
 
 /**
@@ -49,7 +50,12 @@ export function createProxyAccessor<
   options?: ProxyAccessorOptions<Keys>,
 ): Keys extends readonly unknown[]
   ? ProxyAccessor<ContainerServices<C>, Keys>
-  : Readonly<ContainerServices<C>> {
+  : {
+      readonly [K in keyof ContainerServices<C>]: ServiceType<
+        ContainerServices<C>,
+        K
+      >;
+    } {
   const provider = container as unknown as ServiceProvider<any>;
   const optional = options?.optional ?? true;
   const exposed = options?.keys

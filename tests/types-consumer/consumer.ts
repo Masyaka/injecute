@@ -66,6 +66,9 @@ const maybe: undefined = app.get('maybe');
 const asyncUrl: Promise<string> = app.get('asyncUrl');
 const billing: number = app.get('billing');
 const svc: { repo: Repo } = app.get('Domain.svc');
+const domainSvc: { repo: Repo } = app.get('Domain').get('svc');
+const sealedApp = new DIContainer().addInstance('url', 'x').seal();
+const sealedUrl: string = sealedApp.fork().addInstance('n', 1).get('url');
 const [getRepo] = createResolversTuple(app, ['repo']);
 const named = createNamedResolvers(app, ['url', ['logger', 'lg']]);
 const lg: Logger = named.lg();
@@ -115,6 +118,8 @@ export {
   asyncUrl,
   billing,
   svc,
+  domainSvc,
+  sealedUrl,
   getRepo,
   lg,
   dsn,
