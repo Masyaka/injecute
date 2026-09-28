@@ -52,6 +52,28 @@ test('stops endless loops', async ({ page }) => {
   await expect(status(page)).toHaveText('Timed out', { timeout: 30_000 });
 });
 
+test('a slow worker download does not count as an endless loop', async ({
+  page,
+}) => {
+  await page.route('**/runner.worker-*.js', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+    await route.continue();
+  });
+  await page.goto('playground');
+  await expect(status(page)).toHaveText(/\d+ services/, { timeout: 30_000 });
+});
+
+test('a worker that fails to load reports it', async ({ page }) => {
+  await page.route('**/runner.worker-*.js', (route) =>
+    route.fulfill({ status: 404 }),
+  );
+  await page.goto('playground');
+  await expect(page.locator('.playground-error')).toContainText(
+    'The runner failed',
+    { timeout: 30_000 },
+  );
+});
+
 test('loads an example from ?example=', async ({ page }) => {
   await page.goto('playground?example=containers');
   await expect(page.locator('.playground-toolbar select')).toHaveValue(

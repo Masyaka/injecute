@@ -13,7 +13,11 @@ import {
 } from 'vue';
 import type { Tree } from '../../../src/utils/build-services-graph.ts';
 import type { Editor } from './playground/editor.ts';
-import type { RunError, RunResult, TraceEntry } from './playground/protocol.ts';
+import type {
+  RunError,
+  RunnerMessage,
+  TraceEntry,
+} from './playground/protocol.ts';
 import './playground/playground.css';
 
 // request-context/ needs node:async_hooks and relative imports, which the worker can't run
@@ -64,14 +68,32 @@ async function run() {
   const { default: RunnerWorker } =
     await import('./playground/runner.worker.ts?worker');
   const current = (worker = new RunnerWorker());
-  const timeout = setTimeout(() => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const fail = (message: string, label: string) => {
+    clearTimeout(timeout);
     current.terminate();
-    if (worker === current) {
-      error.value = { message: 'Stopped after 3 seconds (an endless loop?).' };
-      status.value = 'Timed out';
+    if (worker !== current) return;
+    error.value = { message };
+    status.value = label;
+  };
+  // A worker that fails to load (a network error, a stale page after a deploy) never answers.
+  current.onerror = (event) => {
+    event.preventDefault();
+    fail(
+      `The runner failed${event.message ? `: ${event.message}` : ' to load. Reload the page.'}`,
+      'Error',
+    );
+  };
+  current.onmessage = ({ data }: MessageEvent<RunnerMessage>) => {
+    if (data.type === 'ready') {
+      // The time limit covers the run only, not downloading the worker.
+      timeout = setTimeout(
+        () => fail('Stopped after 3 seconds (an endless loop?).', 'Timed out'),
+        3000,
+      );
+      current.postMessage({ type: 'run', code });
+      return;
     }
-  }, 3000);
-  current.onmessage = ({ data }: MessageEvent<RunResult>) => {
     clearTimeout(timeout);
     current.terminate();
     if (worker !== current) return;
@@ -84,7 +106,6 @@ async function run() {
       : `${Object.keys(data.graph ?? {}).length} services`;
     if (data.graph && renderGraph) renderGraph(data.graph);
   };
-  current.postMessage({ type: 'run', code });
 }
 
 function scheduleRun() {

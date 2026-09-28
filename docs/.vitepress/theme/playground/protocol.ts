@@ -21,6 +21,11 @@ export interface RunError {
   docs?: string;
 }
 
+/** Sent once the worker has loaded; the page starts the run's time limit only then. */
+export interface RunnerReady {
+  type: 'ready';
+}
+
 export interface RunResult {
   type: 'result';
   graph: Tree | undefined;
@@ -28,3 +33,5 @@ export interface RunResult {
   logs: string[];
   error?: RunError;
 }
+
+export type RunnerMessage = RunnerReady | RunResult;

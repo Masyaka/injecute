@@ -1,12 +1,17 @@
 // Runs playground code off the page: no DOM, a fresh worker per run, terminated after a timeout.
 // The library is bundled into this worker; `import … from 'injecute'` in user code is rewritten to it.
 import * as injecute from '../../../../src/index.ts';
-import type { RunRequest, RunResult, TraceEntry } from './protocol.ts';
+import type {
+  RunnerMessage,
+  RunRequest,
+  RunResult,
+  TraceEntry,
+} from './protocol.ts';
 
 const scope = self as unknown as {
   __injecute: typeof injecute;
   process?: { env: Record<string, string | undefined> };
-  postMessage(message: RunResult): void;
+  postMessage(message: RunnerMessage): void;
   onmessage: ((event: MessageEvent<RunRequest>) => void) | null;
 };
 scope.__injecute = injecute;
@@ -104,7 +109,7 @@ scope.onmessage = async ({ data }) => {
     URL.revokeObjectURL(url);
     const container = pickContainer(module);
     if (!container) {
-      scope.postMessage({
+      post({
         type: 'result',
         graph: undefined,
         trace,
@@ -140,7 +145,7 @@ scope.onmessage = async ({ data }) => {
       }
     }
     container.unuse(tracer);
-    scope.postMessage({
+    post({
       type: 'result',
       graph: injecute.buildServicesGraph(container),
       trace,
@@ -148,7 +153,7 @@ scope.onmessage = async ({ data }) => {
       error,
     });
   } catch (error) {
-    scope.postMessage({
+    post({
       type: 'result',
       graph: undefined,
       trace,
@@ -157,3 +162,20 @@ scope.onmessage = async ({ data }) => {
     });
   }
 };
+
+/** Posts a result; if it can't be cloned, posts the reason instead, so the page never waits for nothing. */
+function post(result: RunResult) {
+  try {
+    scope.postMessage(result);
+  } catch (error) {
+    scope.postMessage({
+      type: 'result',
+      graph: undefined,
+      trace: [],
+      logs: [],
+      error: describe(error),
+    });
+  }
+}
+
+scope.postMessage({ type: 'ready' });
