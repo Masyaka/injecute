@@ -18,3 +18,6 @@ handoffs
 test-results
 playwright-report
 coverage
+
+# created by `deno run` (the CDN smoke test)
+/deno.lock

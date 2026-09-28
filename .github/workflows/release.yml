@@ -1,0 +1,189 @@
+# Releases with Changesets (see CONTRIBUTING.md, "Releasing").
+#
+# On every push to a release branch, `select-mode` decides what to do:
+# - pending changesets → `version` opens or updates the "Version Packages" pull request
+#   (CHANGELOG.md, package.json and jsr.json versions);
+# - a version that isn't on npm yet (the merged "Version Packages" PR) → `pack` + `publish`:
+#   npm (trusted publishing, OIDC) and JSR (OIDC), git tag and GitHub Release, in the `release`
+#   environment, which waits for the maintainer's approval;
+# - nothing to do → `jsr-check` publishes to JSR only if a version reached npm but not JSR.
+#
+# The npm trusted publisher is configured for this file name (release.yml) and the `release`
+# environment. No npm token is used anywhere.
+name: Release
+
+on:
+  push:
+    branches: [next, main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  select-mode:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.select-mode.outputs.mode }}
+      publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - id: select-mode
+        uses: changesets/action/select-mode@v2
+
+  version:
+    if: needs.select-mode.outputs.mode == 'version'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit the version changes
+      pull-requests: write # open the "Version Packages" pull request
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - uses: changesets/action/version@v2
+        with:
+          # changeset version + copy the version into jsr.json
+          script: npm run version-packages
+          pr-title: Version Packages (${{ github.ref_name }})
+          commit-message: Version Packages (${{ github.ref_name }})
+
+  pack:
+    if: needs.select-mode.outputs.mode == 'publish'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    outputs:
+      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      # the same gates as CI, on the exact commit being released
+      - run: npm run check
+      - run: npm run check:package
+      - run: npm run check:jsr
+      # `changeset pack` runs `npm pack`, whose prepack script builds lib/ (code + docs)
+      - id: pack
+        uses: changesets/action/pack@v2
+        with:
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+
+  publish:
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: release
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      version: ${{ steps.version.outputs.version }}
+    permissions:
+      contents: write # git tag and GitHub Release
+      id-token: write # npm and JSR trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          # Node 24 bundles npm 11, which supports trusted publishing (≥ 11.5.1)
+          node-version: 24
+          package-manager-cache: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - id: publish
+        uses: changesets/action/publish@v2
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+      - id: version
+        if: steps.publish.outputs.published == 'true'
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publish to JSR
+        if: steps.publish.outputs.published == 'true'
+        run: deno publish
+
+  # Recovery: a version is on npm but not on JSR (e.g. the JSR step failed). Re-run the workflow
+  # or push again; this publishes the missing JSR version.
+  jsr-check:
+    if: needs.select-mode.outputs.mode == 'none'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    outputs:
+      missing: ${{ steps.check.outputs.missing }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: check
+        run: |
+          version=$(node -p "require('./jsr.json').version")
+          on_npm=$(npm view "injecute@$version" version 2>/dev/null || true)
+          on_jsr=$(curl -sf https://jsr.io/@masyaka/injecute/meta.json | node -e "
+            let s = ''; process.stdin.on('data', (d) => (s += d)).on('end', () =>
+              console.log(JSON.parse(s).versions['$version'] ? 'yes' : ''));")
+          echo "npm: ${on_npm:-no}, JSR: ${on_jsr:-no} ($version)"
+          if [ -n "$on_npm" ] && [ -z "$on_jsr" ]; then echo "missing=$version" >> "$GITHUB_OUTPUT"; fi
+
+  jsr:
+    if: needs.jsr-check.outputs.missing != ''
+    needs: jsr-check
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # JSR trusted publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno publish
+
+  cdn-smoke:
+    if: needs.publish.outputs.published == 'true'
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # CDNs pick up a new version within minutes; the script retries for up to ~10 minutes
+      - run: deno run --allow-net --allow-env --allow-import tests/smoke/cdn.mjs
+        env:
+          INJECUTE_VERSION: ${{ needs.publish.outputs.version }}
