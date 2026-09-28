@@ -76,6 +76,11 @@ Claude Code: `/plugin marketplace add Masyaka/injecute`, then `/plugin install i
 agents: `npx skills add Masyaka/injecute`. More in
 [Using injecute with AI agents](https://masyaka.github.io/injecute/guide/ai-agents).
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Security issues: [SECURITY.md](./SECURITY.md). Versioning and
+supported TypeScript versions: [Versioning and support](https://masyaka.github.io/injecute/guide/versioning).
+
 ## License
 
 MIT

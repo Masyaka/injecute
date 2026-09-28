@@ -131,7 +131,7 @@ jobs:
       - name: Check external links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --config lychee.toml --no-progress README.md llms.txt 'docs/**/*.md' 'skills/**/*.md' 'lib/docs/**/*.md' 'examples/**/*.ts' 'src/**/*.ts'
+          args: --config lychee.toml --no-progress README.md SECURITY.md CONTRIBUTING.md llms.txt 'docs/**/*.md' 'skills/**/*.md' 'lib/docs/**/*.md' 'examples/**/*.ts' 'src/**/*.ts'
           fail: true
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run test:docs

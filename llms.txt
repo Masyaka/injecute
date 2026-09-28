@@ -34,6 +34,7 @@
 - [Migrating from 0.x to 1.0](./lib/docs/migration/0.x-to-1.0.md): Every breaking change, with before/after examples.
 - [Type declarations](./lib/index.d.ts): The public API, with TSDoc and an example on every export.
 - [Changelog](./CHANGELOG.md): Changes per version.
+- [Versioning and support](./lib/docs/guide/versioning.md): What counts as a breaking change; supported TypeScript versions and runtimes.
 
 ## Optional
 

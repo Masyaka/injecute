@@ -42,7 +42,7 @@ readable.
 ## Supported versions
 
 TypeScript **5.2 and newer** (CI checks 5.2 and the latest release, currently 7.0). The minimum is raised
-only in a minor release, announced in the changelog.
+only in a minor release, announced in the changelog; see [Versioning and support](./versioning.md).
 
 If your `lib` setting predates `Symbol.asyncDispose` (for example `"ES2022"`), the package's type
 declarations add it, so `await using` and `dispose()` typecheck anyway.

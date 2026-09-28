@@ -48,6 +48,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Errors', link: '/errors/' },
       { text: 'Migrating from 0.x', link: '/migration/0.x-to-1.0' },
       { text: 'Changelog', link: '/changelog' },
+      { text: 'Versioning and support', link: '/guide/versioning' },
     ],
   },
 ];
