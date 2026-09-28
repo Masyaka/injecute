@@ -114,6 +114,28 @@ jobs:
       - run: npm run build
       - run: npm run test:browser
 
+  docs:
+    name: Docs (build, links, llms.txt, playground)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # library, package docs (lib/docs, checked against llms.txt), API reference, error pages, site;
+      # VitePress fails on dead internal links
+      - run: npm run docs:build
+      - run: npm run docs:check
+      - name: Check external links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml --no-progress README.md llms.txt 'docs/**/*.md' 'skills/**/*.md' 'lib/docs/**/*.md' 'examples/**/*.ts' 'src/**/*.ts'
+          fail: true
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npm run test:docs
+
   type-perf:
     name: Type-check cost (non-blocking)
     runs-on: ubuntu-latest

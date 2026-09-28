@@ -74,6 +74,7 @@
     "docs:dev": "npm run docs:prepare && vitepress dev docs",
     "docs:build": "npm run docs:prepare && vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "docs:check": "node scripts/check-site-llms.mjs",
     "test:docs": "playwright test -c tests/docs/playwright.config.ts"
   },
   "devDependencies": {
