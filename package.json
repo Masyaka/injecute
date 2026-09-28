@@ -62,7 +62,7 @@
     "check:versions": "node scripts/sync-jsr-version.mjs --check",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json",
-    "check:package": "publint --strict && attw --pack . --profile esm-only && node scripts/check-tarball.mjs",
+    "check:package": "npm run build && publint --strict && attw --pack . --profile esm-only && node scripts/check-tarball.mjs",
     "test:smoke": "node tests/smoke/run.mjs",
     "test:types-consumer": "node tests/types-consumer/run.mjs",
     "test:browser": "playwright test -c tests/browser/playwright.config.ts",
