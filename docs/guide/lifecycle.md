@@ -16,6 +16,8 @@ the container as disposed.
 
 - **Singletons it created.** Each is disposed with its registration's `dispose` function, or with
   `[Symbol.asyncDispose]` / `[Symbol.dispose]` when the instance has one. `dispose: false` opts out.
+  When a factory returns a promise, the resolved value is disposed (a singleton still being created is
+  awaited first); one whose promise rejected is skipped.
 - **`addInstance` values registered with `{ dispose: true }` (or a function).** Values you add are yours
   by default.
 - **Namespace containers**, with their services.

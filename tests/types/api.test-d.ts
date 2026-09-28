@@ -58,6 +58,24 @@ expectTypeOf(
   app.addInstance('greet', (name: string) => `hi ${name}`).call('greet', ['x']),
 ).toEqualTypeOf<string>();
 
+// ---- async singletons: get() keeps the promise, disposers receive the resolved value
+const withAsync = new DIContainer()
+  .addSingleton('pool', async () => ({ end: () => {} }), {
+    dependencies: [],
+    dispose: (pool) => {
+      expectTypeOf(pool).toEqualTypeOf<{ end: () => void }>();
+    },
+  })
+  .addInstance('conn', Promise.resolve(1), {
+    dispose: (conn) => {
+      expectTypeOf(conn).toEqualTypeOf<number>();
+    },
+  });
+expectTypeOf(withAsync.get('pool')).toEqualTypeOf<
+  Promise<{ end: () => void }>
+>();
+expectTypeOf(withAsync.get('conn')).toEqualTypeOf<Promise<number>>();
+
 // ---- modules: inline, and non-generic ones that declare only what they need
 const extended = app.extend((c) =>
   c.addSingleton('extra', (repo) => repo.url, ['repo']),

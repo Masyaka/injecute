@@ -6,7 +6,12 @@ import {
   looksLikeConstructor,
   suggestKeys,
 } from './errors.ts';
-import { callableOf, isClass, SET_CACHE_INSTANCE } from './internal.ts';
+import {
+  callableOf,
+  isClass,
+  isThenable,
+  SET_CACHE_INSTANCE,
+} from './internal.ts';
 import type {
   ContainerEvents,
   Dependency,
@@ -264,6 +269,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * `factory` is a function or a class. It receives the resolved `dependencies` in order; a class is
    * called with `new`. A dependency on `key` itself receives the previous definition (decoration).
    *
+   * A factory may return a promise: the promise is cached, a rejected one is dropped (the next
+   * resolution tries again), and `dispose()` releases the resolved value.
+   *
    * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
    * {@link construct}.
    * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` when `key` is registered in this container
@@ -273,6 +281,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * ```ts
    * app
    *   .addSingleton('db', () => createPool(process.env.DATABASE_URL))
+   *   .addSingleton('cache', async () => connectRedis()) // Promise<Redis>, disposed once resolved
    *   .addSingleton('users', UserRepository, ['db'])
    *   .addSingleton('mailer', createMailer, { dependencies: ['config'], dispose: (m) => m.close() });
    * ```
@@ -284,7 +293,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | SingletonOptions<[...D], Produced<F>>,
+    dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>,
   ): DIContainer<S & { [P in K]: Produced<F> }> {
     this.#addFactory('singleton', key, factory, dependencies);
     return this as any;
@@ -327,7 +336,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   addInstance<K extends ServiceKey, T>(
     key: K,
     value: T,
-    options?: InstanceOptions<T>,
+    options?: InstanceOptions<Awaited<T>>,
   ): DIContainer<S & { [P in K]: T }> {
     const dispose = options?.dispose ?? false;
     this.#register(
@@ -637,7 +646,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
 
   /**
    * Runs a factory. Errors that are not InjecuteErrors are wrapped with the resolution path (the
-   * original is `cause`); a class called without `new` gets a CLASS_NOT_CONSTRUCTED hint.
+   * original is `cause`); a class called without `new` gets a CLASS_NOT_CONSTRUCTED hint. A returned
+   * promise that rejects is wrapped the same way.
    */
   #invoke(
     factory: (...args: any[]) => unknown,
@@ -652,15 +662,12 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     try {
       value = this.invokeFactory(factory, args);
     } catch (error) {
-      if (error instanceof InjecuteError) throw error;
-      if (!isClass(original) && isClassCallError(error, original)) {
-        throw classNotConstructed(name, original, path, error);
-      }
-      throw new InjecuteError(
-        'INJECUTE_RESOLUTION_FAILED',
-        `Failed to create "${name}": ${error instanceof Error ? error.message : String(error)}`,
-        { path, cause: error },
-      );
+      throw factoryError(error, name, original, path);
+    }
+    if (isThenable(value)) {
+      return Promise.resolve(value).then(undefined, (error: unknown) => {
+        throw factoryError(error, name, original, path);
+      });
     }
     if (
       value === undefined &&
@@ -721,6 +728,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     this.#owned.push({ seq: DIContainer.#sequence++, reg, value });
   }
 
+  /** A singleton promise that rejects is forgotten, so the next resolution creates it again. */
+  #evictOnRejection(reg: Registration, promise: PromiseLike<unknown>) {
+    promise.then(undefined, () => {
+      if (this.#instances.get(reg) === promise) this.#instances.delete(reg);
+      this.#owned = this.#owned.filter((o) => o.value !== promise);
+    });
+  }
+
   #assertNotDisposed() {
     if (this.#disposed) {
       throw new InjecuteError(
@@ -759,10 +774,16 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     const done = new Set<unknown>();
     const errors: unknown[] = [];
     for (const { reg, value } of owned) {
-      if (done.has(value)) continue;
-      done.add(value);
+      let instance: unknown;
       try {
-        await disposeValue(value, reg.dispose);
+        instance = await value;
+      } catch {
+        continue; // creation failed: nothing to release
+      }
+      if (done.has(instance)) continue;
+      done.add(instance);
+      try {
+        await disposeValue(instance, reg.dispose);
       } catch (error) {
         errors.push(error);
       }
@@ -1024,6 +1045,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         const value = this.#create(reg, path);
         this.#instances.set(reg, value);
         if (reg.dispose !== false) this.#own(reg, value);
+        if (isThenable(value)) this.#evictOnRejection(reg, value);
         return value;
       }
       case 'transient':
@@ -1245,6 +1267,23 @@ async function disposeValue(
   } else if (typeof disposable[syncDispose] === 'function') {
     disposable[syncDispose]!();
   }
+}
+
+function factoryError(
+  error: unknown,
+  name: string,
+  factory: unknown,
+  path: readonly ServiceKey[],
+): InjecuteError {
+  if (error instanceof InjecuteError) return error;
+  if (!isClass(factory) && isClassCallError(error, factory)) {
+    return classNotConstructed(name, factory, path, error);
+  }
+  return new InjecuteError(
+    'INJECUTE_RESOLUTION_FAILED',
+    `Failed to create "${name}": ${error instanceof Error ? error.message : String(error)}`,
+    { path, cause: error },
+  );
 }
 
 function classNotConstructed(

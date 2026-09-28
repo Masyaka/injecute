@@ -17,6 +17,12 @@ export const isClass = (f: unknown): boolean =>
   typeof f === 'function' &&
   Object.getOwnPropertyDescriptor(f, 'prototype')?.writable === false;
 
+/** @internal `true` for promises and other objects with a `then` method. */
+export const isThenable = (v: unknown): v is PromiseLike<unknown> =>
+  (typeof v === 'object' || typeof v === 'function') &&
+  v !== null &&
+  typeof (v as { then?: unknown }).then === 'function';
+
 /** @internal A function that calls `factory`, with `new` when it is a class. */
 export function callableOf(factory: unknown): (...args: any[]) => unknown {
   if (isClass(factory)) {

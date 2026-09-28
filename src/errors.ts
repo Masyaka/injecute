@@ -34,7 +34,7 @@ export const errorCodes = {
     hint: 'Classes compiled to ES5 (Babel for old browsers, TypeScript target: es5) and bound classes cannot be detected. Register them with construct(MyClass).',
   },
   INJECUTE_RESOLUTION_FAILED: {
-    title: 'A factory threw while creating a service',
+    title: 'A factory threw (or its promise rejected) while creating a service',
     hint: 'The original error is in `cause`; `path` shows which service needed it.',
   },
   INJECUTE_NOT_A_FUNCTION: {

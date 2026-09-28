@@ -71,6 +71,7 @@ export type Produced<F> = F extends abstract new (...args: any) => infer I
 /**
  * How `dispose()` releases an instance: `true` (or unset, for singletons) calls
  * `[Symbol.asyncDispose]` / `[Symbol.dispose]` when present, `false` skips it, a function disposes with it.
+ * When the service is a promise, the resolved value is disposed; a rejected one is skipped.
  */
 export type DisposeOption<T> = boolean | ((instance: T) => unknown);
 
@@ -328,7 +329,7 @@ export interface ServiceRegistry<
   >(
     key: K,
     factory: F,
-    dependencies?: [...D] | SingletonOptions<[...D], Produced<F>>,
+    dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>,
   ): ServiceRegistry<
     S & { [P in K]: Produced<F> },
     A & { [P in K]: Produced<F> }
@@ -352,7 +353,7 @@ export interface ServiceRegistry<
   addInstance<K extends ServiceKey, T>(
     key: K,
     value: T,
-    options?: InstanceOptions<T>,
+    options?: InstanceOptions<Awaited<T>>,
   ): ServiceRegistry<S & { [P in K]: T }, A & { [P in K]: T }>;
 
   /** Makes `key` resolve to the service registered under `target`. */
