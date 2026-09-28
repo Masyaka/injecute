@@ -27,7 +27,7 @@ const guide: DefaultTheme.SidebarItem[] = [
     items: [
       { text: 'Testing', link: '/guide/testing' },
       { text: 'Middlewares and events', link: '/guide/middleware-events' },
-      { text: 'Async dependencies', link: '/guide/async' },
+      { text: 'Async services', link: '/guide/async' },
       { text: 'TypeScript', link: '/guide/typescript' },
       { text: 'Without a build step', link: '/guide/no-build' },
       { text: 'Recipes', link: '/guide/recipes' },

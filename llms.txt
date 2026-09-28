@@ -17,7 +17,7 @@
 - [Lifecycle and dispose](./lib/docs/guide/lifecycle.md): Release connections and other resources with dispose() and await using, in reverse creation order.
 - [Testing](./lib/docs/guide/testing.md): Replace dependencies in tests with isolated forks, clean up with await using, and assert error codes.
 - [Middlewares and events](./lib/docs/guide/middleware-events.md): Wrap resolution with middlewares (tracing, fallbacks, deprecations, guards, test doubles) and observe containers with events.
-- [Async dependencies](./lib/docs/guide/async.md): Services that are created asynchronously, with defer().
+- [Async services](./lib/docs/guide/async.md): Services created asynchronously, in a DIContainer with defer() or in an AsyncDIContainer that awaits every dependency.
 - [TypeScript](./lib/docs/guide/typescript.md): How injecute types containers, how to type modules and consumers, and what the errors look like.
 - [Without a build step](./lib/docs/guide/no-build.md): Use injecute directly in browsers, Deno and Bun, from npm, JSR or a CDN.
 - [Recipes](./lib/docs/guide/recipes.md): Request scopes, configuration-driven implementations, feature modules.

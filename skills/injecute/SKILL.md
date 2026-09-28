@@ -126,12 +126,17 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
 
 **Async**
 
-21. A factory may return a promise; dependents then receive the promise. Wrap a factory with
-    `defer(factory)` to await its promised arguments; `get()` of that service returns a promise.
+21. In a `DIContainer`, a factory may return a promise; dependents then receive the promise. Wrap a
+    factory with `defer(factory)` to await its promised arguments; `get()` of that service returns a
+    promise. A rejected singleton is retried on the next `get()`; `dispose()` releases resolved values.
+22. When much of the graph is async, use `new AsyncDIContainer()`: factories receive resolved
+    dependencies, a factory returning `Promise<T>` registers `T`, and every `get()` returns a promise.
+    Its modules take `AsyncServiceRegistry<{ … }>`, consumers `AsyncServiceProvider<{ … }>`; the sync
+    `ServiceRegistry` / `ServiceProvider` types don't accept it. `await preload(app)` at startup.
 
 **Errors**
 
-22. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
+23. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
     Branch on `error.code`, never on the message. Errors thrown by factories arrive wrapped as
     `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`.
 

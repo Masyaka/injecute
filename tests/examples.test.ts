@@ -115,6 +115,25 @@ describe('examples', () => {
     expect((await connect()).url).toBe('postgres://localhost');
   });
 
+  it('async container', async () => {
+    const { users, testUsers, handler, start, shutdown, log, UserRepository } =
+      await import('../examples/async-container.ts');
+    expect(users).toBeInstanceOf(UserRepository);
+    expect(await users.findAll()).toBe(
+      'postgres://localhost/app: select * from users',
+    );
+    expect(testUsers.pool.url).toBe('postgres://test');
+    expect(await handler()).toBe(
+      'postgres://localhost/app: select * from users',
+    );
+    await start();
+    await shutdown();
+    expect(log).toEqual([
+      'close pool postgres://test',
+      'close pool postgres://localhost/app',
+    ]);
+  });
+
   it('recipes: request scope', async () => {
     const { handle } = await import('../examples/recipes/request-scope.ts');
     expect(await handle({ headers: { 'x-user-id': '7' } })).toBe(

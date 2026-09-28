@@ -57,7 +57,7 @@ services.email; // resolves 'mailer'
 ```ts
 import { preload } from 'injecute';
 
-preload(app); // resolves every service now, so configuration errors surface at boot
+await preload(app); // resolves every service now, so configuration errors surface at boot
 ```
 
 `buildServicesGraph(app)` returns every service with its dependencies, for tooling and diagrams; the
