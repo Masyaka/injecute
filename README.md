@@ -59,17 +59,22 @@ Upgrading from 0.x? Read the [migration guide](https://masyaka.github.io/injecut
 
 ## Using injecute with AI coding agents
 
-The package ships its documentation (`node_modules/injecute/docs/`), an
-[`llms.txt`](https://masyaka.github.io/injecute/llms.txt), and an Agent Skill (`skills/injecute`). Add
-this to your project's `AGENTS.md` (or `CLAUDE.md`) so agents use the installed version's docs:
+The package ships its documentation as Markdown (`node_modules/injecute/llms.txt` and `lib/docs/`) and
+two Agent Skills (`skills/`). Add this to your project's `AGENTS.md` (or `CLAUDE.md`) so agents read the
+docs of the version you have installed:
 
 ```md
 ## injecute
 
-Before writing code that uses injecute, read `node_modules/injecute/docs/` (start with
-`llms.txt` and `guide/getting-started.md`). Register classes directly, pass dependency keys as the
-third argument, use `fork({ isolated: true })` in tests, and branch on `InjecuteError.code`.
+Before writing code that uses injecute, read `node_modules/injecute/llms.txt` and the pages it links
+(start with `lib/docs/guide/getting-started.md`). Register classes directly, pass dependency keys as the
+third argument, type modules as `ServiceRegistry<{ …what they need }>`, use `fork({ isolated: true })`
+in tests, and branch on `InjecuteError.code`.
 ```
+
+Claude Code: `/plugin marketplace add Masyaka/injecute`, then `/plugin install injecute@injecute`. Other
+agents: `npx skills add Masyaka/injecute`. More in
+[Using injecute with AI agents](https://masyaka.github.io/injecute/guide/ai-agents).
 
 ## License
 

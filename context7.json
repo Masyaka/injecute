@@ -1,4 +1,22 @@
 {
+  "$schema": "https://context7.com/schema/context7.json",
   "url": "https://context7.com/masyaka/injecute",
-  "public_key": "pk_72rnm0tvgDL33clSkGmIF"
+  "public_key": "pk_72rnm0tvgDL33clSkGmIF",
+  "projectTitle": "injecute",
+  "description": "Type-safe, decorator-free dependency injection container for TypeScript: explicit dependency keys, forks, modules, middlewares and dispose.",
+  "folders": ["docs", "skills"],
+  "excludeFolders": ["docs/.vitepress", "docs/api", "docs/errors/_details"],
+  "excludeFiles": ["changelog.md", "playground.md"],
+  "rules": [
+    "Register services with explicit dependency keys as the third argument: addSingleton('users', UserRepository, ['db']). The factory or class receives them in the same order.",
+    "Register classes directly; use construct(MyClass) only for classes compiled to ES5 or bound classes.",
+    "Build the container in one chain (or assign each add* result): every add* returns the container with a larger type.",
+    "Type modules as plain functions over ServiceRegistry<{ ...what they need }> and apply them with app.extend(module). Consumers take ServiceProvider<{ ... }>.",
+    "Use app.fork() for request scopes and app.fork({ isolated: true }).addInstance(key, fake, { replace: true }) in tests.",
+    "Optional dependencies are optional('key'); get(key, { optional: true }) returns undefined for a missing key.",
+    "Middlewares are (key, next, { container, path, depth }) => next(); add them with use() on the root container.",
+    "Errors are InjecuteError with a stable code (INJECUTE_*); branch on error.code. Factory errors are wrapped as INJECUTE_RESOLUTION_FAILED with the original in error.cause.",
+    "Release resources with await app.dispose() or await using; singletons are disposed in reverse creation order."
+  ],
+  "previousVersions": [{ "branch": "0.x" }]
 }

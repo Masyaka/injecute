@@ -48,16 +48,17 @@ What happened:
 - `app.get('users')` resolves `users` and everything it depends on. Its type is `UserRepository`,
   inferred from the registration.
 
-Hover the types to see what the container knows:
+Factory parameters and results are inferred from the registrations:
 
 ```ts twoslash
 import { DIContainer } from 'injecute';
 
 const app = new DIContainer()
   .addInstance('port', 8080)
+  // port: number
   .addSingleton('address', (port) => `http://localhost:${port}`, ['port']);
 
-const address = app.get('address');
+const address = app.get('address'); // string
 //    ^?
 ```
 

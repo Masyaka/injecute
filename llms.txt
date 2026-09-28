@@ -1,0 +1,42 @@
+# injecute
+
+> Type-safe, decorator-free dependency injection container for TypeScript. This file and the Markdown under `lib/docs/` document the installed version of injecute (1.x). Paths are relative to the package root (`node_modules/injecute/`).
+
+- Register services with explicit dependency keys: `addSingleton(key, factoryOrClass, [dependencyKeys])`. The factory receives the resolved services in the same order.
+- Classes are detected and constructed with `new`; use `construct(Class)` only for ES5-compiled or bound classes.
+- `fork()` creates a child container (request scopes); `fork({ isolated: true })` makes overrides reach the whole graph (tests).
+- Modules are plain functions over `ServiceRegistry<{ …what they need }>`, applied with `extend()`. Consumers take a `ServiceProvider<{ … }>`.
+- Optional dependencies are `optional(key)`; `get(key, { optional: true })` returns `undefined` for a missing key.
+- Every error is an `InjecuteError` with a stable `code`; branch on `code`, not on the message.
+
+## Guide
+
+- [Getting started](./lib/docs/guide/getting-started.md): Install injecute, register services with explicit dependency keys, and resolve them with full types.
+- [Registering services](./lib/docs/guide/registration.md): Lifetimes (singleton, transient, instance), dependency keys, optional dependencies, aliases, decoration and classes.
+- [Containers, forks and modules](./lib/docs/guide/containers.md): Request scopes with fork(), isolated forks for tests, modules with extend(), and namespaces.
+- [Lifecycle and dispose](./lib/docs/guide/lifecycle.md): Release connections and other resources with dispose() and await using, in reverse creation order.
+- [Testing](./lib/docs/guide/testing.md): Replace dependencies in tests with isolated forks, clean up with await using, and assert error codes.
+- [Middlewares and events](./lib/docs/guide/middleware-events.md): Wrap resolution with middlewares (tracing, fallbacks, deprecations, guards, test doubles) and observe containers with events.
+- [Async dependencies](./lib/docs/guide/async.md): Services that are created asynchronously, with defer().
+- [TypeScript](./lib/docs/guide/typescript.md): How injecute types containers, how to type modules and consumers, and what the errors look like.
+- [Without a build step](./lib/docs/guide/no-build.md): Use injecute directly in browsers, Deno and Bun, from npm, JSR or a CDN.
+- [Recipes](./lib/docs/guide/recipes.md): Request scopes, configuration-driven implementations, feature modules.
+- [Using injecute with AI agents](./lib/docs/guide/ai-agents.md): The docs in this package, the Agent Skills, llms.txt and Context7.
+
+## Concepts
+
+- [Roles: provider, registry, container](./lib/docs/concepts/roles.md): Why consumers get a ServiceProvider, modules a ServiceRegistry, and only the composition root the DIContainer.
+- [How resolution works](./lib/docs/concepts/resolution.md): Lookup through parents, which container runs a factory and owns the instance, decoration, middlewares, cycles and errors.
+
+## Reference
+
+- [Errors](./lib/docs/errors/index.md): Every error code, what it means and how to fix it.
+- [Migrating from 0.x to 1.0](./lib/docs/migration/0.x-to-1.0.md): Every breaking change, with before/after examples.
+- [Type declarations](./lib/index.d.ts): The public API, with TSDoc and an example on every export.
+- [Changelog](./CHANGELOG.md): Changes per version.
+
+## Optional
+
+- [Agent Skill: injecute](./skills/injecute/SKILL.md): How to write code with injecute.
+- [Agent Skill: injecute-migrate-to-v1](./skills/injecute-migrate-to-v1/SKILL.md): Step-by-step migration of a codebase from 0.x.
+- [Website](https://masyaka.github.io/injecute/llms.txt): The same docs online, plus the API reference and a playground.

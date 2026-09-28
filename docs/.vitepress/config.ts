@@ -31,6 +31,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'TypeScript', link: '/guide/typescript' },
       { text: 'Without a build step', link: '/guide/no-build' },
       { text: 'Recipes', link: '/guide/recipes' },
+      { text: 'Using with AI agents', link: '/guide/ai-agents' },
     ],
   },
   {
@@ -93,7 +94,9 @@ export default defineConfig({
           '`fork()` creates a child container; `fork({ isolated: true })` makes overrides reach the whole graph (tests).',
           'Modules are plain functions over `ServiceRegistry<{ …what they need }>` applied with `extend()`.',
           'Errors are `InjecuteError` with a stable `code`; each code has a page under /errors/.',
-        ].join('\n'),
+        ]
+          .map((line) => `- ${line}`)
+          .join('\n'),
         ignoreFiles: ['api/**'],
       }),
     ],

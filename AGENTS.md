@@ -29,6 +29,9 @@ injecute is a small, dependency-free, type-safe dependency injection container f
 | `src/async-container.ts` | Experimental async container. **Not exported** until its design is finished          |
 | `tests/`                 | Vitest tests                                                                         |
 | `docs/`                  | Documentation site and playground                                                    |
+| `examples/`              | Tested examples, embedded in the docs (`<<< @/../examples/…#region`)                 |
+| `skills/`                | Agent Skills for **users** of injecute (published in the package)                    |
+| `llms.txt`               | Index of the docs shipped in the package (`lib/docs/`, built by `npm run build`)     |
 
 ## Conventions
 
@@ -36,7 +39,9 @@ injecute is a small, dependency-free, type-safe dependency injection container f
 - Keep the public API small: one recommended way to do each task.
 - Every public export has TSDoc with an `@example`.
 - Every behaviour change has a test; every type change has a type test.
-- Don't edit generated output (`lib/`, `docs/dist/`).
+- Don't edit generated output (`lib/`, `docs/api/`, `docs/errors/*.md`, `docs/.vitepress/dist/`).
+- A new docs page goes into the sidebar (`docs/.vitepress/config.ts`) and into `llms.txt`; the build fails if `llms.txt` misses a page.
+- Don't put an `AGENTS.md` or `CLAUDE.md` into the published package: agents would load it as instructions in consumers' projects.
 
 ## Changesets
 
