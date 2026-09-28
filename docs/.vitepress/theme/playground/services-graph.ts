@@ -264,6 +264,13 @@ export function renderServicesGraph(graph: Tree) {
 
   const zoomGroup = svg.append('g').attr('class', 'zoom-group');
 
+  // Start zoomed in 2× on the centre; the reset button returns here.
+  const initialZoom = d3.zoomIdentity
+    .translate(width / 2, height / 2)
+    .scale(2)
+    .translate(-width / 2, -height / 2);
+  svg.call(zoomBehavior.transform, initialZoom);
+
   // Create arrow markers
   const defs = zoomGroup.append('defs');
 
@@ -462,7 +469,7 @@ export function renderServicesGraph(graph: Tree) {
   setupClickHandlers(nodes, links);
 
   // Add zoom controls
-  addZoomControls(container, svg, zoomBehavior);
+  addZoomControls(container, svg, zoomBehavior, initialZoom);
 
   return '';
 }
@@ -471,6 +478,7 @@ function addZoomControls(
   container: d3.Selection<d3.BaseType, unknown, HTMLElement, any>,
   svg: d3.Selection<SVGSVGElement, unknown, HTMLElement, any>,
   zoom: d3.ZoomBehavior<SVGSVGElement, unknown>,
+  initial: d3.ZoomTransform,
 ) {
   const controlsDiv = container
     .append('div')
@@ -507,7 +515,7 @@ function addZoomControls(
     .attr('title', 'Reset Zoom')
     .html('⊙')
     .on('click', () => {
-      svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+      svg.transition().duration(500).call(zoom.transform, initial);
     });
 }
 

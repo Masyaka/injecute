@@ -42,14 +42,32 @@ function configure() {
     JSON.stringify({ name: 'injecute', types: './lib/index.d.ts' }),
     'file:///node_modules/injecute/package.json',
   );
+  // The worker's shim of node:async_hooks (see async-hooks.ts); Node's own types are too big to load.
+  ts.typescriptDefaults.addExtraLib(
+    `declare module 'node:async_hooks' {
+  export class AsyncLocalStorage<T> {
+    getStore(): T | undefined;
+    run<R, A extends any[]>(store: T, callback: (...args: A) => R, ...args: A): R;
+    exit<R, A extends any[]>(callback: (...args: A) => R, ...args: A): R;
+  }
+}`,
+    'file:///node_modules/@types/node/async_hooks.d.ts',
+  );
   ts.typescriptDefaults.setCompilerOptions({
-    target: ts.ScriptTarget.ES2020,
+    // ES2016 compiles async/await to generators driven by then(), which carries AsyncLocalStorage
+    // stores in the worker; see async-hooks.ts.
+    target: ts.ScriptTarget.ES2016,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     lib: ['es2022', 'esnext.disposable', 'webworker'],
     strict: true,
     noEmit: false,
     allowNonTsExtensions: true,
+  });
+  // 1378: top-level await needs ES2017+. It runs natively, so the ES2016 target doesn't matter to it.
+  ts.typescriptDefaults.setDiagnosticsOptions({
+    ...ts.typescriptDefaults.getDiagnosticsOptions(),
+    diagnosticCodesToIgnore: [1378],
   });
 }
 

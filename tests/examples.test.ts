@@ -1,6 +1,6 @@
 // Runs every file in examples/ (the code the docs embed) and checks what the docs say it does.
 import { DIContainer } from 'injecute';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('examples', () => {
   it('getting-started', async () => {
@@ -243,5 +243,37 @@ describe('examples', () => {
     expect(app.get('mailer').send('ada@example.com')).toBe(
       'smtp → ada@example.com',
     );
+  });
+  it('real world: context, logger, tracer and namespaces', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { responses, traces } = await import('../examples/real-world.ts');
+    const lines = log.mock.calls.map(([line]) => String(line));
+    log.mockRestore();
+    expect(responses).toEqual(['alice: 1 × book', 'failed']);
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        'INFO  - - - [app] server started',
+        'INFO  trace-1 span-3 alice [catalog] book costs 12',
+        'INFO  trace-1 span-2 alice [orders] order placed',
+        'ERROR trace-from-gateway span-8 bob [payments] declined 60, the limit is 50',
+        'ERROR trace-from-gateway - bob [http] 500: payment declined',
+      ]),
+    );
+    expect(traces.map((t) => t.map((l) => l.replace(/\d+ms/, 'Xms')))).toEqual([
+      [
+        'trace trace-1',
+        '  POST /orders Xms',
+        '    orders.place Xms',
+        '      catalog.price Xms',
+        '      payments.charge Xms',
+      ],
+      [
+        'trace trace-from-gateway',
+        '  POST /orders Xms  ✗ payment declined',
+        '    orders.place Xms  ✗ payment declined',
+        '      catalog.price Xms',
+        '      payments.charge Xms  ✗ payment declined',
+      ],
+    ]);
   });
 });

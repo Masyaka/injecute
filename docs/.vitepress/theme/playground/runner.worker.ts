@@ -1,6 +1,8 @@
 // Runs playground code off the page: no DOM, a fresh worker per run, terminated after a timeout.
-// The library is bundled into this worker; `import … from 'injecute'` in user code is rewritten to it.
+// The library is bundled into this worker; `import … from 'injecute'` in user code is rewritten to it,
+// and `node:async_hooks` to a shim of `AsyncLocalStorage`.
 import * as injecute from '../../../../src/index.ts';
+import * as asyncHooks from './async-hooks.ts';
 import type {
   RunnerMessage,
   RunRequest,
@@ -10,11 +12,14 @@ import type {
 
 const scope = self as unknown as {
   __injecute: typeof injecute;
+  __asyncHooks: typeof asyncHooks;
   process?: { env: Record<string, string | undefined> };
   postMessage(message: RunnerMessage): void;
   onmessage: ((event: MessageEvent<RunRequest>) => void) | null;
 };
 scope.__injecute = injecute;
+scope.__asyncHooks = asyncHooks;
+asyncHooks.installAsyncContext(self);
 scope.process ??= { env: {} };
 
 const logs: string[] = [];
@@ -33,17 +38,26 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug'] as const) {
     );
 }
 
+/** The modules user code can import, by the global the worker exposes them as. */
+const modules: Record<string, string> = {
+  injecute: '__injecute',
+  'node:async_hooks': '__asyncHooks',
+  async_hooks: '__asyncHooks',
+};
+
 /** `import { A, B as C } from 'injecute'` → `const { A, B: C } = globalThis.__injecute;` */
 function rewriteImports(code: string): string {
+  const from = `\\s*from\\s*['"](${Object.keys(modules).join('|')})['"];?`;
   return code
     .replace(
-      /import\s*\{([^}]*)\}\s*from\s*['"]injecute['"];?/g,
-      (_m, names: string) =>
-        `const {${names.replace(/\b(\w+)\s+as\s+(\w+)/g, '$1: $2')}} = globalThis.__injecute;`,
+      new RegExp(`import\\s*\\{([^}]*)\\}${from}`, 'g'),
+      (_m, names: string, module: string) =>
+        `const {${names.replace(/\b(\w+)\s+as\s+(\w+)/g, '$1: $2')}} = globalThis.${modules[module]};`,
     )
     .replace(
-      /import\s*\*\s*as\s+(\w+)\s+from\s*['"]injecute['"];?/g,
-      'const $1 = globalThis.__injecute;',
+      new RegExp(`import\\s*\\*\\s*as\\s+(\\w+)${from}`, 'g'),
+      (_m, name: string, module: string) =>
+        `const ${name} = globalThis.${modules[module]};`,
     )
     .replace(/import\s+['"]injecute['"];?/g, '');
 }

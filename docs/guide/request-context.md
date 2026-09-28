@@ -52,6 +52,9 @@ Each request runs inside `storage.run()`:
 Everything the request calls sees its context, including code after `await` and in parallel promises.
 Concurrent requests don't see each other's context.
 
+A whole app on this pattern, with a logger and a tracer that read the context and feature modules in
+namespaces: [open it in the playground](../playground?example=real-world).
+
 ### Queue consumers, cron jobs, CLI commands
 
 Every entry point runs its work in `storage.run()`, so the application code is the same everywhere:

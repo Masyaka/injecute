@@ -20,7 +20,7 @@ import type {
 } from './playground/protocol.ts';
 import './playground/playground.css';
 
-// request-context/ needs node:async_hooks and relative imports, which the worker can't run
+// request-context/ uses relative imports, which the worker can't run
 const examples = import.meta.glob(
   ['../../../examples/**/*.ts', '!../../../examples/request-context/**'],
   { query: '?raw', import: 'default' },

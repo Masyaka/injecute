@@ -99,3 +99,19 @@ export default c;`),
     'https://masyaka.github.io/injecute/errors/not-registered',
   );
 });
+
+test("AsyncLocalStorage keeps each request's context across awaits", async ({
+  page,
+}) => {
+  await page.goto('playground?example=real-world');
+  await expect(status(page)).toHaveText(/\d+ services/, { timeout: 30_000 });
+  await page.getByRole('button', { name: /Console/ }).click();
+  const console = page.locator('.playground-console');
+  await expect(console).toContainText(
+    'INFO  trace-1 span-3 alice [catalog] book costs 12',
+  );
+  await expect(console).toContainText(
+    'ERROR trace-from-gateway span-8 bob [payments] declined 60, the limit is 50',
+  );
+  await expect(console).toContainText('payments.charge');
+});
