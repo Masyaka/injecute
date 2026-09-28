@@ -3,7 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      # 1.x docs go live when `next` is merged into `main` at the release (S6.3)
+      # `next` deploys the 1.x docs during the release candidates (their error messages link to
+      # /errors/ pages). Remove it after 1.0.0, when releases move to `main`.
+      - next
       - main
   workflow_dispatch:
 
