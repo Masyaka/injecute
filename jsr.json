@@ -5,7 +5,6 @@
   "license": "MIT",
   "exports": "./src/index.ts",
   "publish": {
-    "include": ["src/**/*.ts", "README.md", "LICENSE"],
-    "exclude": ["src/async-container.ts"]
+    "include": ["src/**/*.ts", "README.md", "LICENSE"]
   }
 }

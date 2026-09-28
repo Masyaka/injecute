@@ -1,4 +1,5 @@
 import type {
+  AsyncServiceProvider,
   RegistrationInfo,
   ServiceKey,
   ServiceProvider,
@@ -36,7 +37,7 @@ const finalRegistration = (info: RegistrationInfo): RegistrationInfo => {
 };
 
 function toTreeNode(
-  container: ServiceProvider,
+  container: ServiceProvider | AsyncServiceProvider,
   key: ServiceKey,
   tree: Tree,
   depth = 0,
@@ -87,7 +88,9 @@ function toTreeNode(
  * Builds a plain object describing every service visible from `container` and its direct dependencies.
  * Used by the playground to render the services graph.
  */
-export function buildServicesGraph(container: ServiceProvider): Tree {
+export function buildServicesGraph(
+  container: ServiceProvider | AsyncServiceProvider,
+): Tree {
   const result: Tree = {};
   for (const key of container.keys) {
     result[String(key)] = toTreeNode(container, key, result);

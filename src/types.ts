@@ -1,3 +1,4 @@
+import type { AsyncDIContainer } from './async-container.ts';
 import type { DIContainer } from './container.ts';
 
 // ------------------------------------------------------------------------------------------- keys
@@ -417,16 +418,200 @@ export interface ServiceRegistry<
 /** @deprecated Use {@link ServiceRegistry} (read + register) or {@link ServiceProvider} (read-only). */
 export type IDIContainer<S extends object = {}> = ServiceRegistry<S, S>;
 
-/** The service map of a container, registry or provider type. */
+// ------------------------------------------------------------------------------- async containers
+
+/**
+ * Read-only access to an {@link AsyncDIContainer}'s services. Like {@link ServiceProvider}, but
+ * resolutions return promises of the (resolved) service types.
+ *
+ * @example
+ * ```ts
+ * function createHandler(services: AsyncServiceProvider<{ users: UserRepository }>) {
+ *   return async (id: string) => (await services.get('users')).find(id);
+ * }
+ * createHandler(app); // an AsyncDIContainer with `users` and more
+ * ```
+ */
+export interface AsyncServiceProvider<S extends object = {}> {
+  /**
+   * Resolves a service. Rejects when the key is not registered, unless `{ optional: true }` is passed.
+   */
+  get<K extends keyof S, O extends GetOptions = {}>(
+    key: K,
+    options?: O,
+  ): Promise<O extends { optional: true } ? S[K] | undefined : S[K]>;
+
+  /** `true` when a service is registered under `key` (here or in a parent). */
+  has(key: ServiceKey, options?: HasOptions): boolean;
+
+  /** Returns a function that resolves `key` when called. */
+  createResolver<K extends keyof S>(key: K): () => Promise<S[K]>;
+
+  /** Resolves a function service and calls it with `args`. */
+  call<K extends keyof S>(
+    key: K,
+    args: Parameters<Extract<S[K], (...args: any[]) => any>>,
+    thisArg?: unknown,
+  ): Promise<Awaited<ReturnType<Extract<S[K], (...args: any[]) => any>>>>;
+
+  /** Keys visible from this container, including its parents'. */
+  readonly keys: readonly ServiceKey[];
+
+  /** Keys registered in this container. */
+  readonly ownKeys: readonly ServiceKey[];
+
+  /** The parent container (read-only view), if any. */
+  getParent(): AsyncServiceProvider | undefined;
+
+  /** Read-only metadata of the registration visible under `key`, or `undefined`. */
+  getRegistration(key: ServiceKey): RegistrationInfo | undefined;
+}
+
+/** Services added under a namespace of an async container: `Name` and `Name.key` for each service. */
+export type AsyncNamespacedServices<N extends string, T> = {
+  [P in N]: AsyncServiceProvider<T & {}>;
+} & {
+  [K in keyof T as K extends string | number ? `${N}.${K}` : never]: T[K];
+};
+
+/**
+ * Read + register for an {@link AsyncDIContainer}: what its modules and `namespace()` callbacks
+ * receive. Factories receive resolved dependencies; a factory returning `Promise<T>` registers `T`.
+ * Async modules work only with async containers.
+ *
+ * @example
+ * ```ts
+ * const addBilling = (c: AsyncServiceRegistry<{ db: Database }>) =>
+ *   c.addSingleton('invoices', InvoiceRepository, ['db']);
+ *
+ * asyncApp.extend(addBilling);
+ * ```
+ */
+export interface AsyncServiceRegistry<
+  S extends object = {},
+  A extends object = {},
+> extends AsyncServiceProvider<S> {
+  /**
+   * Registers a service created once and cached. The factory receives resolved dependencies and may
+   * return a promise; the service type is the resolved value.
+   */
+  addSingleton<
+    K extends ServiceKey,
+    F extends Factory<D, S>,
+    D extends Dependency<S>[] = [],
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | SingletonOptions<[...D], Awaited<Produced<F>>>,
+  ): AsyncServiceRegistry<
+    S & { [P in K]: Awaited<Produced<F>> },
+    A & { [P in K]: Awaited<Produced<F>> }
+  >;
+
+  /** Registers a service created on every resolution. */
+  addTransient<
+    K extends ServiceKey,
+    F extends Factory<D, S>,
+    D extends Dependency<S>[] = [],
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | RegistrationOptions<[...D]>,
+  ): AsyncServiceRegistry<
+    S & { [P in K]: Awaited<Produced<F>> },
+    A & { [P in K]: Awaited<Produced<F>> }
+  >;
+
+  /** Registers an existing value (or a promise of it). */
+  addInstance<K extends ServiceKey, T>(
+    key: K,
+    value: T,
+    options?: InstanceOptions<Awaited<T>>,
+  ): AsyncServiceRegistry<
+    S & { [P in K]: Awaited<T> },
+    A & { [P in K]: Awaited<T> }
+  >;
+
+  /** Makes `key` resolve to the service registered under `target`. */
+  addAlias<K extends ServiceKey, T extends keyof S>(
+    key: K,
+    target: T,
+  ): AsyncServiceRegistry<S & { [P in K]: S[T] }, A & { [P in K]: S[T] }>;
+
+  /**
+   * Registers the services added by `extension` under `name.`: `name.key` for each of them, and `name`
+   * for the namespace's provider. The extension receives a fork of this container.
+   */
+  namespace<const N extends string, NA extends object, Req extends object = S>(
+    name: N,
+    extension: [S] extends [Req]
+      ? (
+          registry: AsyncServiceRegistry<Req, {}>,
+        ) => AsyncServiceRegistry<any, NA> | AsyncDIContainer<NA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof S
+          >;
+        },
+  ): AsyncServiceRegistry<
+    S & AsyncNamespacedServices<N, NA>,
+    A & AsyncNamespacedServices<N, NA>
+  >;
+
+  /** Applies a module function that registers services. */
+  extend<EA extends object, Req extends object = S>(
+    extension: [S] extends [Req]
+      ? (
+          registry: AsyncServiceRegistry<Req, {}>,
+        ) => AsyncServiceRegistry<any, EA> | AsyncDIContainer<EA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof S
+          >;
+        },
+  ): AsyncServiceRegistry<S & EA, A & EA>;
+
+  /** Runs a function (or class) with resolved dependencies, without registering it. */
+  injecute<D extends Dependency<S>[], R>(
+    factory:
+      | ((...args: ResolveDependencies<D, S>) => R)
+      | (new (...args: ResolveDependencies<D, S>) => R),
+    dependencies: [...D],
+  ): Promise<Awaited<R>>;
+
+  /** Returns a function that runs `factory` with resolved dependencies each time it is called. */
+  bind<D extends Dependency<S>[], R>(
+    dependencies: [...D],
+    factory:
+      | ((...args: ResolveDependencies<D, S>) => R)
+      | (new (...args: ResolveDependencies<D, S>) => R),
+  ): () => Promise<Awaited<R>>;
+}
+
+// ---------------------------------------------------------------------------------------- helpers
+
+/** The service map of a container, registry or provider type (sync or async). */
 export type ContainerServices<C> =
   C extends DIContainer<infer S>
     ? S
-    : C extends ServiceRegistry<infer S, any>
+    : C extends AsyncDIContainer<infer S>
       ? S
-      : C extends ServiceProvider<infer S>
+      : C extends AsyncServiceRegistry<infer S, any>
         ? S
-        : never;
+        : C extends AsyncServiceProvider<infer S>
+          ? S
+          : C extends ServiceRegistry<infer S, any>
+            ? S
+            : C extends ServiceProvider<infer S>
+              ? S
+              : never;
 
 /** The services of namespace `N` of container type `C`. */
 export type NamespaceServices<C, N extends keyof ContainerServices<C>> =
-  ContainerServices<C>[N] extends ServiceProvider<infer S> ? S : never;
+  ContainerServices<C>[N] extends ServiceProvider<infer S>
+    ? S
+    : ContainerServices<C>[N] extends AsyncServiceProvider<infer S>
+      ? S
+      : never;

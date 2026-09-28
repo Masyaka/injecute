@@ -2,6 +2,7 @@
 // on the oldest supported TypeScript version and the latest one. Keep it using every public API.
 import {
   addNamedResolvers,
+  AsyncDIContainer,
   buildServicesGraph,
   construct,
   createNamedResolvers,
@@ -12,6 +13,8 @@ import {
   optional,
   preload,
   setCacheInstance,
+  type AsyncServiceProvider,
+  type AsyncServiceRegistry,
   type Middleware,
   type ServiceProvider,
   type ServiceRegistry,
@@ -88,7 +91,24 @@ app.addSingleton('bad', (n: number) => n, ['url']);
 // @ts-expect-error a provider cannot register
 (app as ServiceProvider<{ url: string }>).addInstance('x', 1);
 
+const addAsyncRepo = (
+  c: AsyncServiceRegistry<{ logger: Logger; url: string }>,
+) => c.addSingleton('repo', Repo, ['logger', 'url']);
+const asyncApp = new AsyncDIContainer()
+  .addSingleton('logger', Logger)
+  .addSingleton('url', async () => 'postgres://')
+  .extend(addAsyncRepo);
+const readAsync = (p: AsyncServiceProvider<{ repo: Repo }>) => p.get('repo');
+const asyncRepo: Promise<Repo> = readAsync(asyncApp.fork());
+const asyncPreload: Promise<void> = preload(asyncApp);
+const asyncGraph = buildServicesGraph(asyncApp);
+// @ts-expect-error an async container is not a sync ServiceProvider
+consume(asyncApp);
+
 export {
+  asyncRepo,
+  asyncPreload,
+  asyncGraph,
   repo,
   logger,
   maybe,

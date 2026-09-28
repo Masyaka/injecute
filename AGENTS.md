@@ -26,7 +26,7 @@ injecute is a small, dependency-free, type-safe dependency injection container f
 | `src/container.ts`       | `DIContainer`: registration, resolution, forks, namespaces, middlewares, events      |
 | `src/types.ts`           | Public types and type-level helpers                                                  |
 | `src/utils/`             | Optional helpers (`construct`, `defer`, `preload`, proxy accessor, resolvers, graph) |
-| `src/async-container.ts` | Experimental async container. **Not exported** until its design is finished          |
+| `src/async-container.ts` | `AsyncDIContainer`: a `DIContainer` subclass, typed by its own interfaces            |
 | `tests/`                 | Vitest tests                                                                         |
 | `docs/`                  | Documentation site and playground                                                    |
 | `examples/`              | Tested examples, embedded in the docs (`<<< @/../examples/…#region`)                 |

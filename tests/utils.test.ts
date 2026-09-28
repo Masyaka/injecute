@@ -7,6 +7,7 @@ import {
   createNamedResolvers,
   createResolversTuple,
   addNamedResolvers,
+  AsyncDIContainer,
   DIContainer,
 } from '../src/index.ts';
 import { setCacheInstance } from '../src/utils/set-cache-instance.ts';
@@ -162,6 +163,49 @@ describe('utils', () => {
       expect(singletonCalled).toBe(false);
       expect(transientCalled).toBe(true);
       expect(instanceCalled).toBe(false);
+    });
+
+    it('waits for async singletons and rejects with their failure', async () => {
+      let created = false;
+      const ok = new DIContainer().addSingleton('db', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        created = true;
+      });
+      await preload(ok);
+      expect(created).toBe(true);
+
+      const failing = new DIContainer()
+        .addSingleton('fine', () => 1)
+        .addSingleton('db', async () => {
+          throw new Error('connection refused');
+        });
+      await expect(preload(failing)).rejects.toMatchObject({
+        code: 'INJECUTE_RESOLUTION_FAILED',
+        path: ['db'],
+      });
+    });
+
+    it('throws synchronous failures of a sync container immediately', () => {
+      const container = new DIContainer().addSingleton('bad', () => {
+        throw new Error('bad config');
+      });
+      expect(() => preload(container)).toThrow('bad config');
+    });
+
+    it('preloads an async container', async () => {
+      const created: string[] = [];
+      const container = new AsyncDIContainer()
+        .addSingleton('a', async () => created.push('a'))
+        .addSingleton('b', (a) => created.push(`b${a}`), ['a']);
+      await preload(container);
+      expect(created).toEqual(['a', 'b1']);
+      await expect(
+        preload(
+          new AsyncDIContainer().addSingleton('x', () => {
+            throw new Error('x');
+          }),
+        ),
+      ).rejects.toMatchObject({ code: 'INJECUTE_RESOLUTION_FAILED' });
     });
   });
 

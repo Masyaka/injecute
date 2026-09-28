@@ -29,6 +29,7 @@
  */
 export type * from './types.ts';
 export { DIContainer } from './container.ts';
+export { AsyncDIContainer } from './async-container.ts';
 export {
   CircularDependencyError,
   errorCodes,
