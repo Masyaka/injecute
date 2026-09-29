@@ -183,7 +183,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      # CDNs pick up a new version within minutes; the script retries for up to ~10 minutes
-      - run: deno run --allow-net --allow-env --allow-import tests/smoke/cdn.mjs
+      # CDNs pick up a new version within minutes; the script retries for up to ~10 minutes.
+      # --minimum-dependency-age=0: Deno skips versions younger than 24 hours by default.
+      - run: deno run --minimum-dependency-age=0 --allow-net --allow-env --allow-import tests/smoke/cdn.mjs
         env:
           INJECUTE_VERSION: ${{ needs.publish.outputs.version }}

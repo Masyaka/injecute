@@ -1,6 +1,6 @@
 // After a release: imports the published version from the CDNs and JSR, the way no-build users do
 // (docs/guide/no-build.md), and runs a small container on each. Run with Deno:
-//   INJECUTE_VERSION=1.0.0 deno run --allow-net --allow-env --allow-import tests/smoke/cdn.mjs
+//   INJECUTE_VERSION=1.0.0 deno run --minimum-dependency-age=0 --allow-net --allow-env --allow-import tests/smoke/cdn.mjs
 // CDNs pick up a new version within minutes, so each source is polled before it is imported.
 const version = process.env.INJECUTE_VERSION;
 if (!version) throw new Error('Set INJECUTE_VERSION');
