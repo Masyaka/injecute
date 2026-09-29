@@ -1,6 +1,6 @@
 {
   "name": "injecute",
-  "version": "0.18.0",
+  "version": "1.0.0-rc.0",
   "description": "Lightweight, type-safe, decorator-free dependency injection container for TypeScript",
   "type": "module",
   "repository": {
