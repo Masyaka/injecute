@@ -7,7 +7,7 @@ node_modules
 package-lock.json
 handoffs
 CHANGELOG.md
-.changeset/*.md
+.changeset/**/*.md
 test-results
 playwright-report
 tests/fixtures
