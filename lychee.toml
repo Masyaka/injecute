@@ -1,0 +1,19 @@
+# Link check for the docs (CI: the "Docs" job in .github/workflows/tests.yml).
+# Links inside the site are checked by `vitepress build` (it fails on dead links) and by
+# scripts/build-package-docs.mjs / scripts/check-site-llms.mjs; this checks everything else.
+max_retries = 3
+retry_wait_time = 5
+timeout = 30
+scheme = ["https", "http"]
+accept = ["200..=299", "429"]
+exclude = [
+  # the 1.x site is deployed at the release; its pages are checked from the build instead
+  '^https://masyaka\.github\.io/injecute',
+  '^https://context7\.com/masyaka',
+  '^https://(www\.)?npmjs\.com',
+  '^https://claude\.ai',
+  '^https://chatgpt\.com',
+  'example\.com',
+  '^https?://localhost',
+]
+exclude_path = ["node_modules", "docs/.vitepress", "docs/api", "handoffs"]

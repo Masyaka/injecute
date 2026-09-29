@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>class called without new</title>
+<pre id="out">pending</pre>
+<script type="module">
+  import { DIContainer } from '/lib/index.js';
+  let result = 'not thrown';
+  try {
+    new DIContainer()
+      .addSingleton('b', class Native {}.bind(null), [])
+      .get('b');
+  } catch (error) {
+    result =
+      error.code === 'INJECUTE_CLASS_NOT_CONSTRUCTED'
+        ? 'ok'
+        : error.code + ': ' + error.message;
+  }
+  document.getElementById('out').textContent = result;
+</script>

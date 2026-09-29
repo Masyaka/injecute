@@ -1,7 +1,23 @@
 node_modules
-playground
+/playground
 lib
 .idea
 .vscode
 .DS_Store
 docs/dist
+# generated docs
+docs/.vitepress/dist
+docs/.vitepress/cache
+docs/api
+docs/errors/*.md
+
+# Local planning / agent handoff notes
+handoffs
+
+# Playwright output
+test-results
+playwright-report
+coverage
+
+# created by `deno run` (the CDN smoke test)
+/deno.lock

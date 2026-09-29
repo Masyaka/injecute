@@ -1,39 +1,18 @@
 {
   "name": "injecute",
-  "version": "0.18.0",
-  "description": "Lightweight extendable typesafe dependency injection container",
+  "version": "1.0.0-rc.0",
+  "description": "Lightweight, type-safe, decorator-free dependency injection container for TypeScript",
+  "type": "module",
   "repository": {
+    "type": "git",
     "url": "git+https://github.com/Masyaka/injecute.git"
   },
-  "scripts": {
-    "clean": "rm -rf ./lib",
-    "watch": "tsc --watch",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
-    "build:esm": "tsc -p ./tsconfig.esm.json",
-    "build:cjs": "tsc -p ./tsconfig.cjs.json",
-    "docs:build": "vite build docs/ --base ./",
-    "docs:dev": "vite docs/",
-    "prepack": "npm run build",
-    "format": "npx prettier ./src -w",
-    "test": "vitest"
+  "homepage": "https://masyaka.github.io/injecute/",
+  "bugs": {
+    "url": "https://github.com/Masyaka/injecute/issues"
   },
-  "types": "./lib/cjs/index.d.ts",
-  "main": "./lib/cjs/index.js",
-  "files": [
-    "lib/**/*"
-  ],
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./lib/esm/index.d.ts",
-        "default": "./lib/esm/index.js"
-      },
-      "require": {
-        "types": "./lib/cjs/index.d.ts",
-        "default": "./lib/cjs/index.js"
-      }
-    }
-  },
+  "license": "MIT",
+  "author": "Masyaka",
   "keywords": [
     "di",
     "dic",
@@ -48,19 +27,81 @@
     "functional",
     "fp"
   ],
-  "author": "Masyaka",
-  "license": "MIT",
-  "devDependencies": {
-    "@types/chai": "^4.3.20",
-    "chai": "^4.5.0",
-    "monaco-editor": "^0.52.2",
-    "prettier": "^2.8.8",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.7",
-    "vitest": "^5.0.2",
-    "@types/d3": "^7.4.3",
-    "d3": "^7.9.0"
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
   },
-  "dependencies": {}
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "src",
+    "skills",
+    "llms.txt",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "rm -rf ./lib",
+    "build": "npm run clean && tsc -p ./tsconfig.build.json && node scripts/postbuild.mjs && npm run docs:errors && npm run docs:package",
+    "typecheck": "tsc -p ./tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run check:versions",
+    "changeset": "changeset",
+    "prepack": "npm run build",
+    "check:versions": "node scripts/sync-jsr-version.mjs --check",
+    "check:jsr": "deno publish --dry-run --allow-dirty",
+    "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json",
+    "check:package": "npm run build && publint --strict && attw --pack . --profile esm-only && node scripts/check-tarball.mjs",
+    "test:smoke": "node tests/smoke/run.mjs",
+    "test:types-consumer": "node tests/types-consumer/run.mjs",
+    "test:browser": "playwright test -c tests/browser/playwright.config.ts",
+    "bench:types": "node scripts/type-perf.mjs",
+    "docs:api": "typedoc",
+    "docs:errors": "node scripts/generate-error-pages.mjs",
+    "docs:package": "node scripts/build-package-docs.mjs",
+    "docs:prepare": "npm run build && npm run docs:api",
+    "docs:dev": "npm run docs:prepare && vitepress dev docs",
+    "docs:build": "npm run docs:prepare && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "docs:check": "node scripts/check-site-llms.mjs",
+    "test:docs": "playwright test -c tests/docs/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@shikijs/vitepress-twoslash": "^4.4.3",
+    "@types/d3": "^7.4.3",
+    "@types/node": "^24.19.0",
+    "@vitest/coverage-v8": "^5.0.2",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "d3": "^7.9.0",
+    "eslint": "^10.11.0",
+    "lz-string": "^1.5.0",
+    "monaco-editor": "^0.52.2",
+    "prettier": "^3.9.9",
+    "publint": "^0.3.24",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.13.1",
+    "typedoc-vitepress-theme": "^1.1.4",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.1",
+    "vitepress": "2.0.0-alpha.20",
+    "vitepress-plugin-llms": "^1.14.0",
+    "vitest": "^5.0.2"
+  }
 }

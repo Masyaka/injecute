@@ -1,557 +1,877 @@
-export type ValueOf<T> = T[keyof T];
-export type Empty = {
-  /*  */
-};
-export type Constructor<TParams extends readonly any[], TResult> = {
-  new (...params: TParams): TResult;
-};
-export type Func<TParams extends readonly any[], TResult> = (
-  ...params: TParams
-) => TResult;
-export type Callable<TParams extends readonly any[], TResult> = Func<
-  TParams,
-  TResult
->;
+import type { AsyncDIContainer } from './async-container.ts';
+import type { DIContainer } from './container.ts';
 
-export type PromisedProperties<T extends Record<ArgumentsKey, any>> = {
-  [K in keyof T]: T[K] extends Promise<any> ? T[K] : Promise<T[K]>;
-};
+// ------------------------------------------------------------------------------------------- keys
 
-export type CallableResult<TCallable> = TCallable extends Constructor<any, any>
-  ? InstanceType<TCallable>
-  : TCallable extends Func<any, any>
-  ? ReturnType<TCallable>
-  : unknown;
+/** A service key: the name a service is registered and resolved under. */
+export type ServiceKey = string | number | symbol;
 
-export type CallableOf<K, TServices> = K extends keyof TServices
-  ? Callable<ValueOf<TServices>[], TServices[K]>
-  : Callable<ValueOf<TServices>[], any>;
+/** @deprecated Renamed to {@link ServiceKey}. */
+export type ArgumentsKey = ServiceKey;
 
-/**
- * Narrows type `O` to keys where values of specific type `T`
- * @example
- * ```
- * type X = ValuesOfType<{ x: 'a', y: 1  }, string>;
- * // { x: 'a' }
- * ```
- */
-export type ValuesOfType<O, T> = {
-  [K in keyof O as O[K] extends T ? K : never]: O[K];
-};
+// ----------------------------------------------------------------------------------- dependencies
 
-/**
- * Keys of type `O` where values is the `T`
- * @example
- * ```
- * type X = KeyForValueOfType<{ x: 'a', y: 1, z: string  }, string>;
- * // 'x' | 'z'
- * ```
- */
-export type KeyForValueOfType<O, T> = keyof ValuesOfType<O, T>;
+declare const optionalDependencyBrand: unique symbol;
 
-export type ArgumentsTypes<C extends Callable<any[], any>> = C extends Callable<
-  infer D,
-  any
->
-  ? D
-  : never;
-
-/**
- * Suitable keys of record for function arguments
- * @example
- * ```
- * type X = Dependencies<(first: number, second: string) => any, { x: 1, y: '2' , z: 'z', s: Symbol}>
- *   // ['x', 'y' | 'z']
- * ```
- */
-export type Dependencies<
-  C extends Callable<any[], any>,
-  TServices extends Record<ArgumentsKey, any>,
-  A extends ArgumentsTypes<C> = ArgumentsTypes<C>,
-> = TypesToKeys<A, TServices>;
-
-export type TypesToKeys<
-  Tup extends readonly any[],
-  TServices extends Record<ArgumentsKey, any>,
-> = Tup extends readonly [infer H, ...infer R extends readonly any[]]
-  ? [KeyForValueOfType<TServices, H> | (() => H), ...TypesToKeys<R, TServices>]
-  : [];
-
-export type Dependency<TServices extends Record<string, any>> =
-  | OptionalDependencySkipKey
-  | keyof TServices
-  | Callable<any, any>;
-
-export type DependenciesToTypes<
-  Keys extends readonly Dependency<TServices>[],
-  TServices extends Record<ArgumentsKey, any>,
-> = Keys extends readonly [
-  infer Head extends any,
-  ...infer Rest extends readonly any[],
-]
-  ? [
-      Head extends () => any
-        ? ReturnType<Head>
-        : Head extends OptionalDependencySkipKey
-        ? undefined
-        : Head extends ArgumentsKey
-        ? TServices[Head]
-        : never,
-      ...DependenciesToTypes<Rest, TServices>,
-    ]
-  : [];
-
-export type GetOptions = { allowUnresolved: boolean };
-
-export type Resolve<T> = () => T;
-
-export type ResolversMapKeys<
-  Keys extends readonly (
-    | readonly [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
-  )[],
-> = Keys extends [
-  infer Key,
-  ...infer Rest extends readonly (
-    | [ArgumentsKey, ArgumentsKey]
-    | ArgumentsKey
-  )[],
-]
-  ? [
-      Key extends ArgumentsKey
-        ? [Key, Key]
-        : Key extends [ArgumentsKey, ArgumentsKey]
-        ? Key
-        : never,
-      ...ResolversMapKeys<Rest>,
-    ]
-  : [];
-
-export type Resolver<TServices> = <Key extends keyof TServices>(
-  name: Key,
-) => TServices[Key] | undefined;
-
-export const optionalDependencySkipKey = 'undefined' as const;
-export type OptionalDependencySkipKey = typeof optionalDependencySkipKey;
-
-export type ArgumentsKey = string | symbol | number;
-
-export type ArgumentsResolver = <
-  TServices extends Record<ArgumentsKey, any>,
-  C extends IDIContainer<TServices>,
->(
-  this: C,
-  fn: Callable<any, any>,
-  argumentsKey: ArgumentsKey,
-) => () => TServices[ArgumentsKey] | undefined;
-
-export type IDIContainerExtension<
-  In extends Record<string, any>,
-  Added extends Record<string, any>,
-  Out extends In & Added = In & Added,
-> = (this: IDIContainer<In>, c: IDIContainer<In>) => IDIContainer<Out>;
-
-export type ContainerServices<C extends IDIContainer<any, any>> =
-  C extends IDIContainer<infer O, infer P> ? Flatten<O & P> : never;
-
-export type ContainerParentServices<C extends IDIContainer<any, any>> =
-  C extends IDIContainer<any, infer P> ? P : never;
-
-export type ContainerOwnServices<C extends IDIContainer<any, any>> =
-  C extends IDIContainer<infer O, any> ? O : never;
-
-export type NamespaceServices<
-  C extends IDIContainer<any>,
-  N extends keyof ContainerServices<C>,
-> = ContainerServices<C>[N] extends IDIContainer<any>
-  ? ContainerServices<ContainerServices<C>[N]>
-  : `${N extends string ? N : ''} is not a namespace container`;
-
-export type InjecuteOptions<
-  TContainerKey,
-  Deps extends readonly (
-    | OptionalDependencySkipKey
-    | TContainerKey
-    | Resolve<any>
-  )[],
-> = {
-  argumentsKey?: TContainerKey | undefined;
-  argumentsNames?: [...Deps];
-};
-
-export type WithNamespace<
-  TNamespace extends string,
-  TNamespaceServices extends Record<ArgumentsKey, any>,
-> = {
-  [K in TNamespace]: IDIContainer<
-    Record<
-      ArgumentsKey,
-      any
-    > /* should be the TNamespaceServices, but needed to be optimized inferred type */
-  >;
-} & {
-  [K in keyof TNamespaceServices as K extends string
-    ? `${TNamespace}.${K}`
-    : never]: TNamespaceServices[K];
-};
-
-/**
- * Actually the Map but...
- */
-export interface MapOf<T> extends Map<keyof T, ValueOf<T>> {
-  get<K extends keyof T>(k: K): T[K];
-
-  set<K extends keyof T, V extends T[K]>(k: K, v: V): this;
+/** A dependency created by {@link optional}: resolves to the service, or `undefined` when it is not registered. */
+export interface OptionalDependency<K extends ServiceKey = ServiceKey> {
+  readonly [optionalDependencyBrand]: K;
 }
 
-export type Merge<T1, T2> = Flatten<T1 & T2>;
-export type Flatten<T> = { [k in keyof T]: T[k] } & {};
+/**
+ * What a registration can depend on:
+ * - a service key: the factory receives that service
+ * - `optional(key)`: the service, or `undefined` when it is not registered
+ * - a function: called on each resolution, the factory receives its result
+ *
+ * `A` is a registry's own additions, on top of the services `S` it was given (see {@link ServiceRegistry}).
+ *
+ * (`() => any` rather than `() => unknown` keeps typos in keys reported on the key itself.)
+ */
+export type Dependency<S, A = {}> =
+  keyof S | keyof A | OptionalDependency | (() => any);
 
 /**
- * How factory was added
+ * The value a single {@link Dependency} resolves to. Keys are looked up in `A` (a registry's own
+ * additions) first, then in `S`.
  */
-export type EntryType =
+export type ResolveDependency<D, S, A = {}> =
+  D extends OptionalDependency<infer K>
+    ? K extends keyof A
+      ? ServiceType<A, K> | undefined
+      : K extends keyof S
+        ? ServiceType<S, K> | undefined
+        : undefined
+    : D extends () => infer R
+      ? R
+      : D extends keyof A
+        ? ServiceType<A, D>
+        : D extends keyof S
+          ? ServiceType<S, D>
+          : never;
+
+/** The factory arguments a dependency list resolves to (see {@link ResolveDependency} for `A`). */
+export type ResolveDependencies<D extends readonly unknown[], S, A = {}> = {
+  -readonly [I in keyof D]: ResolveDependency<D[I], S, A>;
+};
+
+/** @deprecated Renamed to {@link ResolveDependencies}. */
+export type DependenciesToTypes<
+  D extends readonly unknown[],
+  S,
+> = ResolveDependencies<D, S>;
+
+// ------------------------------------------------------------------------------------- factories
+
+/**
+ * Creates a service from its resolved dependencies: a function, or a class (called with `new`).
+ * `A` is a registry's own additions (see {@link ResolveDependency}).
+ */
+export type Factory<D extends readonly unknown[], S, A = {}> =
+  | ((...args: ResolveDependencies<D, S, A>) => unknown)
+  | (new (...args: ResolveDependencies<D, S, A>) => unknown);
+
+/** What a {@link Factory} produces: the instance type of a class, or the return type of a function. */
+export type Produced<F> = F extends abstract new (...args: any) => infer I
+  ? I
+  : F extends (...args: any) => infer R
+    ? R
+    : never;
+
+// --------------------------------------------------------------------------------------- options
+
+/**
+ * How `dispose()` releases an instance: `true` (or unset, for singletons) calls
+ * `[Symbol.asyncDispose]` / `[Symbol.dispose]` when present, `false` skips it, a function disposes with it.
+ * When the service is a promise, the resolved value is disposed; a rejected one is skipped.
+ */
+export type DisposeOption<T> = boolean | ((instance: T) => unknown);
+
+/** Options for {@link ServiceRegistry.addTransient}. */
+export interface RegistrationOptions<D, R extends boolean = boolean> {
+  /** Dependency keys, passed to the factory in the same order. */
+  dependencies?: D;
+  /**
+   * Replace an existing registration of this key in the same container. With `replace: true` the
+   * service's type becomes the new one (see {@link Registered}).
+   */
+  replace?: R;
+}
+
+/** Options for {@link ServiceRegistry.addSingleton}. */
+export interface SingletonOptions<D, T> extends RegistrationOptions<D> {
+  /** How `dispose()` releases the instance. Default: auto-detect `[Symbol.asyncDispose]` / `[Symbol.dispose]`. */
+  dispose?: DisposeOption<T>;
+}
+
+/**
+ * Options of `addSingleton(key, factory, options)`: {@link SingletonOptions} for the instance type
+ * `factory` produces. The instance type is worked out only when an options object is passed, which
+ * keeps registration chains cheap to typecheck.
+ *
+ * @example
+ * ```ts
+ * app.addSingleton('pool', createPool, {
+ *   dependencies: ['config'],
+ *   dispose: (pool) => pool.end(), // pool: Awaited<ReturnType<typeof createPool>>
+ * });
+ * ```
+ */
+export interface SingletonFactoryOptions<
+  D,
+  F,
+  R extends boolean = boolean,
+> extends RegistrationOptions<D, R> {
+  /** How `dispose()` releases the instance. Default: auto-detect `[Symbol.asyncDispose]` / `[Symbol.dispose]`. */
+  dispose?: DisposeOption<Awaited<Produced<F>>>;
+}
+
+/** Options for {@link ServiceRegistry.addInstance}. */
+export interface InstanceOptions<T, R extends boolean = boolean> {
+  /**
+   * Replace an existing registration of this key in the same container. With `replace: true` the
+   * service's type becomes the new one (see {@link Registered}).
+   */
+  replace?: R;
+  /** The container does not own added instances; set this to dispose them with the container. Default: `false`. */
+  dispose?: DisposeOption<T>;
+}
+
+/** Options for {@link ServiceProvider.get}. */
+export interface GetOptions {
+  /** Return `undefined` instead of throwing when the key is not registered. */
+  optional?: boolean;
+}
+
+/** Options for {@link ServiceProvider.has}. */
+export interface HasOptions {
+  /** Only look at this container, not its parents. Default: `false`. */
+  local?: boolean;
+}
+
+/** Options for `fork()`. */
+export interface ForkOptions {
+  /**
+   * Run and own every service the fork resolves, including ones registered in its parents, so
+   * overrides in the fork reach the whole graph and nothing leaks back. Default: `false`.
+   */
+  isolated?: boolean;
+  /** Inherit middlewares from this container and its ancestors. Default: `true`. */
+  middlewares?: boolean;
+}
+
+/** Options for `reset()`. */
+export interface ResetOptions<S> {
+  /** Only reset these keys. Default: every cached instance. */
+  keys?: readonly (keyof S)[];
+  /** Reset the parent containers too. Default: `false`. */
+  resetParent?: boolean;
+}
+
+// ---------------------------------------------------------------------------------- introspection
+
+/**
+ * How a service was registered.
+ * - `singleton` / `transient`: a factory, created once / on every resolution
+ * - `instance`: a value added with `addInstance`
+ * - `alias`: points to another key (`target`)
+ * - `namespace`: a namespace container added with `namespace()`
+ * - `namespace-entry`: `Namespace.key`, resolved from the namespace container
+ * - `delegate`: a namespace service replaced by the parent container
+ */
+export type RegistrationKind =
   | 'singleton'
   | 'transient'
   | 'instance'
-  | 'namespace-container'
   | 'alias'
-  | 'namespace-entry';
+  | 'namespace'
+  | 'namespace-entry'
+  | 'delegate';
 
-export type Events<C extends IDIContainer<any>> = {
-  add: { key: ArgumentsKey; replace: boolean; container: C };
-  replace: {
-    key: ArgumentsKey;
-    container: C;
-    replaced: {
-      callable: Callable<any, any>;
-      type: EntryType;
-    };
+/** A dependency of a registration, as reported by {@link RegistrationInfo}. */
+export type DependencyInfo =
+  | { readonly type: 'key'; readonly key: ServiceKey }
+  | { readonly type: 'optional'; readonly key: ServiceKey }
+  | { readonly type: 'previous'; readonly key: ServiceKey }
+  | { readonly type: 'function'; readonly name: string };
+
+/** Read-only metadata about a registration. Returned by {@link ServiceProvider.getRegistration}. */
+export interface RegistrationInfo {
+  /** The registered key. */
+  readonly key: ServiceKey;
+  /** How the service was registered. */
+  readonly kind: RegistrationKind;
+  /** The dependencies passed to the factory, in order. */
+  readonly dependencies: readonly DependencyInfo[];
+  /** 0 when registered in the container that was asked, 1 for its parent, and so on. */
+  readonly depth: number;
+  /** Alias target, or the key inside the namespace container. */
+  readonly target?: ServiceKey;
+  /** The namespace name, for `namespace` and `namespace-entry` registrations. */
+  readonly namespace?: string;
+  /** For `namespace-entry` and `delegate`: the registration it resolves to. */
+  readonly linked?: RegistrationInfo;
+}
+
+// ------------------------------------------------------------------------------------ middleware
+
+/** Context passed to a {@link Middleware}. */
+export interface MiddlewareContext {
+  /** The container the resolution runs in (read-only view). */
+  readonly container: ServiceProvider<any>;
+  /** Keys being resolved, outermost first; the last one is the current key. */
+  readonly path: readonly ServiceKey[];
+  /** Nesting level: 0 for a `get()` call, 1 for its dependencies, and so on. */
+  readonly depth: number;
+}
+
+/**
+ * Wraps resolution. Call `next()` to continue (or `next(otherKey)` to resolve another key) and return
+ * the value. Returning without calling `next` replaces the resolution.
+ *
+ * @example
+ * ```ts
+ * const timing: Middleware = (key, next, { depth }) => {
+ *   const start = performance.now();
+ *   const value = next();
+ *   console.debug(`${'  '.repeat(depth)}${String(key)} ${performance.now() - start}ms`);
+ *   return value;
+ * };
+ * container.use(timing);
+ * ```
+ */
+export type Middleware = (
+  key: ServiceKey,
+  next: (key?: ServiceKey) => unknown,
+  context: MiddlewareContext,
+) => unknown;
+
+// ---------------------------------------------------------------------------------------- events
+
+/** Event payloads, by event name. `container` is a read-only view of the container that emitted it. */
+export interface ContainerEvents {
+  /** A registration was added (or replaced, with `replace: true`). */
+  add: {
+    key: ServiceKey;
+    replace: boolean;
+    kind: RegistrationKind;
+    container: ServiceProvider<any>;
   };
-  reset: { resetParent: boolean; container: C; keys?: ArgumentsKey[] };
-  get: { key: ArgumentsKey; value: any; container: C };
-  produce: { key: ArgumentsKey; value: any; container: C };
+  /** A registration was replaced; `previous` describes the old one. */
+  replace: {
+    key: ServiceKey;
+    previous: RegistrationInfo;
+    container: ServiceProvider<any>;
+  };
+  /** Cached instances were cleared by `reset()`. */
+  reset: {
+    keys?: readonly ServiceKey[];
+    resetParent: boolean;
+    container: ServiceProvider<any>;
+  };
+  /** A service was resolved with `get()` (also fired for nested dependencies). */
+  get: { key: ServiceKey; value: unknown; container: ServiceProvider<any> };
+  /** A factory created a new instance. */
+  produce: {
+    key: ServiceKey;
+    value: unknown;
+    container: ServiceProvider<any>;
+  };
+  /** `dispose()` has released every owned instance. */
+  dispose: { container: ServiceProvider<any> };
+}
+
+// ------------------------------------------------------------------------------------ containers
+
+/**
+ * Read-only access to a container's services: resolve and inspect, but not register or configure.
+ *
+ * Give it to code that only consumes services (handlers, middleware context, tooling).
+ * A provider of more services is assignable to a provider of fewer, so declare what you need:
+ *
+ * @example
+ * ```ts
+ * function createHandler(services: ServiceProvider<{ users: UserRepository }>) {
+ *   return (id: string) => services.get('users').find(id);
+ * }
+ * createHandler(app); // app has `users` and more
+ * ```
+ */
+export interface ServiceProvider<S extends object = {}> {
+  /**
+   * Resolves a service. Throws when the key is not registered, unless `{ optional: true }` is passed.
+   */
+  get<K extends keyof S, O extends GetOptions = {}>(
+    key: K,
+    options?: O,
+  ): O extends { optional: true }
+    ? ServiceType<S, K> | undefined
+    : ServiceType<S, K>;
+
+  /** `true` when a service is registered under `key` (here or in a parent). */
+  has(key: ServiceKey, options?: HasOptions): boolean;
+
+  /** Returns a function that resolves `key` when called. */
+  createResolver<K extends keyof S>(key: K): () => ServiceType<S, K>;
+
+  /** Resolves a function service and calls it with `args`. */
+  call<K extends keyof S>(
+    key: K,
+    args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
+    thisArg?: unknown,
+  ): ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>;
+
+  /** Keys visible from this container, including its parents'. */
+  readonly keys: readonly ServiceKey[];
+
+  /** Keys registered in this container. */
+  readonly ownKeys: readonly ServiceKey[];
+
+  /** The parent container (read-only view), if any. */
+  getParent(): ServiceProvider | undefined;
+
+  /** Read-only metadata of the registration visible under `key`, or `undefined`. */
+  getRegistration(key: ServiceKey): RegistrationInfo | undefined;
+}
+
+// ------------------------------------------------------------------------------------- namespaces
+
+declare const namespaceBrand: unique symbol;
+
+/**
+ * Stands for a namespace in a service map. The map keeps each service of a namespace once, under
+ * `Name.key`; `get('Name')` returns a {@link ServiceProvider} of those services (see {@link ServiceType}).
+ * Keeping the provider out of the map keeps inferred types and emitted `.d.ts` files small.
+ *
+ * @example
+ * ```ts
+ * const app = new DIContainer().namespace('Billing', (b) => b.addInstance('currency', 'EUR'));
+ *
+ * type Services = ContainerServices<typeof app>; // { Billing: Namespace; 'Billing.currency': string }
+ * app.get('Billing'); // ServiceProvider<{ currency: string }>
+ * ```
+ */
+export interface Namespace {
+  readonly [namespaceBrand]: 'sync';
+}
+
+/**
+ * Stands for a namespace of an {@link AsyncDIContainer} in a service map: `get('Name')` resolves to an
+ * {@link AsyncServiceProvider} of its services.
+ *
+ * @example
+ * ```ts
+ * const app = new AsyncDIContainer().namespace('Billing', (b) => b.addInstance('currency', 'EUR'));
+ *
+ * type Services = ContainerServices<typeof app>; // { Billing: AsyncNamespace; 'Billing.currency': string }
+ * await app.get('Billing'); // AsyncServiceProvider<{ currency: string }>
+ * ```
+ */
+export interface AsyncNamespace {
+  readonly [namespaceBrand]: 'async';
+}
+
+/**
+ * The services of namespace `N` in service map `S`, without the `N.` prefix. Nested namespaces keep
+ * their inner prefix (`Read`, `Read.key`).
+ *
+ * @example
+ * ```ts
+ * type S = { Billing: Namespace; 'Billing.currency': string; db: Database };
+ * type Billing = ServicesInNamespace<S, 'Billing'>; // { currency: string }
+ * ```
+ */
+export type ServicesInNamespace<S, N extends ServiceKey> = {
+  [K in keyof S as K extends `${N & string}.${infer R}` ? R : never]: S[K];
 };
 
-export interface IDIContainer<
-  TOwnServices extends Record<ArgumentsKey, any>,
-  TParentServices extends Record<ArgumentsKey, any> = Empty,
-> {
-  addEventListener<E extends keyof Events<this>>(
-    e: E,
-    handler: (
-      e: Events<IDIContainer<TOwnServices & TParentServices>>[E],
-    ) => void,
-  ): this;
+/**
+ * What resolving `K` from service map `S` returns: the registered type, or for a namespace key a
+ * provider of the namespace's services.
+ *
+ * @example
+ * ```ts
+ * type S = { Billing: Namespace; 'Billing.currency': string; db: Database };
+ * type Db = ServiceType<S, 'db'>; // Database
+ * type Billing = ServiceType<S, 'Billing'>; // ServiceProvider<{ currency: string }>
+ * ```
+ */
+export type ServiceType<S, K extends keyof S> = [S[K]] extends [
+  Namespace | AsyncNamespace,
+]
+  ? // `any` and `never` are assignable to the markers too; only a marker has exactly the brand key
+    [keyof S[K]] extends [typeof namespaceBrand]
+    ? [S[K]] extends [AsyncNamespace]
+      ? AsyncServiceProvider<ServicesInNamespace<S, K>>
+      : ServiceProvider<ServicesInNamespace<S, K>>
+    : S[K]
+  : S[K];
 
-  removeEventListener<E extends keyof Events<this>>(
-    e: E,
-    handler: (
-      e: Events<IDIContainer<TOwnServices & TParentServices>>[E],
-    ) => void,
-  ): this;
+/**
+ * Services added under a namespace: `Name` (a {@link Namespace}; `get('Name')` returns its provider)
+ * and `Name.key` for each service.
+ *
+ * @example
+ * ```ts
+ * type Billing = NamespacedServices<'Billing', { currency: string }>;
+ * // { Billing: Namespace } & { 'Billing.currency': string }
+ * ```
+ */
+export type NamespacedServices<N extends string, T> = {
+  [P in N]: Namespace;
+} & {
+  [K in keyof T as K extends string | number ? `${N}.${K}` : never]: T[K];
+};
 
+/**
+ * The services a registry resolves: the ones it was given (`S`) and the ones it added (`A`).
+ * A container is a registry that was given nothing, so its services are just `A`.
+ *
+ * @example
+ * ```ts
+ * type Billing = RegistryServices<{ db: Database }, { invoices: InvoiceRepository }>;
+ * // { db: Database } & { invoices: InvoiceRepository }
+ * ```
+ */
+export type RegistryServices<S, A> = [keyof S] extends [never] ? A : S & A;
+
+/**
+ * Read + register: what extension (module) functions and `namespace()` callbacks receive.
+ * It cannot add middlewares, listen to events, fork or dispose; that is the composition root's job
+ * (the {@link DIContainer} itself).
+ *
+ * `S` is the services the registry was given, `A` the services added through it; it resolves both
+ * (`S & A`). Registrations grow only `A`, so `S` (usually the whole container) stays one type and
+ * lookups into it are computed once per callback, which keeps long modules cheap to typecheck.
+ *
+ * @example A module declares only what it needs
+ * ```ts
+ * const addBilling = (c: ServiceRegistry<{ db: Database }>) =>
+ *   c.addSingleton('invoices', InvoiceRepository, ['db']);
+ *
+ * app.extend(addBilling);
+ * ```
+ */
+export interface ServiceRegistry<
+  S extends object = {},
+  A extends object = {},
+> extends ServiceProvider<RegistryServices<S, A>> {
   /**
-   * true if services with such key is registered, false otherwise
-   * @param name
-   */
-  has(name: keyof (TOwnServices & TParentServices) | string): boolean;
-
-  getParent(): IDIContainer<TParentServices> | undefined;
-
-  /**
-   * keys of current container with parent keys if exists
-   */
-  get keys(): ArgumentsKey[];
-
-  /**
-   * keys of current container without parent keys
-   */
-  get ownKeys(): ArgumentsKey[];
-
-  /**
-   * Adds existing instance to collection
-   * @param name
-   * @param instance
-   * @param options {{ replace: boolean }}
-   */
-  addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: K,
-    instance: TResult,
-    options?: {
-      replace: boolean;
-      beforeResolving?: () => void;
-      afterResolving?: (instance: TResult) => void;
-      beforeReplaced?: () => () => TResult | void;
-    },
-  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
-
-  /**
-   * Each time requested transient service - factory will be executed and returned new instance.
-   * @param name
-   * @param factory
-   * @param options {{
-   *  replace: boolean | undefined,
-   *  dependencies: string[] | undefined
-   * } | string[]}
-   */
-  addTransient<
-    K extends ArgumentsKey,
-    TCallable extends Callable<
-      DependenciesToTypes<Deps, TOwnServices & TParentServices>,
-      any
-    >,
-    Deps extends Dependency<TOwnServices & TParentServices>[],
-    TResult extends CallableResult<TCallable>,
-  >(
-    this: unknown,
-    name: K,
-    factory: TCallable,
-    options?:
-      | {
-          replace?: boolean;
-          dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
-        }
-      | [...Deps],
-  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
-
-  /**
-   * Once created instance will be returned for each service request
-   * @param name
-   * @param factory function or constructor
-   * @param options {{
-   *  replace: boolean | undefined,
-   *  dependencies: string[] | undefined
-   * } | string[]}
+   * Registers a service created once and cached. `factory` is a function or a class; it receives the
+   * dependencies in order.
    */
   addSingleton<
-    K extends ArgumentsKey,
-    TCallable extends Callable<
-      DependenciesToTypes<Deps, TOwnServices & TParentServices>,
-      any
-    >,
-    Deps extends Dependency<TOwnServices & TParentServices>[],
-    TResult extends CallableResult<TCallable>,
+    K extends ServiceKey,
+    F extends Factory<D, S, A>,
+    D extends Dependency<S, A>[] = [],
+    const R extends boolean = false,
   >(
-    this: unknown,
-    name: K,
-    factory: TCallable,
-    options?:
-      | {
-          replace?: boolean;
-          dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
-        }
-      | [...Deps],
-  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
-
-  /**
-   * When the service with `name` needed - `aliasTo` service will be given.
-   * @example ```
-   * class MyServiceClass {}
-   * container.addSingleton('myService', MyServiceClass);
-   * container.addAlias('service', 'myService');
-   * expect(container.get('service')).instanceOf(MyServiceClass);
-   * ```
-   * @param name
-   * @param aliasTo
-   */
-  addAlias<
-    TResult extends (TOwnServices & TParentServices)[A],
-    K extends ArgumentsKey,
-    A extends keyof (TOwnServices & TParentServices),
-  >(
-    name: K,
-    aliasTo: A,
-  ): IDIContainer<TOwnServices & { [k in K]: TResult }, TParentServices>;
-
-  /**
-   * Get registered service from container
-   *
-   * Return existing instance if allowed by service lifetime or will create new instance.
-   * If no service registered it would try to get service from parent container.
-   * If no service registered in parent container or no parent container set. It will throw Error
-   *
-   * @example ```
-   * class MyServiceClass {}
-   * container.addSingleton('myService', MyServiceClass);
-   *
-   * // --- much later when developer need MyServiceClass instance ---
-   * container.get('myService')
-   * ```
-   *
-   * @param serviceName
-   * @param options {GetOptions}
-   */
-  get<
-    Key extends keyof (TOwnServices & TParentServices),
-    O extends GetOptions,
-    T extends any = (TOwnServices & TParentServices)[Key],
-  >(
-    serviceName: Key,
-    options?: O,
-  ): O['allowUnresolved'] extends true ? T | undefined : T;
-
-  /**
-   * Binds Callable to container with specific arguments keys.
-   * "Injecute but later"
-   * @example ```
-   * const send = (logger, httpClient) => {  ... code using http client and logic  };
-   * const sendHttpRequestAndLogResponse = container.bind(['logger', 'httpClient'], send);
-   *
-   * // --- somewhere else ---
-   * sendHttpRequestAndLogResponse() // logger and httpClient will be provided by container.
-   * ```
-   * @param keys
-   * @param callable
-   */
-  bind<
-    TResult extends any,
-    Deps extends readonly (
-      | OptionalDependencySkipKey
-      | keyof (TOwnServices & TParentServices)
-    )[],
-  >(
-    keys: [...Deps],
-    callable: Callable<
-      DependenciesToTypes<Deps, TOwnServices & TParentServices>,
-      TResult
-    >,
-  ): () => TResult;
-
-  /**
-   * Create getter for specified key
-   * @param key
-   */
-  createResolver<K extends keyof (TOwnServices & TParentServices)>(
     key: K,
-  ): () => (TOwnServices & TParentServices)[K];
+    factory: F,
+    dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
+  ): ServiceRegistry<S, Registered<A, { [P in K]: Produced<F> }, R>>;
+
+  /** Registers a service created on every resolution. */
+  addTransient<
+    K extends ServiceKey,
+    F extends Factory<D, S, A>,
+    D extends Dependency<S, A>[] = [],
+    const R extends boolean = false,
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | RegistrationOptions<[...D], R>,
+  ): ServiceRegistry<S, Registered<A, { [P in K]: Produced<F> }, R>>;
+
+  /** Registers an existing value. */
+  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+    key: K,
+    value: T,
+    options?: InstanceOptions<Awaited<T>, R>,
+  ): ServiceRegistry<S, Registered<A, { [P in K]: T }, R>>;
+
+  /** Makes `key` resolve to the service registered under `target`. */
+  addAlias<K extends ServiceKey, T extends keyof S | keyof A>(
+    key: K,
+    target: T,
+  ): ServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A> }>;
 
   /**
-   * Creates child container.
-   * Child container will have access to all parent services but not vice versa.
-   * For cases when you don`t want to add service to main container.
-   * @example ```
-   * const localRequestContainer = container.fork().addInstance('request', request);
-   * container.get('request') // error
-   * localRequestContainer.get('request') === request;
-   * ```
-   */
-  fork<
-    T extends TOwnServices & TParentServices = TOwnServices & TParentServices,
-  >(options?: {
-    skipMiddlewares?: boolean;
-    skipResolvers?: boolean;
-  }): IDIContainer<{}, T>;
-
-  /**
-   * Moves all factories, but not caches from parent containers to current level.
-   * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
-   */
-  flatten(options?: {
-    fork?: boolean;
-    onKeyIntersection?: <K extends keyof (TOwnServices & TParentServices)>(
-      k: K,
-    ) => Resolve<(TOwnServices & TParentServices)[K]>;
-  }): IDIContainer<TOwnServices & TParentServices>;
-
-  /**
-   * Adopts callback result container services.
-   * Provided fork of current container can be used or new created container.
-   * Current container will have access to namespace services with namespace prefix.
-   * For cases when you want to avoid keys intersection conflict.
-   *
-   * @param namespace
-   * @param extension
+   * Registers the services added by `extension` under `name.`: `name.key` for each of them, and `name`
+   * for the namespace's provider. The extension receives a fork of this container.
    */
   namespace<
-    TNamespaceServices extends Flatten<
-      ContainerOwnServices<ReturnType<TExtension>>
-    >,
-    TExtension extends (
-      c: IDIContainer<{}, TOwnServices & TParentServices>,
-    ) => IDIContainer<any, TOwnServices & TParentServices>,
-    TNamespace extends string,
+    const N extends string,
+    NA extends object,
+    Req extends object = S & A,
   >(
-    namespace: TNamespace,
-    extension: TExtension,
-  ): IDIContainer<
-    TOwnServices & WithNamespace<TNamespace, TNamespaceServices>,
-    TParentServices
+    name: N,
+    extension: [S & A] extends [Req]
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof (S & A)
+          >;
+        },
+  ): ServiceRegistry<
+    S,
+    A & { [K in keyof NamespacedServices<N, NA>]: NamespacedServices<N, NA>[K] }
   >;
 
-  /**
-   * Use extension function to add services.
-   * @example ```
-   * const addSrv1 = function(this: IDIContainer<T>): IDIContainer<T & { srv1: Srv }> {
-   *   return this.addSingleton('srv', Srv)
-   * }
-   * container.extend(addSrv1);
-   * container.get('srv1') // Srv
-   * ```
-   */
-  extend<S extends TOwnServices, T extends Record<ArgumentsKey, any>>(
-    extensionFunction: (
-      container: IDIContainer<S, TParentServices>,
-    ) => IDIContainer<T, TParentServices>,
-  ): IDIContainer<TOwnServices & T, TParentServices>;
+  /** Applies a module function that registers services. */
+  extend<EA extends object, Req extends object = S & A>(
+    extension: [S & A] extends [Req]
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof (S & A)
+          >;
+        },
+  ): ServiceRegistry<S, A & { [K in keyof EA]: EA[K] }>;
 
-  /**
-   * Clear singletons instances cache.
-   * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
-   * Helpful when some service is replaced and cached dependant should be created once more.
-   *
-   * @param {{
-   * resetParent?: boolean;
-   * keys?: (keyof (TOwnServices & TParentServices))[];
-   * } | undefined} options
-   */
-  reset(options?: {
-    resetParent?: boolean;
-    keys?: (keyof (TOwnServices & TParentServices))[];
-  }): IDIContainer<TOwnServices, TParentServices>;
+  /** Runs a function (or class) with resolved dependencies, without registering it. */
+  injecute<D extends Dependency<S, A>[], R>(
+    factory:
+      | ((...args: ResolveDependencies<D, S, A>) => R)
+      | (new (...args: ResolveDependencies<D, S, A>) => R),
+    dependencies: [...D],
+  ): R;
 
-  call<
-    FnKey extends KeyForValueOfType<
-      TOwnServices & TParentServices,
-      (...p: any[]) => any
-    >,
-    Fn extends (TOwnServices & TParentServices)[FnKey],
-  >(
-    key: FnKey,
-    params: ArgumentsTypes<Fn>,
-  ): ReturnType<Fn>;
-
-  /**
-   * Executes function or constructor using container dependencies without adding it to container.
-   * @example ```
-   * container.addInstance('logger', console);
-   * //
-   * const logger = container.get('logger);
-   * const useLogger = (logger) => { logSome }
-   * useLogger(logger)
-   * // is equivalent to
-   * container.injecute((logger) => logSome, ['logger'])
-   * ```
-   * @param callable
-   * @param options
-   */
-  injecute<
-    TResult,
-    TCallable extends Callable<
-      DependenciesToTypes<Deps, TOwnServices & TParentServices>,
-      TResult
-    >,
-    Deps extends Dependency<TOwnServices & TParentServices>[],
-  >(
-    callable: TCallable,
-    options?:
-      | InjecuteOptions<keyof (TOwnServices & TParentServices), Deps>
-      | [...Deps],
-  ): CallableResult<TCallable>;
+  /** Returns a function that runs `factory` with resolved dependencies each time it is called. */
+  bind<D extends Dependency<S, A>[], R>(
+    dependencies: [...D],
+    factory:
+      | ((...args: ResolveDependencies<D, S, A>) => R)
+      | (new (...args: ResolveDependencies<D, S, A>) => R),
+  ): () => R;
 }
+
+/** @deprecated Use {@link ServiceRegistry} (read + register) or {@link ServiceProvider} (read-only). */
+export type IDIContainer<S extends object = {}> = ServiceRegistry<{}, S>;
+
+// ------------------------------------------------------------------------------- async containers
+
+/**
+ * Read-only access to an {@link AsyncDIContainer}'s services. Like {@link ServiceProvider}, but
+ * resolutions return promises of the (resolved) service types.
+ *
+ * @example
+ * ```ts
+ * function createHandler(services: AsyncServiceProvider<{ users: UserRepository }>) {
+ *   return async (id: string) => (await services.get('users')).find(id);
+ * }
+ * createHandler(app); // an AsyncDIContainer with `users` and more
+ * ```
+ */
+export interface AsyncServiceProvider<S extends object = {}> {
+  /**
+   * Resolves a service. Rejects when the key is not registered, unless `{ optional: true }` is passed.
+   */
+  get<K extends keyof S, O extends GetOptions = {}>(
+    key: K,
+    options?: O,
+  ): Promise<
+    O extends { optional: true }
+      ? ServiceType<S, K> | undefined
+      : ServiceType<S, K>
+  >;
+
+  /** `true` when a service is registered under `key` (here or in a parent). */
+  has(key: ServiceKey, options?: HasOptions): boolean;
+
+  /** Returns a function that resolves `key` when called. */
+  createResolver<K extends keyof S>(key: K): () => Promise<ServiceType<S, K>>;
+
+  /** Resolves a function service and calls it with `args`. */
+  call<K extends keyof S>(
+    key: K,
+    args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
+    thisArg?: unknown,
+  ): Promise<
+    Awaited<ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>>
+  >;
+
+  /** Keys visible from this container, including its parents'. */
+  readonly keys: readonly ServiceKey[];
+
+  /** Keys registered in this container. */
+  readonly ownKeys: readonly ServiceKey[];
+
+  /** The parent container (read-only view), if any. */
+  getParent(): AsyncServiceProvider | undefined;
+
+  /** Read-only metadata of the registration visible under `key`, or `undefined`. */
+  getRegistration(key: ServiceKey): RegistrationInfo | undefined;
+}
+
+/**
+ * Services added under a namespace of an async container: `Name` (an {@link AsyncNamespace}) and
+ * `Name.key` for each service.
+ *
+ * @example
+ * ```ts
+ * type Billing = AsyncNamespacedServices<'Billing', { currency: string }>;
+ * // { Billing: AsyncNamespace } & { 'Billing.currency': string }
+ * ```
+ */
+export type AsyncNamespacedServices<N extends string, T> = {
+  [P in N]: AsyncNamespace;
+} & {
+  [K in keyof T as K extends string | number ? `${N}.${K}` : never]: T[K];
+};
+
+/**
+ * Read + register for an {@link AsyncDIContainer}: what its modules and `namespace()` callbacks
+ * receive. Factories receive resolved dependencies; a factory returning `Promise<T>` registers `T`.
+ * Async modules work only with async containers.
+ *
+ * @example
+ * ```ts
+ * const addBilling = (c: AsyncServiceRegistry<{ db: Database }>) =>
+ *   c.addSingleton('invoices', InvoiceRepository, ['db']);
+ *
+ * asyncApp.extend(addBilling);
+ * ```
+ */
+export interface AsyncServiceRegistry<
+  S extends object = {},
+  A extends object = {},
+> extends AsyncServiceProvider<RegistryServices<S, A>> {
+  /**
+   * Registers a service created once and cached. The factory receives resolved dependencies and may
+   * return a promise; the service type is the resolved value.
+   */
+  addSingleton<
+    K extends ServiceKey,
+    F extends Factory<D, S, A>,
+    D extends Dependency<S, A>[] = [],
+    const R extends boolean = false,
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
+  ): AsyncServiceRegistry<
+    S,
+    Registered<A, { [P in K]: Awaited<Produced<F>> }, R>
+  >;
+
+  /** Registers a service created on every resolution. */
+  addTransient<
+    K extends ServiceKey,
+    F extends Factory<D, S, A>,
+    D extends Dependency<S, A>[] = [],
+    const R extends boolean = false,
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | RegistrationOptions<[...D], R>,
+  ): AsyncServiceRegistry<
+    S,
+    Registered<A, { [P in K]: Awaited<Produced<F>> }, R>
+  >;
+
+  /** Registers an existing value (or a promise of it). */
+  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+    key: K,
+    value: T,
+    options?: InstanceOptions<Awaited<T>, R>,
+  ): AsyncServiceRegistry<S, Registered<A, { [P in K]: Awaited<T> }, R>>;
+
+  /** Makes `key` resolve to the service registered under `target`. */
+  addAlias<K extends ServiceKey, T extends keyof S | keyof A>(
+    key: K,
+    target: T,
+  ): AsyncServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A> }>;
+
+  /**
+   * Registers the services added by `extension` under `name.`: `name.key` for each of them, and `name`
+   * for the namespace's provider. The extension receives a fork of this container.
+   */
+  namespace<
+    const N extends string,
+    NA extends object,
+    Req extends object = S & A,
+  >(
+    name: N,
+    extension: [S & A] extends [Req]
+      ? (
+          registry: AsyncServiceRegistry<Req, {}>,
+        ) => AsyncServiceRegistry<any, NA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof (S & A)
+          >;
+        },
+  ): AsyncServiceRegistry<
+    S,
+    A & {
+      [K in keyof AsyncNamespacedServices<N, NA>]: AsyncNamespacedServices<
+        N,
+        NA
+      >[K];
+    }
+  >;
+
+  /** Applies a module function that registers services. */
+  extend<EA extends object, Req extends object = S & A>(
+    extension: [S & A] extends [Req]
+      ? (
+          registry: AsyncServiceRegistry<Req, {}>,
+        ) => AsyncServiceRegistry<any, EA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof (S & A)
+          >;
+        },
+  ): AsyncServiceRegistry<S, A & { [K in keyof EA]: EA[K] }>;
+
+  /** Runs a function (or class) with resolved dependencies, without registering it. */
+  injecute<D extends Dependency<S, A>[], R>(
+    factory:
+      | ((...args: ResolveDependencies<D, S, A>) => R)
+      | (new (...args: ResolveDependencies<D, S, A>) => R),
+    dependencies: [...D],
+  ): Promise<Awaited<R>>;
+
+  /** Returns a function that runs `factory` with resolved dependencies each time it is called. */
+  bind<D extends Dependency<S, A>[], R>(
+    dependencies: [...D],
+    factory:
+      | ((...args: ResolveDependencies<D, S, A>) => R)
+      | (new (...args: ResolveDependencies<D, S, A>) => R),
+  ): () => Promise<Awaited<R>>;
+}
+
+/**
+ * Service map `S` plus the services in `T`. With `R` true (the registration passed `replace: true`),
+ * `T`'s services replace the same keys of `S`, so replacing a service changes its type instead of
+ * intersecting the old and the new one.
+ *
+ * @example
+ * ```ts
+ * type Added = Registered<{ port: string }, { host: string }, false>; // { port: string } & { host: string }
+ * type Replaced = Registered<{ port: string; host: string }, { port: number }, true>;
+ * // Omit<{ port: string; host: string }, 'port'> & { port: number }
+ * ```
+ */
+export type Registered<S, T, R> = R extends true ? Omit<S, keyof T> & T : S & T;
+
+// ------------------------------------------------------------------------------------ sealed containers
+
+/** The methods that register services; a sealed container has none of them. */
+type RegistrationMethod =
+  | 'addSingleton'
+  | 'addTransient'
+  | 'addInstance'
+  | 'addAlias'
+  | 'namespace'
+  | 'extend'
+  | 'seal';
+
+/** Owner methods that return the container itself (redeclared so they return the sealed type). */
+type ChainedMethod =
+  'use' | 'unuse' | 'addEventListener' | 'removeEventListener' | 'reset';
+
+/**
+ * A {@link DIContainer} after `seal()`: it resolves services, runs middlewares and events, resets and
+ * disposes, but registers nothing. Its forks are regular, open containers.
+ *
+ * @example
+ * ```ts
+ * const app: SealedDIContainer<{ db: Database }> = new DIContainer().addSingleton('db', createDb).seal();
+ * app.get('db');
+ * app.fork().addInstance('requestId', id);
+ * ```
+ */
+export interface SealedDIContainer<S extends object = {}> extends Omit<
+  DIContainer<S>,
+  RegistrationMethod | ChainedMethod
+> {
+  /** Adds a middleware around every resolution started from this container and its forks. */
+  use(middleware: Middleware): this;
+  /** Removes a middleware added with `use()`. */
+  unuse(middleware: Middleware): this;
+  /** Subscribes to container events. */
+  addEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this;
+  /** Removes a listener added with `addEventListener()`. */
+  removeEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this;
+  /** Clears cached instances (all, or `keys`), so the next resolution creates them again. */
+  reset(options?: ResetOptions<S>): this;
+}
+
+/**
+ * An {@link AsyncDIContainer} after `seal()`: like {@link SealedDIContainer}, with promises for resolutions.
+ *
+ * @example
+ * ```ts
+ * const app = new AsyncDIContainer().addSingleton('db', () => connect(url)).seal();
+ * await app.get('db');
+ * ```
+ */
+export interface SealedAsyncDIContainer<S extends object = {}> extends Omit<
+  AsyncDIContainer<S>,
+  RegistrationMethod | ChainedMethod
+> {
+  /** Adds a middleware around every resolution started from this container and its forks. */
+  use(middleware: Middleware): this;
+  /** Removes a middleware added with `use()`. */
+  unuse(middleware: Middleware): this;
+  /** Subscribes to container events. */
+  addEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this;
+  /** Removes a listener added with `addEventListener()`. */
+  removeEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this;
+  /** Clears cached instances (all, or `keys`), so the next resolution creates them again. */
+  reset(options?: ResetOptions<S>): this;
+}
+
+// ---------------------------------------------------------------------------------------- helpers
+
+/** The service map of a container, registry or provider type (sync or async). */
+export type ContainerServices<C> =
+  C extends DIContainer<infer S>
+    ? S
+    : C extends AsyncDIContainer<infer S>
+      ? S
+      : C extends SealedDIContainer<infer S>
+        ? S
+        : C extends SealedAsyncDIContainer<infer S>
+          ? S
+          : C extends AsyncServiceRegistry<infer S, infer A>
+            ? RegistryServices<S, A>
+            : C extends AsyncServiceProvider<infer S>
+              ? S
+              : C extends ServiceRegistry<infer S, infer A>
+                ? RegistryServices<S, A>
+                : C extends ServiceProvider<infer S>
+                  ? S
+                  : never;
+
+/**
+ * The services of namespace `N` of container type `C`, without the `N.` prefix.
+ *
+ * @example
+ * ```ts
+ * const app = new DIContainer().namespace('Billing', (b) => b.addInstance('currency', 'EUR'));
+ * type Billing = NamespaceServices<typeof app, 'Billing'>; // { currency: string }
+ * ```
+ */
+export type NamespaceServices<
+  C,
+  N extends keyof ContainerServices<C>,
+> = ServicesInNamespace<ContainerServices<C>, N>;

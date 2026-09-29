@@ -1,955 +1,1363 @@
+import { optionalKey } from './dependencies.ts';
 import {
-  ArgumentsKey,
-  ArgumentsTypes,
-  Callable,
-  CallableResult,
-  ContainerOwnServices,
-  Empty,
-  Events,
-  EntryType,
+  CircularDependencyError,
+  InjecuteError,
+  isClassCallError,
+  looksLikeConstructor,
+  suggestKeys,
+} from './errors.ts';
+import {
+  callableOf,
+  isClass,
+  isThenable,
+  SET_CACHE_INSTANCE,
+} from './internal.ts';
+import type {
+  ContainerEvents,
+  Dependency,
+  DependencyInfo,
+  DisposeOption,
+  Factory,
+  ForkOptions,
   GetOptions,
-  IDIContainer,
-  KeyForValueOfType,
-  DependenciesToTypes,
-  MapOf,
-  OptionalDependencySkipKey,
-  Resolve,
-  Resolver,
-  ValueOf,
-  optionalDependencySkipKey,
-  type Dependency,
-} from './types';
+  HasOptions,
+  InstanceOptions,
+  Middleware,
+  MiddlewareContext,
+  NamespacedServices,
+  Produced,
+  RegistrationInfo,
+  RegistrationKind,
+  RegistrationOptions,
+  ResetOptions,
+  ResolveDependencies,
+  ResolveDependency,
+  ServiceKey,
+  ServiceProvider,
+  ServiceRegistry,
+  ServiceType,
+  SingletonFactoryOptions,
+  Registered,
+  SealedDIContainer,
+} from './types.ts';
 
-const firstResultDefaultPredicate = (r: any) => r !== undefined && r !== null;
-export const firstResult =
-  <TArgs extends any[], TResult extends any>(
-    fns: ((...args: TArgs) => TResult)[],
-    predicate: (r: TResult) => boolean = firstResultDefaultPredicate,
-  ) =>
-  (...args: TArgs): TResult | undefined => {
-    for (const f of fns) {
-      const result = f(...args);
-      if (predicate(result)) return result;
-    }
-  };
+/** Internal: a dependency after normalization. */
+type InternalDependency =
+  | { readonly type: 'key'; readonly key: ServiceKey }
+  | { readonly type: 'optional'; readonly key: ServiceKey }
+  | { readonly type: 'previous'; readonly key: ServiceKey }
+  | { readonly type: 'function'; readonly fn: () => unknown };
 
-export type Middleware<
-  TServices extends Record<ArgumentsKey, any>,
-  Key extends keyof TServices = keyof TServices,
-> = (
-  this: DIContainer<TServices>,
-  name: Key,
-  next: Resolver<TServices>,
-) => Resolver<TServices>;
-
-export class CircularDependencyError extends Error {
-  constructor(stack: ArgumentsKey[]) {
-    const circularStackDescription = stack
-      .map((k) => (k === stack[stack.length - 1] ? `*${k.toString()}*` : k))
-      .join(' -> ');
-    super(`Circular dependency detected ${circularStackDescription}.`);
-  }
+/** Internal: a registration is plain data; the executing container owns produced instances. */
+interface Registration {
+  readonly key: ServiceKey;
+  readonly kind: RegistrationKind;
+  readonly owner: DIContainer<any>;
+  readonly dependencies: readonly InternalDependency[];
+  readonly factory?: (...args: any[]) => unknown;
+  /** the factory is a class: call it with `new` */
+  readonly construct?: boolean;
+  readonly value?: unknown;
+  /** alias target, namespace-entry key, or delegate target */
+  readonly target?: ServiceKey;
+  /** namespace-entry: the namespace container; namespace: the container itself; delegate: target container */
+  readonly container?: DIContainer<any>;
+  readonly namespace?: string;
+  /** namespace: the callback, re-applied lazily inside isolated forks */
+  readonly extension?: (c: any) => unknown;
+  /** the registration this one replaced in the same container */
+  readonly previous?: Registration;
+  readonly dispose?: DisposeOption<any>;
 }
 
-const stringOrNumber = (i: any): i is string | number =>
-  ['string', 'number'].includes(typeof i);
+const NOT_FOUND: unique symbol = Symbol('injecute.notFound');
 
-const createNamespaceServiceKey = <N extends string, K extends string | number>(
-  namespace: N,
-  key: K,
-) => `${namespace}.${key}`;
+// Well-known symbols with the same fallback TypeScript's `using` helper uses, for runtimes without them.
+const asyncDispose: typeof Symbol.asyncDispose = (Symbol.asyncDispose ??
+  Symbol.for('Symbol.asyncDispose')) as typeof Symbol.asyncDispose;
+const syncDispose: typeof Symbol.dispose = (Symbol.dispose ??
+  Symbol.for('Symbol.dispose')) as typeof Symbol.dispose;
 
-export type DIContainerConstructorArguments<
-  TParentServices extends Record<ArgumentsKey, any> = Empty,
-> = {
-  parentContainer?: IDIContainer<TParentServices>;
-};
-
-const getContainersChain = (c: IDIContainer<any>) => {
-  const result = [];
-  let current: IDIContainer<any> | undefined = c;
-  do {
-    result.push(c);
-    current = current.getParent();
-  } while (current);
-  return result;
-};
-
-export const entryTypeKey = Symbol('factoryType');
-
-type Factory<
-  TServices extends Record<ArgumentsKey, any>,
-  K extends keyof TServices,
-  C extends Callable<ValueOf<TServices>[], TServices[K]> = Callable<
-    ValueOf<TServices>[],
-    TServices[K]
-  >,
-> = {
-  [entryTypeKey]: EntryType;
-  callable: C;
-  dependencies: Dependency<TServices>[];
-  linkedFactory?: Factory<TServices, K>;
-  beforeResolving?: () => void;
-  afterResolving?: (instance: any) => void;
-  beforeReplaced?: (newFactory: Factory<TServices, K>) => C | void;
-};
-
-const isFactory = (f: unknown): f is Factory<any, any> => {
-  return (
-    !!f &&
-    typeof f === 'object' &&
-    'dependencies' in f &&
-    'callable' in f &&
-    entryTypeKey in f
-  );
-};
+/** An instance this container created (or was asked to own), in creation order. */
+interface Owned {
+  readonly seq: number;
+  readonly reg: Registration;
+  readonly value: unknown;
+}
 
 const isKey = (a: unknown): a is string | number | symbol =>
-  ['string', 'number', 'symbol'].includes(typeof a);
+  typeof a === 'string' || typeof a === 'number' || typeof a === 'symbol';
+
+const isLinkableKey = (k: ServiceKey): k is string | number =>
+  typeof k === 'string' || typeof k === 'number';
+
+const namespaceKey = (namespace: string, key: string | number) =>
+  `${namespace}.${key}`;
+
+const describeKey = (k: ServiceKey) => String(k);
+
+type Listeners = {
+  [E in keyof ContainerEvents]: Set<(e: ContainerEvents[E]) => void>;
+};
 
 /**
- * Dependency Injection container
+ * A dependency injection container: registers services with explicit dependency keys and resolves them
+ * with full types. The container is the composition root: it can also add middlewares, listen to
+ * events, fork scopes and dispose what it created. Hand narrower views to the rest of the code:
+ * {@link ServiceRegistry} to modules, {@link ServiceProvider} to consumers.
+ *
+ * @example
+ * ```ts
+ * import { DIContainer } from 'injecute';
+ *
+ * class UserRepository {
+ *   constructor(readonly dbUrl: string) {}
+ * }
+ *
+ * const app = new DIContainer()
+ *   .addInstance('dbUrl', 'postgres://localhost/app')
+ *   .addSingleton('users', UserRepository, ['dbUrl']);
+ *
+ * app.get('users'); // UserRepository
+ * ```
  */
-export class DIContainer<
-  TOwnServices extends Record<ArgumentsKey, any> = Empty,
-  TParentServices extends Record<ArgumentsKey, any> = Empty,
-  TServices extends TParentServices & TOwnServices = TParentServices &
-    TOwnServices,
-> implements IDIContainer<TParentServices, TServices>
-{
-  constructor(p?: DIContainerConstructorArguments<TParentServices>) {
-    this.#parentContainer = p?.parentContainer;
-    this.rebuildMiddlewareStack();
-  }
-
-  protected readonly eventHandlers: {
-    [E in keyof Events<IDIContainer<TOwnServices, TParentServices>>]: Set<
-      (e: Events<IDIContainer<TOwnServices, TParentServices>>[E]) => void
-    >;
-  } = {
-    replace: new Set(),
+export class DIContainer<S extends object = {}> implements ServiceRegistry<
+  {},
+  S
+> {
+  #parent: DIContainer<any> | undefined;
+  readonly #registrations = new Map<ServiceKey, Registration>();
+  /** instances produced (and owned) by this container, keyed by registration */
+  readonly #instances = new Map<Registration, unknown>();
+  /** values set with setCacheInstance(); cleared by reset() */
+  readonly #overrides = new Map<ServiceKey, unknown>();
+  readonly #middlewares: Middleware[] = [];
+  #inheritMiddlewares = true;
+  /** Isolated forks run (and own) every factory they resolve, including parent-registered ones. */
+  #isolated = false;
+  /** Owned instances, in creation order, including ones retired by replace()/reset(). */
+  #owned: Owned[] = [];
+  /** Creation order across all containers, so dispose() can run dependents first. */
+  static #sequence = 0;
+  #disposed = false;
+  /** Set by seal(): no more registrations in this container (forks stay open). */
+  #sealed = false;
+  #disposing: Promise<void> | undefined;
+  /** Namespace containers re-created inside this isolated fork, keyed by the namespace registration. */
+  readonly #isolatedNamespaces = new Map<Registration, DIContainer<any>>();
+  #middlewareCache: { epoch: number; list: readonly Middleware[] } | undefined;
+  /** Bumped by every use()/unuse() anywhere, so cached effective chains are rebuilt. */
+  static #middlewareEpoch = 0;
+  readonly #listeners: Listeners = {
     add: new Set(),
+    replace: new Set(),
     reset: new Set(),
     get: new Set(),
     produce: new Set(),
+    dispose: new Set(),
   };
-  readonly #parentContainer: IDIContainer<TParentServices> | undefined;
-  getParent() {
-    return this.#parentContainer;
-  }
-  readonly #factories: MapOf<{
-    [key in keyof TServices]?: Factory<TServices, key>;
-  }> = new Map();
-  getFactory<K extends keyof TServices>(k: K) {
-    return this.#factories.get(k);
-  }
-  readonly #singletonInstances: MapOf<{
-    [key in keyof TServices]?: TServices[key];
-  }> = new Map();
-  readonly #middlewares: Middleware<TServices>[] = [];
-  #middlewareStack!: Resolver<TServices>;
-
-  get keys(): (keyof TServices)[] {
-    const keys = this.ownKeys;
-    const parent = this.getParent();
-    if (parent) {
-      keys.push(...parent.keys);
-    }
-    return keys;
-  }
-
-  get ownKeys(): (keyof TServices)[] {
-    return Array.from(this.#factories.keys()) as (keyof TServices)[];
-  }
-
-  protected setSingletonInstance(
-    name: keyof (TOwnServices & TParentServices),
-    instance: any,
-  ) {
-    this.#singletonInstances.set(name, instance);
-  }
-
-  addEventListener<
-    E extends keyof Events<IDIContainer<TOwnServices, TParentServices>>,
-  >(
-    e: E,
-    handler: (
-      e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
-    ) => void,
-  ) {
-    if (e in this.eventHandlers) {
-      this.eventHandlers[e].add(handler);
-      return this;
-    }
-    throw this.eventNotSupported(e);
-  }
-
-  removeEventListener<
-    E extends keyof Events<IDIContainer<TOwnServices, TParentServices>>,
-  >(
-    e: E,
-    handler: (
-      e: Events<IDIContainer<TOwnServices, TParentServices>>[E],
-    ) => void,
-  ) {
-    if (e in this.eventHandlers) {
-      this.eventHandlers[e].delete(handler);
-      return this;
-    }
-    throw this.eventNotSupported(e);
-  }
 
   /**
-   * true if services with such name is registered, false otherwise
-   * @param name
-   * @param askParent true by default
+   * @internal Creates the container used by {@link fork}. Subclasses keep their type in forks.
    */
-  has(
-    name: keyof TServices | ArgumentsKey,
-    askParent: boolean = true,
-  ): boolean {
-    return (
-      this.#factories.has(name) ||
-      this.#singletonInstances.has(name) ||
-      (askParent ? !!this.#parentContainer?.has(name) : false)
-    );
+  protected createChild(): DIContainer<any> {
+    const Ctor = this.constructor as new () => DIContainer<any>;
+    const child = new Ctor();
+    child.#parent = this;
+    return child;
   }
 
   /**
-   * Adds existing instance to collection
-   * @param name
-   * @param instance
-   * @param options {{ replace: boolean }}
+   * @internal Calls a factory. Subclasses (the async container) override it to change how factories run.
    */
-  addInstance<K extends ArgumentsKey, TResult extends any>(
-    name: K,
-    instance: TResult,
-    options?: {
-      replace?: boolean;
-      beforeResolving?: () => void;
-      afterResolving?: (instance: TResult) => void;
-      beforeReplaced?: () => () => TResult | void;
-      [entryTypeKey]?: 'instance' | 'namespace-container';
-    },
-  ): IDIContainer<TServices & { [k in K]: TResult }> {
-    return this.addFactory(name, () => instance, {
-      [entryTypeKey]: options?.[entryTypeKey] ?? 'instance',
-      replace: options?.replace || false,
-      beforeResolving: options?.beforeResolving,
-      afterResolving: options?.afterResolving,
-      beforeReplaced: options?.beforeReplaced,
-      dependencies: [],
-    });
+  protected invokeFactory(
+    factory: (...args: any[]) => unknown,
+    args: unknown[],
+  ): unknown {
+    return factory(...args);
   }
 
+  // ------------------------------------------------------------------------------ ServiceProvider
+
   /**
-   * Each time requested transient service - factory will be executed and returned new instance.
-   * @param name
-   * @param factory
-   * @param options {{
-   *  replace: boolean | undefined,
-   *  dependencies: string[] | undefined
-   * } | string[]}
+   * Resolves a service: returns the cached singleton, creates it, or creates a new transient.
+   * Looks in parent containers when the key is not registered here. Throws when nothing is
+   * registered under `key`, unless `{ optional: true }` is passed.
+   *
+   * @throws {InjecuteError} `INJECUTE_NOT_REGISTERED` (with "did you mean" suggestions),
+   * `INJECUTE_RESOLUTION_FAILED` when a factory throws (the original error is `cause`),
+   * `INJECUTE_CLASS_NOT_CONSTRUCTED`, `INJECUTE_DISPOSED`.
+   *
+   * @example
+   * ```ts
+   * const users = app.get('users');
+   * const cache = app.get('cache', { optional: true }); // Cache | undefined
+   * ```
    */
-  addTransient<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
-    Deps extends Dependency<TServices>[],
-    TResult extends CallableResult<TCallable>,
-  >(
-    name: K,
-    factory: TCallable,
-    options:
-      | {
-          [entryTypeKey]?: EntryType;
-          replace?: boolean;
-          dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
-        }
-      | [...Deps] = [] as any,
-  ): IDIContainer<TServices & { [k in K]: TResult }> {
-    return this.addFactory(name, factory, options);
+  get<K extends keyof S, O extends GetOptions = {}>(
+    key: K,
+    options?: O,
+  ): O extends { optional: true }
+    ? ServiceType<S, K> | undefined
+    : ServiceType<S, K> {
+    this.#assertNotDisposed();
+    return this.#get(key, options?.optional ?? false, []) as any;
+  }
+
+  /** `true` when a service is registered under `key`, here or (unless `local: true`) in a parent. */
+  has(key: ServiceKey, options?: HasOptions): boolean {
+    if (this.#registrations.has(key) || this.#overrides.has(key)) return true;
+    return options?.local ? false : !!this.#parent?.has(key);
+  }
+
+  /** Returns a function that resolves `key` when called. */
+  createResolver<K extends keyof S>(key: K): () => ServiceType<S, K> {
+    return () => this.get(key);
   }
 
   /**
-   * Once created instance will be returned for each service request
-   * @param name
-   * @param factory
-   * @param options {{
-   *  replace: boolean | undefined,
-   *  dependencies: string[] | undefined
-   * } | string[]}
+   * Resolves a function service and calls it.
+   *
+   * @example
+   * ```ts
+   * app.addInstance('greet', (name: string) => `Hello ${name}`);
+   * app.call('greet', ['Ada']); // "Hello Ada"
+   * ```
+   */
+  call<K extends keyof S>(
+    key: K,
+    args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
+    thisArg: unknown = undefined,
+  ): ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>> {
+    const value = this.get(key);
+    if (typeof value !== 'function') {
+      throw new InjecuteError(
+        'INJECUTE_NOT_A_FUNCTION',
+        `Service "${describeKey(key)}" is not a function, so it cannot be called.`,
+      );
+    }
+    return value.apply(thisArg, args);
+  }
+
+  /** Keys visible from this container, including its parents' (each once). */
+  get keys(): readonly ServiceKey[] {
+    const keys = new Set<ServiceKey>(this.#registrations.keys());
+    for (const k of this.#parent?.keys ?? []) keys.add(k);
+    return [...keys];
+  }
+
+  /** Keys registered in this container. */
+  get ownKeys(): readonly ServiceKey[] {
+    return [...this.#registrations.keys()];
+  }
+
+  /** The parent container as a read-only view, if any. */
+  getParent(): ServiceProvider | undefined {
+    return this.#parent ? this.#parent.#view() : undefined;
+  }
+
+  /** Read-only metadata of the registration visible under `key`, or `undefined`. */
+  getRegistration(key: ServiceKey): RegistrationInfo | undefined {
+    let depth = 0;
+    let current: DIContainer<any> | undefined = this;
+    while (current) {
+      const reg = current.#registrations.get(key);
+      if (reg) return toInfo(reg, depth);
+      current = current.#parent;
+      depth++;
+    }
+    return undefined;
+  }
+
+  // ------------------------------------------------------------------------------ ServiceRegistry
+
+  /**
+   * Registers a service that is created once, on first use, and then cached.
+   *
+   * `factory` is a function or a class. It receives the resolved `dependencies` in order; a class is
+   * called with `new`. A dependency on `key` itself receives the previous definition (decoration).
+   *
+   * A factory may return a promise: the promise is cached, a rejected one is dropped (the next
+   * resolution tries again), and `dispose()` releases the resolved value.
+   *
+   * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
+   * {@link construct}.
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` when `key` is registered in this container
+   * (pass `replace: true`), `INJECUTE_CIRCULAR_DEPENDENCY` when the dependencies form a cycle.
+   *
+   * @example
+   * ```ts
+   * app
+   *   .addSingleton('db', () => createPool(process.env.DATABASE_URL))
+   *   .addSingleton('cache', async () => connectRedis()) // Promise<Redis>, disposed once resolved
+   *   .addSingleton('users', UserRepository, ['db'])
+   *   .addSingleton('mailer', createMailer, { dependencies: ['config'], dispose: (m) => m.close() });
+   * ```
    */
   addSingleton<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
-    Deps extends Dependency<TServices>[],
-    TResult extends CallableResult<TCallable>,
+    K extends ServiceKey,
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
   >(
-    name: K,
-    factory: TCallable,
-    options:
-      | {
-          [entryTypeKey]?: Extract<EntryType, 'instance'>;
-          replace?: boolean;
-          dependencies: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: () => TCallable | void;
-        }
-      | [...Deps] = [] as any,
-  ): IDIContainer<TServices & { [k in K]: TResult }> {
-    const optionsIsArray = Array.isArray(options);
-    return this.addFactory(name, factory, {
-      [entryTypeKey]: ((!optionsIsArray && options?.[entryTypeKey]) ||
-        'singleton') as EntryType,
-      replace: optionsIsArray ? false : options?.replace,
-      dependencies: optionsIsArray ? options : options?.dependencies,
-      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: (instance: TResult) => {
-        this.setSingletonInstance(name, instance);
-        !optionsIsArray && options?.afterResolving?.(instance);
-      },
-      beforeReplaced: !optionsIsArray ? options?.beforeReplaced : undefined,
-    });
+    key: K,
+    factory: F,
+    dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
+  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
+    this.#addFactory('singleton', key, factory, dependencies);
+    return this as any;
   }
 
   /**
-   * When the service with `name` needed - `aliasTo` service will be given.
-   * @example ```
-   * class MyServiceClass {}
-   * container.addSingleton('myService', MyServiceClass);
-   * container.addAlias('service', 'myService');
-   * expect(container.get('service')).instanceOf(MyServiceClass);
+   * Registers a service that is created again on every resolution. The container does not keep (or
+   * dispose) transient instances.
+   *
+   * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
+   * {@link construct}.
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED`, `INJECUTE_CIRCULAR_DEPENDENCY`.
+   *
+   * @example
+   * ```ts
+   * app.addTransient('requestId', () => crypto.randomUUID());
    * ```
-   * @param name
-   * @param aliasTo
    */
-  addAlias<
-    T extends TServices[A],
-    K extends ArgumentsKey,
-    A extends keyof TServices,
-  >(name: K, aliasTo: A): IDIContainer<TServices & { [k in K]: T }> {
-    return this.addFactory(
-      name as Exclude<K, OptionalDependencySkipKey>,
-      (aliased) => aliased,
+  addTransient<
+    K extends ServiceKey,
+    F extends Factory<D, {}, S>,
+    D extends Dependency<{}, S>[] = [],
+    const R extends boolean = false,
+  >(
+    key: K,
+    factory: F,
+    dependencies?: [...D] | RegistrationOptions<[...D], R>,
+  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
+    this.#addFactory('transient', key, factory, dependencies);
+    return this as any;
+  }
+
+  /**
+   * Registers an existing value. The container does not dispose it unless `dispose` is set.
+   *
+   * @example
+   * ```ts
+   * app.addInstance('config', loadConfig());
+   * ```
+   */
+  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+    key: K,
+    value: T,
+    options?: InstanceOptions<Awaited<T>, R>,
+  ): DIContainer<Registered<S, { [P in K]: T }, R>> {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
+    const dispose = options?.dispose ?? false;
+    this.#register(
+      { key, kind: 'instance', owner: this, dependencies: [], value, dispose },
+      !!options?.replace,
+    );
+    if (dispose !== false) this.#own(this.#registrations.get(key)!, value);
+    return this as any;
+  }
+
+  /**
+   * Makes `key` resolve to the service registered under `target`.
+   *
+   * @example
+   * ```ts
+   * app.addAlias('logger', config.production ? 'jsonLogger' : 'prettyLogger');
+   * ```
+   */
+  addAlias<K extends ServiceKey, T extends keyof S>(
+    key: K,
+    target: T,
+  ): DIContainer<S & { [P in K]: ResolveDependency<T, {}, S> }> {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
+    this.#register(
       {
-        dependencies: [aliasTo],
-        [entryTypeKey]: 'alias',
+        key,
+        kind: 'alias',
+        owner: this,
+        target,
+        dependencies: [{ type: 'key', key: target }],
       },
+      false,
+    );
+    return this as any;
+  }
+
+  /**
+   * Registers the services added by `extension` under a prefix: `name.key` for each of them, and
+   * `name` for a read-only provider of the namespace. The extension receives a fork of this container,
+   * so it can use every service registered here; its own registrations stay in the namespace.
+   *
+   * In the service map, `name` is a {@link Namespace} marker; `get(name)` is typed as a
+   * {@link ServiceProvider} of the namespace's services.
+   *
+   * @example
+   * ```ts
+   * app.namespace('Billing', (billing) =>
+   *   billing.addSingleton('invoices', InvoiceRepository, ['db']),
+   * );
+   * app.get('Billing.invoices');
+   * ```
+   */
+  namespace<const N extends string, NA extends object, Req extends object = S>(
+    name: N,
+    extension: [S] extends [Req]
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, NA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof S
+          >;
+        },
+  ): DIContainer<
+    S & { [K in keyof NamespacedServices<N, NA>]: NamespacedServices<N, NA>[K] }
+  > {
+    this.#assertNotSealed(`Namespace "${name}" cannot be added`);
+    if (this.has(name)) {
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_CONFLICT',
+        `Namespace "${name}" cannot be added: the key is already in use.`,
+      );
+    }
+    const run = extension as unknown as (registry: unknown) => unknown;
+    const result = run(this.fork());
+    if (result === this) {
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_RESULT',
+        `Namespace "${name}" callback returned the parent container itself.`,
+      );
+    }
+    if (!(result instanceof DIContainer)) {
+      throw new InjecuteError(
+        'INJECUTE_NAMESPACE_RESULT',
+        `Namespace "${name}" callback did not return a container.`,
+      );
+    }
+    this.#adoptNamespace(name, result, run);
+    return this as any;
+  }
+
+  /**
+   * Applies a module: a function that registers services and returns the registry it was given (or a
+   * fork of it). A module can declare only the services it needs; `extend` checks that they exist.
+   *
+   * @example
+   * ```ts
+   * const addBilling = (c: ServiceRegistry<{ db: Database }>) =>
+   *   c.addSingleton('invoices', InvoiceRepository, ['db']);
+   *
+   * const app = new DIContainer().addSingleton('db', createDb).extend(addBilling);
+   * ```
+   */
+  // The module's additions are flattened into one object, so the service map grows by one member per
+  // module instead of one per registration. Flattening the whole map instead would nest with every
+  // call and hit TypeScript's depth limit after about 90 calls (scripts/type-perf.mjs checks 150).
+  extend<EA extends object, Req extends object = S>(
+    extension: [S] extends [Req]
+      ? (registry: ServiceRegistry<Req, {}>) => ServiceRegistry<any, EA>
+      : {
+          'injecute: extension requires services that are not registered': Exclude<
+            keyof Req,
+            keyof S
+          >;
+        },
+  ): DIContainer<S & { [K in keyof EA]: EA[K] }> {
+    this.#assertNotSealed('extend() cannot add services');
+    const run = extension as unknown as (registry: unknown) => unknown;
+    const result = run.call(this, this);
+    let current: unknown = result;
+    while (current instanceof DIContainer) {
+      if (current === this) return result as any;
+      current = current.#parent;
+    }
+    throw new InjecuteError(
+      'INJECUTE_EXTENSION_RESULT',
+      'The extension returned a container that is not the same container or its child.',
     );
   }
 
-  use(middleware: Middleware<any>): DIContainer<TParentServices, TServices> {
+  /**
+   * Runs a function (or constructs a class) with resolved dependencies, without registering it.
+   *
+   * @example
+   * ```ts
+   * const handler = app.injecute((users, logger) => createHandler(users, logger), ['users', 'logger']);
+   * ```
+   */
+  injecute<D extends Dependency<{}, S>[], R>(
+    factory:
+      | ((...args: ResolveDependencies<D, {}, S>) => R)
+      | (new (...args: ResolveDependencies<D, {}, S>) => R),
+    dependencies: [...D],
+  ): R {
+    const deps = normalizeDependencies(dependencies, undefined);
+    const args = deps.map((d) => this.#resolveDependency(d, undefined, []));
+    return this.#invoke(callableOf(factory), args, factory, []) as R;
+  }
+
+  /**
+   * Returns a function that runs `factory` with freshly resolved dependencies on every call.
+   *
+   * @example
+   * ```ts
+   * const sendReport = app.bind(['mailer', 'reports'], (mailer, reports) => mailer.send(reports.weekly()));
+   * sendReport();
+   * ```
+   */
+  bind<D extends Dependency<{}, S>[], R>(
+    dependencies: [...D],
+    factory:
+      | ((...args: ResolveDependencies<D, {}, S>) => R)
+      | (new (...args: ResolveDependencies<D, {}, S>) => R),
+  ): () => R {
+    return () => this.injecute(factory, dependencies);
+  }
+
+  // ---------------------------------------------------------------------- owner: configure, lifecycle
+
+  /**
+   * Adds a middleware around every resolution started from this container and its forks.
+   *
+   * A middleware receives the key, a `next` function that continues the resolution (optionally with
+   * another key) and a context with the resolution path. The last added middleware runs first.
+   * Middlewares added to a parent later still apply to existing forks.
+   *
+   * @example
+   * ```ts
+   * app.use((key, next, { depth }) => {
+   *   const start = performance.now();
+   *   const value = next();
+   *   console.debug(`${'  '.repeat(depth)}${String(key)}: ${performance.now() - start}ms`);
+   *   return value;
+   * });
+   * ```
+   */
+  use(middleware: Middleware): this {
     this.#middlewares.push(middleware);
-    this.rebuildMiddlewareStack();
+    DIContainer.#middlewareEpoch++;
+    return this;
+  }
+
+  /** Removes a middleware added with {@link use}. */
+  unuse(middleware: Middleware): this {
+    const index = this.#middlewares.lastIndexOf(middleware);
+    if (index !== -1) {
+      this.#middlewares.splice(index, 1);
+      DIContainer.#middlewareEpoch++;
+    }
     return this;
   }
 
   /**
-   * Get registered service from container
-   * @example ```
-   * class MyServiceClass {}
-   * container.addSingleton('myService', MyServiceClass);
+   * Subscribes to container events: `add`, `replace`, `reset`, `get`, `produce`, `dispose`.
    *
-   * // --- much later when developer need MyServiceClass instance ---
-   * container.get('myService')
-   * ```
-   *
-   * Return existing instance if allowed by service lifetime or will create new instance.
-   * If no service registered it would try to get service from parent container.
-   * If no service registered in parent container or no parent container set. It will throw Error
-   * @param serviceName
-   * @param options {GetOptions}
-   */
-  get<
-    Key extends keyof TServices,
-    O extends GetOptions,
-    T extends any = TServices[Key],
-  >(
-    serviceName: Key,
-    options?: O,
-  ): O['allowUnresolved'] extends true ? T | undefined : T {
-    const instance = this.#middlewareStack(serviceName);
-
-    this.onGet(serviceName, instance);
-
-    if (typeof instance !== 'undefined') {
-      return instance;
-    }
-
-    if (options?.allowUnresolved) {
-      return undefined as any;
-    }
-
-    throw new Error(`No service registered for "${String(serviceName)}" key.`);
-  }
-
-  /**
-   * Binds Callable to container with specific arguments keys.
-   * "Injecute but later"
-   * @example ```
-   * const send = (logger, httpClient) => {  ... code using http client and logic  };
-   * const sendHttpRequestAndLogResponse = container.bind(['logger', 'httpClient'], send);
-   *
-   * // --- somewhere else ---
-   * sendHttpRequestAndLogResponse() // logger and httpClient will be provided by container.
-   * ```
-   * @param keys
-   * @param callable
-   */
-  bind<TResult extends any, Deps extends Dependency<TServices>[]>(
-    keys: [...Deps],
-    callable: Callable<DependenciesToTypes<Deps, TServices>, TResult>,
-  ): () => TResult {
-    return () => this.injecute(callable, keys);
-  }
-
-  /**
-   * Create getter for specified key.
-   * @param key
-   */
-  createResolver<K extends keyof TServices>(key: K): Resolve<TServices[K]> {
-    return this.get.bind(this, key) as () => TServices[K];
-  }
-
-  /**
-   * Creates child container.
-   * For cases when you don`t want to add service to main container.
-   * Will copy arguments resolvers from parent container.
-   * @example ```
-   * const localRequestContainer = container.fork().addInstance('request', request);
-   * container.get('request') // error
-   * localRequestContainer.get('request') === request;
+   * @example
+   * ```ts
+   * app.addEventListener('produce', ({ key }) => console.debug(`created ${String(key)}`));
    * ```
    */
-  fork<T extends TServices = TServices>(options?: {
-    skipResolvers?: boolean;
-  }): IDIContainer<{}, T> {
-    const child = new DIContainer<T>({
-      parentContainer: this as IDIContainer<TOwnServices, TParentServices>,
-    });
+  addEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this {
+    if (!(event in this.#listeners)) throw this.#eventNotSupported(event);
+    this.#listeners[event].add(handler);
+    return this;
+  }
 
-    if (!options?.skipResolvers) {
-      this.#middlewares.forEach((m) => child.use(m));
-    }
-
-    return child as IDIContainer<T>;
+  /** Removes a listener added with {@link addEventListener}. */
+  removeEventListener<E extends keyof ContainerEvents>(
+    event: E,
+    handler: (event: ContainerEvents[E]) => void,
+  ): this {
+    if (!(event in this.#listeners)) throw this.#eventNotSupported(event);
+    this.#listeners[event].delete(handler);
+    return this;
   }
 
   /**
-   * Moves all factories, but not caches from parent containers to current level.
-   * Will throw if keys intersection met and `onKeyIntersection` recovery callback not provided.
-   */
-  flatten(
-    options: {
-      fork?: boolean;
-      onKeyIntersection?: <K extends keyof TServices>(
-        k: K,
-      ) => Resolve<TServices[K]>;
-    } = { fork: true },
-  ) {
-    // todo: Add tests
-    const resultContainer = (
-      options.fork ? this.fork() : this
-    ) as DIContainer<TServices>;
-    let current: DIContainer<any> = this;
-
-    while (true) {
-      const parent = current.getParent();
-      if (parent instanceof DIContainer) {
-        current = parent;
-      } else {
-        break;
-      }
-
-      current.keys.forEach((k: keyof TServices) => {
-        if (resultContainer.has(k)) {
-          if (options.onKeyIntersection) {
-            const factory = options.onKeyIntersection(k);
-            resultContainer.addFactory(k, factory, { replace: true });
-          } else {
-            throw new Error(
-              `Keys intersection occurred on key: "${k.toString()}". Use onKeyIntersection recovery mechanism.`,
-            );
-          }
-        }
-        const factoryFromParent = current!.getFactory(k);
-        resultContainer.#factories.set(k, factoryFromParent);
-      });
-    }
-
-    return resultContainer;
-  }
-
-  /**
-   * Adopts callback result container services.
-   * Provided fork of current container can be used or new created container.
-   * Current container will have access to namespace services with namespace prefix.
-   * For cases when you want to avoid keys intersection conflict.
+   * Seals the container: no more services can be registered in it (`add*`, `namespace` and `extend`
+   * throw `INJECUTE_SEALED`); resolving, middlewares, events, `reset()` and `dispose()` keep working, and
+   * forks of a sealed container are open for registrations. Call it once the composition root is
+   * complete, then fork it per request or test.
    *
-   * Only the returned container services will be exposed in namespace types.
-   * It means if you made few forks in namespace and returned latest fork,
-   * only registered in latest fork entries will be listed in namespace services type.
-   * Btw in runtime every service from returned container can be accessed.
+   * The returned type has no registration methods, and its service map is one object type instead of
+   * an intersection of every registration, so code built on it (forks, request scopes) typechecks
+   * faster and shows readable types.
    *
-   * @param namespace
-   * @param extension
+   * @throws {InjecuteError} `INJECUTE_DISPOSED`.
+   *
+   * @example
+   * ```ts
+   * export const app = new DIContainer()
+   *   .addSingleton('db', createDb)
+   *   .addSingleton('users', UserRepository, ['db'])
+   *   .seal();
+   *
+   * app.get('users');
+   * const scope = app.fork().addInstance('requestId', id); // forks stay open
+   * ```
    */
-  namespace<
-    TNamespace extends string,
-    TExtension extends (
-      c: IDIContainer<{}, TServices>,
-    ) => IDIContainer<any, any>,
-    TNamespaceServices extends ContainerOwnServices<ReturnType<TExtension>>,
-  >(
-    namespace: TNamespace,
-    extension: TExtension,
-  ): IDIContainer<
-    TOwnServices & { [K in TNamespace]: IDIContainer<TNamespaceServices> } & {
-      [K in keyof TNamespaceServices as K extends string
-        ? `${TNamespace}.${K}`
-        : never]: TNamespaceServices[K];
-    },
-    TParentServices
-  > {
-    if (this.has(namespace)) {
-      throw new Error(`Namespace key "${namespace}" already in use.`);
-    }
-    const namespaceContainer = extension(this.fork() as any);
-    if (namespaceContainer == (this as any)) {
-      throw new Error(
-        'Namespace result can not be the same container. Use parent.fork(), provided namespace container or new container as result.',
-      );
-    }
-    this.adoptNamespaceContainer(namespace, namespaceContainer);
+  seal(): SealedDIContainer<{ [K in keyof S]: S[K] }> {
+    this.#assertNotDisposed();
+    this.#sealed = true;
     return this as any;
   }
 
   /**
-   * Use extension function to add services.
-   * @example ```
-   * const addSrv1 = function(this: IDIContainer<T>): IDIContainer<T & { srv1: Srv }> {
-   *   return this.addSingleton('srv', Srv)
-   * }
-   * container.extend(addSrv1);
-   * container.get('srv1') // Srv
+   * Creates a child container. The child sees every service of this container (and later additions to
+   * it); services added to the child stay in the child.
+   *
+   * - By default a service registered in this container runs **here** and is shared by all forks,
+   *   so overriding one of its dependencies in a fork does not affect it.
+   * - With `isolated: true` the fork runs and caches **every** service it resolves, including ones
+   *   registered here. Overrides in the fork then reach the whole graph, and nothing leaks back.
+   *   Use it for tests and per-tenant variants.
+   *
+   * Services registered here can't depend on what a fork adds. Before forking per request, consider
+   * the alternatives in the "Per-request state" guide: an argument, a factory with `using`, a context
+   * accessor for request data (trace id, tenant, user), or one instance per context. A fork per request
+   * fits a group of services that share per-request instances and depend on this container's services.
+   *
+   * @example
+   * ```ts
+   * await using requestScope = app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
+   *
+   * const testContainer = app.fork({ isolated: true }).addInstance('db', fakeDb, { replace: true });
+   * testContainer.get('users'); // built with fakeDb; app is untouched
    * ```
    */
-  extend<S extends TServices, T extends Record<ArgumentsKey, any>>(
-    extensionFunction: (container: IDIContainer<S>) => IDIContainer<T>,
-  ): IDIContainer<TServices & T> {
-    const c = this as IDIContainer<TOwnServices, TParentServices>;
-    const result = extensionFunction.apply(c, [c]);
-    if (getContainersChain(result).some((c) => c === this)) {
-      return result;
+  fork(options?: ForkOptions): DIContainer<S> {
+    this.#assertNotDisposed();
+    const child = this.createChild();
+    child.#inheritMiddlewares = options?.middlewares ?? true;
+    child.#isolated = options?.isolated ?? false;
+    return child as DIContainer<S>;
+  }
+
+  /**
+   * Clears cached instances (all, or `keys`), so the next resolution creates them again. Instances
+   * are not disposed here; `dispose()` still releases them later.
+   */
+  reset(options: ResetOptions<S> = {}): this {
+    const keys = options.keys ? new Set<ServiceKey>(options.keys) : undefined;
+    for (const reg of [...this.#instances.keys()]) {
+      if (!keys || keys.has(reg.key)) this.#instances.delete(reg);
     }
-    throw new Error(
-      'Extension result container not the same container or its child.',
+    for (const k of [...this.#overrides.keys()]) {
+      if (!keys || keys.has(k)) this.#overrides.delete(k);
+    }
+    for (const reg of this.#registrations.values()) {
+      if (reg.kind === 'namespace' && reg.container)
+        reg.container.#resetChain(this);
+    }
+    if (options.resetParent) this.#parent?.reset(options as ResetOptions<any>);
+    this.#emit('reset', {
+      resetParent: options.resetParent || false,
+      keys: options.keys,
+      container: this.#view(),
+    });
+    return this;
+  }
+
+  /**
+   * Disposes every instance this container owns, dependents first (reverse creation order), then marks
+   * the container as disposed: later `get()` and registrations throw.
+   *
+   * Owned instances are the singletons this container created, and `addInstance` values registered
+   * with `dispose`. Each is disposed with its registration's `dispose` function, or with
+   * `[Symbol.asyncDispose]` / `[Symbol.dispose]` when it has one. Namespace containers are disposed
+   * too; forks are not (dispose each fork you create, e.g. with `await using`).
+   *
+   * Calling it again returns the same promise. If some disposers fail, the others still run and the
+   * promise rejects with an `AggregateError`.
+   *
+   * @example
+   * ```ts
+   * await using scope = app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
+   * // ... scope and its singletons (the transaction) are disposed at the end of the block
+   * ```
+   */
+  dispose(): Promise<void> {
+    this.#disposing ??= this.#runDispose();
+    return this.#disposing;
+  }
+
+  /** Same as {@link dispose}; enables `await using container = …`. */
+  [asyncDispose](): Promise<void> {
+    return this.dispose();
+  }
+
+  /** @internal Used by setCacheInstance(). */
+  [SET_CACHE_INSTANCE](key: ServiceKey, value: unknown): void {
+    this.#overrides.set(key, value);
+  }
+
+  // ---------------------------------------------------------------- internals
+
+  /**
+   * Runs a factory. Errors that are not InjecuteErrors are wrapped with the resolution path (the
+   * original is `cause`); a class called without `new` gets a CLASS_NOT_CONSTRUCTED hint. A returned
+   * promise that rejects is wrapped the same way.
+   */
+  #invoke(
+    factory: (...args: any[]) => unknown,
+    args: unknown[],
+    original: unknown,
+    path: readonly ServiceKey[],
+  ): unknown {
+    const name = describeKey(
+      path.at(-1) ?? ((original as { name?: string })?.name || 'factory'),
+    );
+    let value: unknown;
+    try {
+      value = this.invokeFactory(factory, args);
+    } catch (error) {
+      throw factoryError(error, name, original, path);
+    }
+    if (isThenable(value)) {
+      return Promise.resolve(value).then(undefined, (error: unknown) => {
+        throw factoryError(error, name, original, path);
+      });
+    }
+    if (
+      value === undefined &&
+      !isClass(original) &&
+      looksLikeConstructor(original)
+    ) {
+      throw classNotConstructed(name, original, path, undefined);
+    }
+    return value;
+  }
+
+  #notRegistered(key: ServiceKey, path: readonly ServiceKey[]): InjecuteError {
+    const suggestions = suggestKeys(key, this.keys);
+    let levels = 0;
+    for (
+      let level: DIContainer<any> | undefined = this;
+      level;
+      level = level.#parent
+    )
+      levels++;
+    const searched =
+      levels === 1
+        ? 'this container'
+        : `this container and ${levels - 1} parent(s)`;
+    return new InjecuteError(
+      'INJECUTE_NOT_REGISTERED',
+      `No service registered for "${describeKey(key)}" (searched ${searched}).` +
+        (suggestions.length > 0
+          ? ` Did you mean ${suggestions.map((s) => `"${s}"`).join(', ')}?`
+          : ''),
+      { path },
     );
   }
 
-  /**
-   * Clear singletons instances cache.
-   * When singleton will be required new instance will be created and factory will be executed once more with new dependencies.
-   * Helpful when some service is replaced and cached dependant should be created once more.
-   *
-   * @param {{
-   * resetParent?: boolean;
-   * keys?: (keyof (TOwnServices & TParentServices))[];
-   * } | undefined} options
-   */
-  reset(
-    options: {
-      resetParent?: boolean;
-      keys?: (keyof (TOwnServices & TParentServices))[];
-    } = {},
-  ): IDIContainer<TOwnServices, TParentServices> {
-    if (!options.keys) {
-      this.#singletonInstances.clear();
-    } else {
-      options.keys.forEach((k) => {
-        this.#singletonInstances.delete(k);
-      });
-    }
-    if (options.resetParent) {
-      this.#parentContainer?.reset(options);
-    }
-    this.onReset(options);
-    return this as IDIContainer<TOwnServices, TParentServices>;
+  /** This container as the read-only view handed to middlewares and event listeners. */
+  #view(): ServiceProvider<any> {
+    return this as unknown as ServiceProvider<any>;
   }
 
-  /**
-   * If entry under the key is function it will be called with params and optional `this`.
-   * @param key
-   * @param params
-   * @param targetThis
-   * @returns
-   */
-  call<
-    FnKey extends KeyForValueOfType<TServices, (...p: any[]) => any>,
-    Fn extends TServices[FnKey],
-  >(
-    key: FnKey,
-    params: ArgumentsTypes<Fn>,
-    targetThis: any = null,
-  ): ReturnType<Fn> {
-    const value = this.get(key);
-    if (typeof value !== 'function') {
-      throw new Error(
-        `Entry "${String(key)}" is not a function and can not be invoked`,
-      );
-    }
-    return value.apply(targetThis, params);
+  /** Ancestors' middlewares (root first) followed by this container's own, cached until use()/unuse(). */
+  #effectiveMiddlewares(): readonly Middleware[] {
+    const epoch = DIContainer.#middlewareEpoch;
+    if (this.#middlewareCache?.epoch === epoch)
+      return this.#middlewareCache.list;
+    const inherited =
+      this.#inheritMiddlewares && this.#parent
+        ? this.#parent.#effectiveMiddlewares()
+        : [];
+    const list =
+      inherited.length === 0
+        ? this.#middlewares.slice()
+        : [...inherited, ...this.#middlewares];
+    this.#middlewareCache = { epoch, list };
+    return list;
   }
 
-  /**
-   * Executes function or constructor using container dependencies without adding it to container.
-   * @example ```
-   * container.addInstance('logger', console);
-   * //
-   * const logger = container.get('logger');
-   * const useLogger = (logger) => { logSome }
-   * useLogger(logger)
-   * // is equivalent to
-   * container.injecute((logger) => logSome, ['logger'])
-   * ```
-   * @param callable
-   * @param options
-   */
-  injecute<
-    TResult,
-    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, TResult>,
-    Deps extends Dependency<TServices>[],
-  >(callable: TCallable, dependencies: [...Deps]): CallableResult<TCallable> {
-    return this.applyCallable(callable, dependencies as any);
+  #own(reg: Registration, value: unknown) {
+    this.#owned.push({ seq: DIContainer.#sequence++, reg, value });
   }
 
-  protected applyCallable<D extends any[]>(
-    callable: Callable<D, any>,
-    dependencies: D,
-  ) {
-    const dependenciesInstances: any =
-      this.mapDependenciesToInstances(dependencies);
-    return callable(...dependenciesInstances) as any;
-  }
-
-  protected mapDependenciesToInstances(dependencies: Dependency<TServices>[]) {
-    return dependencies.map((d) => {
-      if (d === optionalDependencySkipKey) {
-        return undefined;
-      }
-      if (isKey(d)) {
-        return this.get(d);
-      }
-      if (isFactory(d)) {
-        return this.injecute(
-          d.callable,
-          d.dependencies as Dependency<TServices>[],
-        );
-      }
-      if (typeof d === 'function') {
-        return d();
-      }
-      throw new Error(`Invalid dependency type`);
+  /** A singleton promise that rejects is forgotten, so the next resolution creates it again. */
+  #evictOnRejection(reg: Registration, promise: PromiseLike<unknown>) {
+    promise.then(undefined, () => {
+      if (this.#instances.get(reg) === promise) this.#instances.delete(reg);
+      this.#owned = this.#owned.filter((o) => o.value !== promise);
     });
   }
 
-  protected assertNotRegistered(name: keyof TServices | ArgumentsKey) {
-    if (this.has(name, false)) {
-      throw new Error(
-        `Factory or instance with name "${String(name)}" already registered`,
+  #assertNotDisposed() {
+    if (this.#disposed) {
+      throw new InjecuteError(
+        'INJECUTE_DISPOSED',
+        'This container is disposed.',
       );
     }
   }
 
-  protected applyFactory(factory: Factory<any, any>) {
-    factory.beforeResolving?.();
-    const result = this.injecute(
-      factory.callable as Callable<any, any>,
-      factory.dependencies as Dependency<TServices>[],
-    );
-    factory.afterResolving?.(result);
+  #assertNotSealed(what: string) {
+    if (this.#sealed) {
+      throw new InjecuteError(
+        'INJECUTE_SEALED',
+        `${what}: the container is sealed.`,
+      );
+    }
+  }
+
+  /** This container plus the namespace containers it owns (and theirs), up to this container. */
+  #ownedContainers(): DIContainer<any>[] {
+    const result: DIContainer<any>[] = [this];
+    const addChain = (container: DIContainer<any>) => {
+      for (
+        let level: DIContainer<any> | undefined = container;
+        level && level !== this && !result.includes(level);
+        level = level.#parent
+      ) {
+        result.push(...level.#ownedContainers());
+      }
+    };
+    for (const reg of this.#registrations.values()) {
+      if (reg.kind === 'namespace' && reg.container) addChain(reg.container);
+    }
+    for (const container of this.#isolatedNamespaces.values())
+      addChain(container);
     return result;
   }
 
-  protected resolveInstance: Resolver<TServices> = (name) =>
-    this.#singletonInstances.get(name);
-
-  protected resolveFromFactory: Resolver<TServices> = (name) => {
-    const factory = this.#factories.get(name);
-    if (factory) {
-      const result = this.applyFactory(factory);
-      if (factory[entryTypeKey] !== 'instance') {
-        this.onProduce(name, result);
+  async #runDispose(): Promise<void> {
+    const containers = this.#ownedContainers();
+    for (const container of containers) container.#disposed = true;
+    const owned = containers
+      .flatMap((container) => container.#owned)
+      .sort((a, b) => b.seq - a.seq);
+    const done = new Set<unknown>();
+    const errors: unknown[] = [];
+    for (const { reg, value } of owned) {
+      let instance: unknown;
+      try {
+        instance = await value;
+      } catch {
+        continue; // creation failed: nothing to release
       }
-      return result;
+      if (done.has(instance)) continue;
+      done.add(instance);
+      try {
+        await disposeValue(instance, reg.dispose);
+      } catch (error) {
+        errors.push(error);
+      }
     }
-  };
-
-  protected resolveFromParent: Resolver<TServices> = (name) =>
-    this.#parentContainer?.get(name, { allowUnresolved: true });
-
-  protected readonly resolve = firstResult([
-    this.resolveInstance,
-    this.resolveFromFactory,
-    this.resolveFromParent,
-  ]) as Middleware<TServices>;
-
-  protected assertFactoryIsAcceptable(
-    factory: any,
-    name: keyof TServices | ArgumentsKey,
-  ) {
-    if (typeof factory !== 'function') {
-      throw new Error(
-        `Non function factory or class constructor added for "${String(
-          name,
-        )}" key`,
+    for (const container of containers) {
+      container.#owned = [];
+      container.#instances.clear();
+    }
+    this.#emit('dispose', { container: this.#view() });
+    if (errors.length > 0) {
+      throw new InjecuteError(
+        'INJECUTE_DISPOSE_FAILED',
+        `Failed to dispose ${errors.length} service(s).`,
+        { cause: new AggregateError(errors, 'Dispose failures') },
       );
     }
   }
 
-  protected assertKeyIsValid(
-    k: unknown,
-  ): asserts k is Exclude<any, OptionalDependencySkipKey> {
-    if (k === optionalDependencySkipKey) {
-      throw new Error(
-        `"${optionalDependencySkipKey}" key is not allowed as key for service.`,
-      );
-    }
-  }
-
-  protected onReplace(
-    name: keyof TServices,
-    newFactory: Factory<TServices, keyof TServices>,
-  ) {
-    const currentFactory = this.#factories.get(name);
-    if (!currentFactory) return;
-    currentFactory.beforeReplaced?.(newFactory);
-    for (const handler of this.eventHandlers.replace) {
-      handler({
-        key: name,
-        container: this as IDIContainer<TOwnServices, TParentServices>,
-        replaced: {
-          callable: currentFactory.callable,
-          type: currentFactory[entryTypeKey],
-        },
-      });
-    }
-  }
-
-  protected onAdd(name: keyof TServices, replace: boolean) {
-    for (const handler of this.eventHandlers.add) {
-      handler({
-        key: name,
-        replace,
-        container: this as IDIContainer<TOwnServices, TParentServices>,
-      });
-    }
-  }
-
-  protected onReset(resetOptions: {
-    resetParent?: boolean;
-    keys?: (keyof (TOwnServices & TParentServices))[];
-  }) {
-    for (const handler of this.eventHandlers.reset) {
-      handler({
-        resetParent: resetOptions.resetParent || false,
-        keys: resetOptions.keys,
-        container: this as IDIContainer<TOwnServices, TParentServices>,
-      });
-    }
-  }
-
-  protected onGet(name: ArgumentsKey, value: any) {
-    for (const handler of this.eventHandlers.get) {
-      handler({
-        key: name,
-        value,
-        container: this as IDIContainer<TOwnServices, TParentServices>,
-      });
-    }
-  }
-
-  protected onProduce(name: ArgumentsKey, value: any) {
-    for (const handler of this.eventHandlers.produce) {
-      handler({
-        key: name,
-        value,
-        container: this as IDIContainer<TOwnServices, TParentServices>,
-      });
-    }
-  }
-
-  private linkNamespaceService<N extends string, C extends IDIContainer<any>>(
-    namespaceContainer: C,
-    namespace: N,
-    key: string | number,
-  ) {
-    const namespaceKey = createNamespaceServiceKey(namespace, key) as Exclude<
-      string,
-      OptionalDependencySkipKey | keyof TServices
-    >;
-    this.addFactory(namespaceKey, namespaceContainer.createResolver(key), {
-      beforeReplaced: () => {
-        // if parent container replaces namespace entry, namespace container will use this replaced entry as well
-        namespaceContainer.addTransient(
-          key,
-          this.createResolver(namespaceKey),
-          {
-            replace: true,
-            dependencies: [],
-            beforeReplaced: () => {
-              this.#factories.delete(namespaceKey);
-              this.#singletonInstances.delete(namespaceKey);
-            },
-          },
-        );
-      },
-      linkedFactory:
-        (namespaceContainer instanceof DIContainer &&
-          namespaceContainer.getFactory(key)) ||
-        undefined,
-      dependencies: [],
-      [entryTypeKey]: 'namespace-entry',
-    });
-  }
-
-  private adoptNamespaceContainer<
-    N extends string,
-    C extends IDIContainer<any>,
-  >(namespace: N, namespaceContainer: C) {
-    this.addInstance(namespace as any, namespaceContainer, {
-      [entryTypeKey]: 'namespace-container',
-    });
-
-    let adoptee: IDIContainer<any> | undefined;
-    while (true) {
-      const currentAdoptee = (adoptee = !adoptee
-        ? namespaceContainer
-        : adoptee.getParent());
-      if (!currentAdoptee || currentAdoptee === this) {
-        break;
-      }
-
-      // 1. can't concatenate symbol. 2. symbols are for private services
-      for (const key of currentAdoptee.ownKeys.filter(stringOrNumber)) {
-        this.linkNamespaceService(currentAdoptee, namespace, key);
-      }
-
-      // If for, some reason, something added to namespace after adoption - it should be added as well.
-      currentAdoptee.addEventListener('add', ({ key }) => {
-        if (!stringOrNumber(key)) return;
-        if (this.has(createNamespaceServiceKey(namespace, key))) return;
-        this.linkNamespaceService(currentAdoptee, namespace, key);
-      });
-
-      this.addEventListener('reset', () => {
-        currentAdoptee.reset();
-      });
-    }
-  }
-
-  private eventNotSupported(e: string) {
-    const supportedEvents = Object.keys(this.eventHandlers)
+  #eventNotSupported(e: string) {
+    const supported = Object.keys(this.#listeners)
       .map((k) => `"${k}"`)
       .join(', ');
-    return new Error(`Event "${e}" not supported. ${supportedEvents} allowed`);
+    return new InjecuteError(
+      'INJECUTE_UNKNOWN_EVENT',
+      `Event "${e}" is not supported. Supported: ${supported}.`,
+    );
   }
 
-  private addFactory<
-    K extends ArgumentsKey,
-    TCallable extends Callable<DependenciesToTypes<Deps, TServices>, any>,
-    Deps extends Dependency<TServices>[],
-    TResult extends CallableResult<TCallable>,
-  >(
-    name: K,
-    factory: TCallable,
-    options?:
+  #emit<E extends keyof ContainerEvents>(
+    event: E,
+    payload: ContainerEvents[E],
+  ) {
+    const handlers = this.#listeners[event] as Set<
+      (e: ContainerEvents[E]) => void
+    >;
+    if (handlers.size === 0) return;
+    for (const handler of handlers) handler(payload);
+  }
+
+  #addFactory(
+    kind: 'singleton' | 'transient',
+    key: ServiceKey,
+    factory: unknown,
+    options:
       | {
-          [entryTypeKey]?: EntryType;
           replace?: boolean;
-          linkedFactory?: Factory<TServices, K>;
-          dependencies?: [...Deps];
-          beforeResolving?: () => void;
-          afterResolving?: (instance: TResult) => void;
-          beforeReplaced?: (
-            oldFactory: Factory<TServices, K>,
-          ) => TCallable | void;
+          dependencies?: unknown[];
+          dispose?: DisposeOption<any>;
         }
-      | [...Deps],
-  ): IDIContainer<TServices & { [k in K]: TResult }> {
-    const optionsIsArray = Array.isArray(options);
-    const replace = !optionsIsArray && !!options?.replace;
-    const dependencies: Dependency<TServices>[] =
-      (optionsIsArray ? options : options?.dependencies) || [];
-    const newFactory: Factory<TServices, K> = {
-      [entryTypeKey]: ((!optionsIsArray && options?.[entryTypeKey]) ||
-        'transient') as EntryType,
-      dependencies,
-      linkedFactory: !optionsIsArray ? options?.linkedFactory : undefined,
-      beforeResolving: !optionsIsArray ? options?.beforeResolving : undefined,
-      afterResolving: !optionsIsArray ? options?.afterResolving : undefined,
-      beforeReplaced: !optionsIsArray
-        ? (options?.beforeReplaced as any)
-        : undefined,
-      callable: factory as Callable<any[], any>,
-    };
-    this.validateAdd(name, newFactory, replace);
-    if (replace) {
-      if (this.#factories.has(name)) {
-        this.onReplace(name as any, newFactory);
-      }
-      const sameKeyIndex = dependencies?.indexOf(name) ?? -1;
-      if (sameKeyIndex !== -1) {
-        dependencies[sameKeyIndex] = this.getFactory(name) as any;
-      }
-      this.#singletonInstances.delete(name);
+      | unknown[]
+      | undefined,
+  ) {
+    this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
+    if (typeof factory !== 'function') {
+      throw new InjecuteError(
+        'INJECUTE_INVALID_FACTORY',
+        `The factory for "${describeKey(key)}" is not a function or class (got ${typeof factory}).`,
+      );
     }
-    this.#factories.set(name, newFactory);
-    this.onAdd(name as any, replace);
-    return this as any;
+    const isArray = Array.isArray(options);
+    const replace = !isArray && !!options?.replace;
+    const dependencies = (isArray ? options : options?.dependencies) ?? [];
+    const dispose = isArray ? undefined : options?.dispose;
+    if (kind === 'transient' && dispose !== undefined && dispose !== false) {
+      throw new InjecuteError(
+        'INJECUTE_INVALID_OPTION',
+        `"dispose" is not supported for transient "${describeKey(key)}": the container does not keep transient instances.`,
+      );
+    }
+    this.#register(
+      {
+        key,
+        kind,
+        owner: this,
+        factory: factory as (...args: any[]) => unknown,
+        construct: isClass(factory),
+        dependencies: normalizeDependencies(dependencies, key),
+        dispose,
+      },
+      replace,
+    );
   }
 
-  private rebuildMiddlewareStack() {
-    this.#middlewareStack = [this.resolve, ...this.#middlewares].reduce(
-      (next, current) => (message) =>
-        current.apply(this, [message, next as Resolver<TServices>]),
-    ) as Resolver<TServices>;
-  }
-
-  private ensureNoCirculars(
-    key: ArgumentsKey,
-    stack: ArgumentsKey[] = [],
-    initialDependencies?: Dependency<TServices>[],
-  ): ArgumentsKey[][] {
-    const dependencies =
-      initialDependencies || this.#factories.get(key)?.dependencies;
-    if (!dependencies) return [stack];
-    return dependencies.flatMap((a) => {
-      if (isFactory(a) || typeof a === 'function') {
-        return [];
-      }
-      const newStack = [...stack, a];
-      if (stack.includes(a)) {
-        throw new CircularDependencyError(newStack);
-      }
-      return this.ensureNoCirculars(a, newStack);
+  #register(reg: Registration, replace: boolean) {
+    this.#assertNotDisposed();
+    const key = reg.key;
+    const existing = this.#registrations.get(key);
+    if (existing && !replace) {
+      throw new InjecuteError(
+        'INJECUTE_ALREADY_REGISTERED',
+        `"${describeKey(key)}" is already registered in this container.`,
+      );
+    }
+    const usesPrevious = reg.dependencies.some((d) => d.type === 'previous');
+    if (usesPrevious && !existing && !this.#parent?.has(key)) {
+      throw new InjecuteError(
+        'INJECUTE_NO_PREVIOUS_DEFINITION',
+        `"${describeKey(key)}" depends on itself, but no previous definition of "${describeKey(key)}" is registered.`,
+      );
+    }
+    this.#assertNoCycle(reg);
+    const stored: Registration = existing
+      ? { ...reg, previous: existing }
+      : reg;
+    this.#registrations.set(key, stored);
+    if (existing) {
+      for (const [r] of this.#instances)
+        if (r.key === key) this.#instances.delete(r);
+      this.#overrides.delete(key);
+      this.#emit('replace', {
+        key,
+        container: this.#view(),
+        previous: toInfo(existing, 0),
+      });
+      this.#propagateNamespaceReplacement(existing, stored);
+    }
+    this.#emit('add', {
+      key,
+      replace: !!existing,
+      container: this.#view(),
+      kind: stored.kind,
     });
   }
 
-  private validateAdd(
-    name: Exclude<ArgumentsKey, OptionalDependencySkipKey>,
-    factory: Factory<TServices, keyof TServices>,
-    replace?: boolean,
-  ) {
-    this.ensureNoCirculars(name, replace ? [] : [name], factory.dependencies);
-    this.assertKeyIsValid(name);
-    this.assertFactoryIsAcceptable(factory.callable, name);
-    if (!replace) {
-      this.assertNotRegistered(name);
+  /** O(V+E) depth-first search over the key dependencies visible from this container. */
+  #assertNoCycle(reg: Registration) {
+    const start = reg.key;
+    const visited = new Set<ServiceKey>();
+    const visit = (deps: readonly InternalDependency[], path: ServiceKey[]) => {
+      for (const d of deps) {
+        if (d.type !== 'key') continue;
+        if (d.key === start)
+          throw new CircularDependencyError([...path, d.key]);
+        if (visited.has(d.key)) continue;
+        visited.add(d.key);
+        const next = this.#lookup(d.key);
+        if (next && 'reg' in next)
+          visit(next.reg.dependencies, [...path, d.key]);
+      }
+    };
+    visit(reg.dependencies, [start]);
+  }
+
+  /** Finds the registration (or override) visible under `key`, starting at this container. */
+  #lookup(
+    key: ServiceKey,
+  ):
+    | { reg: Registration; owner: DIContainer<any> }
+    | { override: unknown }
+    | undefined {
+    let current: DIContainer<any> | undefined = this;
+    while (current) {
+      if (current.#overrides.has(key))
+        return { override: current.#overrides.get(key) };
+      const reg = current.#registrations.get(key);
+      if (reg) return { reg, owner: current };
+      current = current.#parent;
+    }
+    return undefined;
+  }
+
+  /** Resolves `key` through this container's middlewares; `NOT_FOUND` when nothing is registered. */
+  #get(key: ServiceKey, allowUnresolved: boolean, path: ServiceKey[]): unknown {
+    let found = true;
+    const resolveInner = (k: ServiceKey) => {
+      const value = this.#resolve(k, path);
+      if (value === NOT_FOUND) {
+        if (k === key) found = false;
+        return undefined;
+      }
+      if (k === key) found = true;
+      return value;
+    };
+    let value: unknown;
+    const middlewares = this.#effectiveMiddlewares();
+    if (middlewares.length === 0) {
+      value = resolveInner(key);
+    } else {
+      const context: MiddlewareContext = {
+        container: this.#view(),
+        path: [...path, key],
+        depth: path.length,
+      };
+      const chain = middlewares.reduce<(k: ServiceKey) => unknown>(
+        (next, middleware) => (k) =>
+          middleware(k, (nextKey = k) => next(nextKey), context),
+        resolveInner,
+      );
+      value = chain(key);
+      if (value !== undefined) found = true;
+    }
+    this.#emit('get', { key, value, container: this.#view() });
+    if (!found && value === undefined) {
+      if (allowUnresolved) return undefined;
+      throw this.#notRegistered(key, [...path, key]);
+    }
+    return value;
+  }
+
+  /**
+   * The container that runs `owner`'s registrations for a resolution started here: the nearest isolated
+   * fork between this container and the owner, otherwise the owner itself.
+   */
+  #executorFor(owner: DIContainer<any>): DIContainer<any> {
+    let current: DIContainer<any> | undefined = this;
+    while (current && current !== owner) {
+      if (current.#isolated) return current;
+      current = current.#parent;
+    }
+    return owner;
+  }
+
+  /** Re-applies a namespace callback inside this isolated fork, once. */
+  #isolatedNamespace(reg: Registration): DIContainer<any> {
+    let container = this.#isolatedNamespaces.get(reg);
+    if (!container) {
+      const result = reg.extension!(this.fork());
+      if (!(result instanceof DIContainer)) {
+        throw new Error('Namespace extension must return a container.');
+      }
+      container = result;
+      this.#isolatedNamespaces.set(reg, container);
+    }
+    return container;
+  }
+
+  /** Resolution without middlewares: finds the registration and lets the executing container produce it. */
+  #resolve(key: ServiceKey, path: ServiceKey[]): unknown {
+    const found = this.#lookup(key);
+    if (!found) return NOT_FOUND;
+    if ('override' in found) return found.override;
+    return this.#executorFor(found.owner).#produce(found.reg, [...path, key]);
+  }
+
+  #produce(reg: Registration, path: ServiceKey[]): unknown {
+    switch (reg.kind) {
+      case 'instance':
+        return reg.value;
+      case 'alias':
+        return this.#get(reg.target!, false, path);
+      case 'namespace':
+        return this === reg.owner
+          ? reg.container
+          : this.#isolatedNamespace(reg);
+      case 'namespace-entry': {
+        if (this === reg.owner)
+          return reg.container!.#get(reg.target!, false, path);
+        const namespace = reg.owner.#registrations.get(reg.namespace!);
+        return this.#isolatedNamespace(namespace!).#get(
+          reg.target!,
+          false,
+          path,
+        );
+      }
+      case 'delegate':
+        return reg.container!.#get(reg.target!, false, path);
+      case 'singleton': {
+        if (this.#instances.has(reg)) return this.#instances.get(reg);
+        this.#assertNotDisposed();
+        const value = this.#create(reg, path);
+        this.#instances.set(reg, value);
+        if (reg.dispose !== false) this.#own(reg, value);
+        if (isThenable(value)) this.#evictOnRejection(reg, value);
+        return value;
+      }
+      case 'transient':
+        return this.#create(reg, path);
     }
   }
+
+  #create(reg: Registration, path: ServiceKey[]): unknown {
+    if (path.indexOf(reg.key) !== path.length - 1) {
+      throw new CircularDependencyError(path);
+    }
+    const args = reg.dependencies.map((d) =>
+      this.#resolveDependency(d, reg, path),
+    );
+    const factory = reg.construct
+      ? callableOf(reg.factory as unknown as new (...args: any[]) => unknown)
+      : reg.factory!;
+    const value = this.#invoke(factory, args, reg.factory, path);
+    this.#emit('produce', { key: reg.key, value, container: this.#view() });
+    return value;
+  }
+
+  #resolveDependency(
+    d: InternalDependency,
+    reg: Registration | undefined,
+    path: ServiceKey[],
+  ): unknown {
+    switch (d.type) {
+      case 'function':
+        return d.fn();
+      case 'key':
+        return this.#get(d.key, false, path);
+      case 'optional':
+        return this.#get(d.key, true, path);
+      case 'previous': {
+        if (reg?.previous) return this.#produce(reg.previous, path);
+        // The previous definition lives above the registration's owner.
+        const above = reg ? reg.owner.#parent : undefined;
+        const found = above ? above.#lookup(d.key) : undefined;
+        if (!found) {
+          throw new InjecuteError(
+            'INJECUTE_NO_PREVIOUS_DEFINITION',
+            `"${describeKey(d.key)}" depends on itself, but no previous definition of "${describeKey(d.key)}" is registered.`,
+            { path },
+          );
+        }
+        if ('override' in found) return found.override;
+        const executor = this === reg!.owner ? found.owner : this;
+        return executor.#produce(found.reg, path);
+      }
+    }
+  }
+
+  #adoptNamespace(
+    namespace: string,
+    container: DIContainer<any>,
+    extension: (c: any) => unknown,
+  ) {
+    this.#register(
+      {
+        key: namespace,
+        kind: 'namespace',
+        owner: this,
+        namespace,
+        container,
+        extension,
+        dependencies: [],
+      },
+      false,
+    );
+    // The returned container may be a fork of a fork: link every level up to this container.
+    let level: DIContainer<any> | undefined = container;
+    while (level && level !== this) {
+      const current: DIContainer<any> = level;
+      for (const key of current.ownKeys.filter(isLinkableKey)) {
+        this.#linkNamespaceEntry(namespace, current, key);
+      }
+      current.addEventListener('add', ({ key, replace, kind }) => {
+        if (!isLinkableKey(key) || kind === 'delegate') return;
+        const linked = namespaceKey(namespace, key);
+        const existing = this.#registrations.get(linked);
+        if (!existing) {
+          this.#linkNamespaceEntry(namespace, current, key);
+        } else if (replace && existing.kind !== 'namespace-entry') {
+          // the namespace replaced an entry the parent had overridden: the namespace wins again
+          this.#registrations.set(linked, {
+            key: linked,
+            kind: 'namespace-entry',
+            owner: this,
+            namespace,
+            container: current,
+            target: key,
+            dependencies: [],
+          });
+        }
+      });
+      level = current.#parent;
+    }
+  }
+
+  #linkNamespaceEntry(
+    namespace: string,
+    container: DIContainer<any>,
+    key: string | number,
+  ) {
+    const linked = namespaceKey(namespace, key);
+    if (this.#registrations.has(linked)) return;
+    this.#register(
+      {
+        key: linked,
+        kind: 'namespace-entry',
+        owner: this,
+        namespace,
+        container,
+        target: key,
+        dependencies: [],
+      },
+      false,
+    );
+  }
+
+  /** When a parent replaces `NS.key`, the namespace container uses the replacement too. */
+  #propagateNamespaceReplacement(replaced: Registration, next: Registration) {
+    if (replaced.kind !== 'namespace-entry' || next.kind === 'namespace-entry')
+      return;
+    if (next.dependencies.some((d) => d.type === 'previous')) return; // decorating: keep the original
+    const container = replaced.container!;
+    container.#register(
+      {
+        key: replaced.target!,
+        kind: 'delegate',
+        owner: container,
+        container: this,
+        target: replaced.key,
+        dependencies: [],
+      },
+      true,
+    );
+  }
+
+  #resetChain(stopAt: DIContainer<any>) {
+    let level: DIContainer<any> | undefined = this;
+    while (level && level !== stopAt) {
+      level.reset();
+      level = level.#parent;
+    }
+  }
+}
+
+function normalizeDependencies(
+  dependencies: readonly unknown[],
+  ownKey: ServiceKey | undefined,
+): InternalDependency[] {
+  return dependencies.map((d): InternalDependency => {
+    const optional = optionalKey(d);
+    if (optional !== undefined) return { type: 'optional', key: optional };
+    if (isKey(d)) {
+      return ownKey !== undefined && d === ownKey
+        ? { type: 'previous', key: d }
+        : { type: 'key', key: d };
+    }
+    if (typeof d === 'function')
+      return { type: 'function', fn: d as () => unknown };
+    throw new InjecuteError(
+      'INJECUTE_INVALID_DEPENDENCY',
+      `Invalid dependency ${String(d)}${ownKey === undefined ? '' : ` of "${describeKey(ownKey)}"`}.`,
+    );
+  });
+}
+
+function toInfo(reg: Registration, depth: number): RegistrationInfo {
+  const dependencies = reg.dependencies.map((d): DependencyInfo => {
+    switch (d.type) {
+      case 'key':
+        return { type: 'key', key: d.key };
+      case 'previous':
+        return { type: 'previous', key: d.key };
+      case 'optional':
+        return { type: 'optional', key: d.key };
+      case 'function':
+        return { type: 'function', name: d.fn.name };
+    }
+  });
+  const info: RegistrationInfo = {
+    key: reg.key,
+    kind: reg.kind,
+    dependencies,
+    depth,
+    ...(reg.target !== undefined ? { target: reg.target } : {}),
+    ...(reg.namespace !== undefined ? { namespace: reg.namespace } : {}),
+  };
+  if (
+    (reg.kind === 'namespace-entry' || reg.kind === 'delegate') &&
+    reg.container
+  ) {
+    const linked = reg.container.getRegistration(reg.target!);
+    if (linked) return { ...info, linked };
+  }
+  return info;
+}
+
+async function disposeValue(
+  value: unknown,
+  dispose: DisposeOption<unknown> | undefined,
+): Promise<void> {
+  if (dispose === false) return;
+  if (typeof dispose === 'function') {
+    await dispose(value);
+    return;
+  }
+  if (
+    (typeof value !== 'object' && typeof value !== 'function') ||
+    value === null
+  )
+    return;
+  const disposable = value as Partial<AsyncDisposable & Disposable>;
+  if (typeof disposable[asyncDispose] === 'function') {
+    await disposable[asyncDispose]!();
+  } else if (typeof disposable[syncDispose] === 'function') {
+    disposable[syncDispose]!();
+  }
+}
+
+function factoryError(
+  error: unknown,
+  name: string,
+  factory: unknown,
+  path: readonly ServiceKey[],
+): InjecuteError {
+  if (error instanceof InjecuteError) return error;
+  if (!isClass(factory) && isClassCallError(error, factory)) {
+    return classNotConstructed(name, factory, path, error);
+  }
+  return new InjecuteError(
+    'INJECUTE_RESOLUTION_FAILED',
+    `Failed to create "${name}": ${error instanceof Error ? error.message : String(error)}`,
+    { path, cause: error },
+  );
+}
+
+function classNotConstructed(
+  name: string,
+  factory: unknown,
+  path: readonly ServiceKey[],
+  cause: unknown,
+): InjecuteError {
+  const className = (factory as { name?: string })?.name || 'TheClass';
+  return new InjecuteError(
+    'INJECUTE_CLASS_NOT_CONSTRUCTED',
+    `"${name}" looks like a class that was called without new. Register it as construct(${className}).`,
+    { path, cause },
+  );
 }
