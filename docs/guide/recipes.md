@@ -45,6 +45,9 @@ const app = new DIContainer()
   .extend(addBilling);
 ```
 
+When a module expects a service under another key or in another shape, see
+[Adapting a module's dependencies](./containers.md#adapting-a-module-s-dependencies).
+
 ## Sharing services between independent containers
 
 ```ts

@@ -65,6 +65,22 @@ receives a fork of the container, so it can use every service registered there.
 (`ContainerServices<typeof app>`), `Reports` is a `Namespace` marker next to the `Reports.*` keys;
 `NamespaceServices<typeof app, 'Reports'>` gives the namespace's services.
 
+## Adapting a module's dependencies
+
+A module names the services it needs under its own keys. When the container has them under other
+keys, or in another shape, register the missing keys before `extend()`: `addAlias()` for the same
+service under another key, a factory for a value derived from another service. Do it in a namespace,
+so the adapters stay out of the container's root:
+
+<<< @/../examples/containers.ts#adapt
+
+- The adapters are services of the namespace like any other: `host.get('Audit.dbUrl')` resolves them,
+  and `fork({ isolated: true })` overrides of `config` reach them.
+- An adapter has a lifetime too. A singleton keeps the first value it derives; register it with
+  `addTransient()` when the value must follow a service that changes.
+- `extend()` on the container itself works without a namespace, but the adapters then become keys of
+  the root, and two modules that need `dbUrl` with different values can't both have it.
+
 ## Sealing the composition root
 
 `seal()` ends the registrations of a container: afterwards `add*`, `namespace()` and `extend()` throw
@@ -79,10 +95,11 @@ readable types (see [TypeScript](./typescript.md#seal-the-composition-root)).
 
 ## Which one to use
 
-| You want to…                                                       | Use                                         |
-| ------------------------------------------------------------------ | ------------------------------------------- |
-| give services the trace id, tenant or user of the current request  | a [context accessor](./request-context.md)  |
-| keep state that belongs to one request, like a transaction         | see [Per-request state](./request-state.md) |
-| replace a dependency for everything, without touching the original | `fork({ isolated: true })`                  |
-| split registrations by feature                                     | modules with `extend()`                     |
-| group services under a name, e.g. `Billing.*`                      | `namespace()`                               |
+| You want to…                                                       | Use                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| give services the trace id, tenant or user of the current request  | a [context accessor](./request-context.md)                   |
+| keep state that belongs to one request, like a transaction         | see [Per-request state](./request-state.md)                  |
+| replace a dependency for everything, without touching the original | `fork({ isolated: true })`                                   |
+| split registrations by feature                                     | modules with `extend()`                                      |
+| group services under a name, e.g. `Billing.*`                      | `namespace()`                                                |
+| apply a module that names its dependencies differently             | [adapters in a namespace](#adapting-a-module-s-dependencies) |

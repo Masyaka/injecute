@@ -89,6 +89,9 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     ```
 
     Return the registry the function received (the `add*` chain does that).
+    When the host has a dependency under another key or in another shape, adapt it in a namespace
+    instead of renaming the host's keys or the module's:
+    `app.namespace('Audit', (c) => c.addSingleton('dbUrl', (config) => config.auditDb, ['config']).addAlias('log', 'logger').extend(addAudit))`.
 
 11. Code that only resolves services takes a `ServiceProvider<{ users: UserRepository }>`. Use plain
     `ServiceProvider` (no type argument) to accept any container.

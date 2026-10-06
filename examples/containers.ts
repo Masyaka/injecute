@@ -51,6 +51,30 @@ withNamespace.get('Reports.daily'); // { users, kind: 'daily' }
 withNamespace.get('Reports').get('timezone'); // "UTC"
 // #endregion namespaces
 
+// #region adapt
+interface Logger {
+  info(message: string): void;
+}
+
+// The module declares the services it needs under its own keys.
+const addAudit = (c: ServiceRegistry<{ dbUrl: string; log: Logger }>) =>
+  c.addSingleton('audit', (dbUrl, log) => ({ dbUrl, log }), ['dbUrl', 'log']);
+
+// The host has them under other keys, or in another shape.
+const host = new DIContainer()
+  .addInstance('config', { auditDb: 'postgres://audit' })
+  .addInstance('logger', { info: () => {} } as Logger)
+  .namespace('Audit', (audit) =>
+    audit
+      .addSingleton('dbUrl', (config) => config.auditDb, ['config']) // derive a value
+      .addAlias('log', 'logger') // the same service under another key
+      .extend(addAudit),
+  );
+
+host.get('Audit.audit').dbUrl; // "postgres://audit"
+host.has('dbUrl'); // false: the adapters stay in the namespace
+// #endregion adapt
+
 // #region seal
 // Register everything, then seal the composition root.
 const root = new DIContainer()
@@ -72,6 +96,7 @@ export {
   testScope,
   withBilling,
   withNamespace,
+  host,
   root,
   perRequest,
   Database,

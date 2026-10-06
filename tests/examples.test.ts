@@ -33,6 +33,7 @@ describe('examples', () => {
       testScope,
       withBilling,
       withNamespace,
+      host,
       root,
       perRequest,
       Database,
@@ -43,6 +44,10 @@ describe('examples', () => {
     expect(withBilling.get('invoices').db).toBeInstanceOf(Database);
     expect(withNamespace.get('Reports.daily').kind).toBe('daily');
     expect(withNamespace.get('Reports').get('timezone')).toBe('UTC');
+    expect(host.get('Audit.audit').dbUrl).toBe('postgres://audit');
+    expect(host.get('Audit.audit').log).toBe(host.get('logger'));
+    expect(host.has('dbUrl')).toBe(false);
+    expect(host.get('Audit.dbUrl')).toBe('postgres://audit');
     expect(perRequest.get('users')).toBe(root.get('users'));
     expect(perRequest.get('requestId')).toBe('req-2');
     expect(() =>
