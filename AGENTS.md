@@ -35,6 +35,9 @@ injecute is a small, dependency-free, type-safe dependency injection container f
 
 ## Conventions
 
+- Before designing a feature or changing behaviour, read [Design principles](docs/concepts/principles.md),
+  especially "Keeping the direction". A change that bends a principle names it in the pull request and
+  adds a row to its Exceptions table.
 - TypeScript strict mode. No runtime dependencies.
 - Keep the public API small: one recommended way to do each task.
 - Every public export has TSDoc with an `@example`.
@@ -57,3 +60,5 @@ Every change to the published package needs a changeset (`npx changeset`). CI fa
 2. Behaviour changes have runtime tests; type changes have type tests.
 3. A changeset is added (see above); breaking changes are in the migration guide.
 4. TSDoc is updated for every touched export.
+5. The change passes "Keeping the direction" in [Design principles](docs/concepts/principles.md), or adds
+   the principle it bends to the Exceptions table.

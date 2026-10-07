@@ -32,6 +32,7 @@
 
 ## Concepts
 
+- [Design principles](./lib/docs/concepts/principles.md): The principles injecute is built on, what they mean for your code, their known exceptions, and the design tests a new feature has to pass.
 - [Roles: provider, registry, container](./lib/docs/concepts/roles.md): Why consumers get a ServiceProvider, modules a ServiceRegistry, and only the composition root the DIContainer.
 - [How resolution works](./lib/docs/concepts/resolution.md): Lookup through parents, which container runs a factory and owns the instance, decoration, middlewares, cycles and errors.
 

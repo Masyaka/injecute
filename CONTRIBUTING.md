@@ -25,16 +25,19 @@ npm run check   # format, lint, typecheck, tests, build: what CI runs
 | Browser tests (no bundler) / docs tests | `npm run test:browser` / `npm run test:docs` |
 
 [AGENTS.md](./AGENTS.md) describes the layout and the conventions; it's written for coding agents and
-people alike.
+people alike. [Design principles](./docs/concepts/principles.md) lists the principles injecute is built
+on and the tests a new feature has to pass.
 
 ## Pull requests
 
 Open pull requests against **`next`** until 1.0.0 is released, then against `main`.
 
-1. `npm run check` passes.
-2. Behaviour changes have runtime tests; type changes have type tests (`tests/types/*.test-d.ts`).
-3. Public exports have TSDoc with an `@example`; docs pages and `examples/` are updated.
-4. A changeset is added (below).
+1. The change passes the tests in [Keeping the direction](./docs/concepts/principles.md#keeping-the-direction);
+   a change that bends a principle says so and adds it to the Exceptions table.
+2. `npm run check` passes.
+3. Behaviour changes have runtime tests; type changes have type tests (`tests/types/*.test-d.ts`).
+4. Public exports have TSDoc with an `@example`; docs pages and `examples/` are updated.
+5. A changeset is added (below).
 
 ## Changesets
 

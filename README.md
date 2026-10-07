@@ -15,6 +15,9 @@ Type-safe dependency injection for TypeScript, without decorators.
 - **Errors that say how to fix it**, with stable codes and a docs page each.
 - **Runs everywhere.** ES module for Node.js ≥ 22, Deno, Bun and browsers. No runtime dependencies.
 
+The [design principles](https://masyaka.github.io/injecute/concepts/principles) explain how injecute
+behaves and why.
+
 ## Install
 
 ```sh
