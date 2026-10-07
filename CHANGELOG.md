@@ -1,5 +1,23 @@
 # injecute
 
+## 1.0.0-rc.1
+
+### Minor Changes
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`95d907d`](https://github.com/Masyaka/injecute/commit/95d907db4a3efd07f13d16944d72f5da4d90e9ad) Thanks [@Masyaka](https://github.com/Masyaka)! - **Lifecycle hooks: `startLifecycle()` and `createLifecycle()`.** Modules can now run code when the app starts and undo it when it stops, without the composition root knowing each of them. A hook is a singleton registered under a stage key, `addSingleton(lifecycle.start('consumer'), (consumer) => { consumer.start(); return () => consumer.stop(); }, ['consumer'])`. `const running = await startLifecycle(app)` runs the stages `init` → `start` → `ready`, including hooks in namespaces. `running.stop()` undoes them in reverse, then disposes the container. A failed start undoes what ran. Options: `concurrent`, `dispose: false`, `signal` (timeouts, also for `stop()`) and `onError`. Apps can define their own stages with `createLifecycle([...])`; stages are tags, so `collect(lifecycle.start)` works too. `startable(key, factory, deps, { start, stop })` registers a service and its hook in one call (in a `DIContainer` or an `AsyncDIContainer`), hooks receive the start signal by depending on `startSignal`, hook types are checked when they are registered, and `onHook` reports each hook and undo with its duration. See [Startup and shutdown](https://masyaka.github.io/injecute/guide/startup-shutdown).
+  
+  New error codes: `INJECUTE_INVALID_HOOK` (a hook isn't a singleton, or depends on another hook), `INJECUTE_UNDO_FAILED` (an undo function failed or didn't finish, in the `cause` of `INJECUTE_DISPOSE_FAILED`) and `INJECUTE_LIFECYCLE_STOPPED` (starting a stopped lifecycle). A key that ends with `:init`, `:start` or `:ready` is a hook when you run `startLifecycle()`; rename such keys if they aren't hooks.
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`95d907d`](https://github.com/Masyaka/injecute/commit/95d907db4a3efd07f13d16944d72f5da4d90e9ad) Thanks [@Masyaka](https://github.com/Masyaka)! - **Extension points with tags: `createTag()` and `collect()`.** A tag names an extension point that modules contribute services to. `const route = createTag('route').of<Route>()`; a module registers `addSingleton(route('orders'), (db) => ordersRoute(db), ['db'])` (the key `'orders:route'`), and the service is checked against `Route` at compile time; the owner depends on `collect(route)` and receives a `Route[]` of every service under the tag, including namespaces (`Orders.orders:route`), in registration order. Services are collected in the container that creates the owner, so isolated forks see their replacements and additions; an `AsyncDIContainer` awaits them. See [Extension points with tags](https://masyaka.github.io/injecute/guide/tags).
+  
+  `DependencyInfo` (from `getRegistration()`) has a new variant, `{ type: 'collect', tag }`: code that switches over every dependency type should handle it.
+  
+  Typing: keys built by a tag are `TaggedKey`s. In the service map they are plain strings, and `get()`, `call()`, `createResolver()`, dependency lists and `optional()` accept them. `addSingleton`, `addTransient`, `addInstance` and `addAlias` check what is registered under them against the tag's type. `Factory` has an optional fourth type parameter, the type the factory must produce.
+
+### Patch Changes
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`b421ab3`](https://github.com/Masyaka/injecute/commit/b421ab3085b4e58f62fe3e66b5cb4005df19afc3) Thanks [@Masyaka](https://github.com/Masyaka)! - **Docs: adapting a module's dependencies.** A new section in [Containers, forks and modules](https://masyaka.github.io/injecute/guide/containers#adapting-a-module-s-dependencies) shows how to apply a module whose dependencies the host has under other keys or in another shape: register adapters (`addAlias()`, or a factory that derives the value) in a namespace before `extend()`. The Agent Skill follows the same advice.
+
 ## 1.0.0-rc.0
 
 ### Major Changes
