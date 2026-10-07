@@ -81,7 +81,7 @@ export const errorCodes = {
   },
   INJECUTE_INVALID_HOOK: {
     title: 'A lifecycle hook is not registered correctly',
-    hint: 'A key that ends with ":<stage>" is a lifecycle hook. Register it with addSingleton() under lifecycle.<stage>(name), and let it depend on services, never on other hooks: order hooks with stages. Rename a key that is not meant as a hook.',
+    hint: 'A key that ends with `:<stage>` is a lifecycle hook. Register it with addSingleton() under `lifecycle.<stage>(name)`, and let it depend on services, never on other hooks: order hooks with stages. Rename a key that is not meant as a hook.',
   },
   INJECUTE_UNDO_FAILED: {
     title: 'A lifecycle hook could not be undone',

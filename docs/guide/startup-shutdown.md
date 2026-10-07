@@ -1,6 +1,6 @@
 ---
 title: Startup and shutdown
-description: Lifecycle hooks with createLifecycle() and startLifecycle(): modules plug into each other at startup (routes, subscriptions, jobs), start work in stages, and stop gracefully in reverse.
+description: 'Lifecycle hooks with createLifecycle() and startLifecycle(): modules start work in stages at startup (consumers, servers, subscriptions) and stop gracefully in reverse.'
 ---
 
 # Startup and shutdown

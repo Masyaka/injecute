@@ -19,7 +19,7 @@
 - [Containers, forks and modules](./lib/docs/guide/containers.md): Forks, isolated forks for tests, modules with extend(), and namespaces.
 - [Extension points with tags](./lib/docs/guide/tags.md): Let modules contribute services to an extension point (routes, commands, health checks, plugins) with createTag(), and give the owner all of them as a typed array with collect().
 - [Lifecycle and dispose](./lib/docs/guide/lifecycle.md): Release connections and other resources with dispose() and await using, in reverse creation order.
-- [Startup and shutdown](./lib/docs/guide/startup-shutdown.md): Lifecycle hooks with createLifecycle() and startLifecycle(): modules plug into each other at startup (routes, subscriptions, jobs), start work in stages, and stop gracefully in reverse.
+- [Startup and shutdown](./lib/docs/guide/startup-shutdown.md): Lifecycle hooks with createLifecycle() and startLifecycle(): modules start work in stages at startup (consumers, servers, subscriptions) and stop gracefully in reverse.
 - [Testing](./lib/docs/guide/testing.md): Replace dependencies in tests with isolated forks, clean up with await using, and assert error codes.
 - [Middlewares and events](./lib/docs/guide/middleware-events.md): Wrap resolution with middlewares (tracing, fallbacks, deprecations, guards, test doubles) and observe containers with events.
 - [Async services](./lib/docs/guide/async.md): Services created asynchronously, in a DIContainer with defer() or in an AsyncDIContainer that awaits every dependency.
