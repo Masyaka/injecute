@@ -69,6 +69,34 @@ describe('examples', () => {
     ]);
   });
 
+  it('tags', async () => {
+    const { routes, response, testRoutes } =
+      await import('../examples/tags.ts');
+    expect(routes).toEqual(['GET /orders', 'GET /health']);
+    expect(response).toBe('orders: 2');
+    expect(testRoutes).toEqual(['GET /orders', 'GET /health', 'GET /debug']);
+  });
+
+  it('startup-shutdown', async () => {
+    const { log, wiringInTests, failingStart, migrateThenStart } =
+      await import('../examples/startup-shutdown.ts');
+    expect(log).toEqual([
+      'listening on 8080: /orders',
+      'consumer started',
+      'started: Orders.subscriptions:init, server:start, Payments.consumer:start, readiness:ready',
+      'orders: order-1',
+      'consumer stopped',
+      'server closed',
+    ]);
+    expect(await wiringInTests()).toBe('Orders.subscriptions:init → /orders');
+    log.length = 0;
+    expect(await failingStart()).toBe(
+      'Failed to create "server:start": port 8080 is in use',
+    );
+    expect(log).toEqual(['cache warmed', 'cache cleared']);
+    expect(await migrateThenStart()).toEqual(['schema', 'jobs']);
+  });
+
   it('middleware: tracing', async () => {
     const { lines } = await import('../examples/middleware/tracing.ts');
     expect(lines.map((l) => l.replace(/[\d.]+ms/, 'Xms'))).toEqual([

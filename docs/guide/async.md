@@ -68,7 +68,9 @@ can be a value or a promise:
 
 ### Startup and shutdown
 
-`preload()` returns a promise that settles once every service is created; await it at startup.
+`preload()` returns a promise that settles once every service is created; await it at startup. To run
+work at startup (migrations, consumers, listening) and stop it in reverse, use
+[lifecycle hooks](./startup-shutdown.md): `startLifecycle()` awaits each hook, including in an async container.
 `dispose()` waits for singletons that are still being created, then releases them:
 
 <<< @/../examples/async-container.ts#startup

@@ -4,15 +4,23 @@ import {
   addNamedResolvers,
   AsyncDIContainer,
   buildServicesGraph,
+  collect,
   construct,
+  createLifecycle,
+  createTag,
   createNamedResolvers,
   createProxyAccessor,
   createResolversTuple,
   defer,
   DIContainer,
+  lifecycle,
   optional,
   preload,
   setCacheInstance,
+  startLifecycle,
+  startable,
+  type LifecycleHook,
+  type RunningLifecycle,
   type AsyncServiceProvider,
   type AsyncServiceRegistry,
   type Middleware,
@@ -108,7 +116,40 @@ const asyncGraph = buildServicesGraph(asyncApp);
 // @ts-expect-error an async container is not a sync ServiceProvider
 consume(asyncApp);
 
+// lifecycle: works without DOM or Node.js types (the signal falls back to AbortSignalLike)
+const stages = createLifecycle(['migrate', 'start']);
+const withHooks = new DIContainer()
+  .addSingleton(lifecycle.start('server'), (): LifecycleHook => () => undefined)
+  .addSingleton(stages.migrate('schema'), () => {});
+const running: Promise<RunningLifecycle> = startLifecycle(withHooks, {
+  concurrent: ['start'],
+  onError: (error, { during }) => [error, during],
+});
+const customRunning = startLifecycle(withHooks, { lifecycle: stages });
+const stopped = running.then((r) => r.stop());
+
+// tags, collect() and startable()
+const route = createTag('route').of<{ path: string }>();
+class Worker {
+  start(): void {}
+}
+const withTags = new DIContainer()
+  .addSingleton(route('home'), () => ({ path: '/' }))
+  .addSingleton('paths', (routes) => routes.map((r) => r.path), [
+    collect(route),
+  ])
+  .extend(startable('worker', Worker, [], { start: (w) => w.start() }));
+const paths: string[] = withTags.get('paths');
+const timed = startLifecycle(withTags, {
+  onHook: ({ key, ms }) => [key, ms],
+});
+
 export {
+  paths,
+  timed,
+  running,
+  customRunning,
+  stopped,
   asyncRepo,
   asyncPreload,
   asyncGraph,

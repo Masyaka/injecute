@@ -26,8 +26,9 @@ export const errorCodes = {
     hint: 'Pass a function that creates the service, a class, or use addInstance() for a ready value.',
   },
   INJECUTE_INVALID_DEPENDENCY: {
-    title: 'A dependency is not a key, optional(key) or a function',
-    hint: 'Dependencies are service keys, optional(key), or functions that return the value.',
+    title:
+      'A dependency is not a key, optional(key), collect(tag) or a function',
+    hint: 'Dependencies are service keys, optional(key), collect(tag) with a tag made by createTag(), or functions that return the value.',
   },
   INJECUTE_CLASS_NOT_CONSTRUCTED: {
     title: 'A class was called without new',
@@ -68,7 +69,7 @@ export const errorCodes = {
   },
   INJECUTE_INVALID_OPTION: {
     title: 'An option is not supported here',
-    hint: 'Transient services are not kept by the container, so they cannot have a dispose option.',
+    hint: 'Transient services are not kept by the container, so they cannot have a dispose option. createTag() and createLifecycle() take unique, non-empty names without ":" or "."; startLifecycle() takes a lifecycle made by createLifecycle() and only its stages in "concurrent".',
   },
   INJECUTE_UNKNOWN_EVENT: {
     title: 'Unknown event name',
@@ -77,6 +78,18 @@ export const errorCodes = {
   INJECUTE_READ_ONLY: {
     title: 'The object is read-only',
     hint: 'Proxy accessors only read services. Register or replace services on the container.',
+  },
+  INJECUTE_INVALID_HOOK: {
+    title: 'A lifecycle hook is not registered correctly',
+    hint: 'A key that ends with ":<stage>" is a lifecycle hook. Register it with addSingleton() under lifecycle.<stage>(name), and let it depend on services, never on other hooks: order hooks with stages. Rename a key that is not meant as a hook.',
+  },
+  INJECUTE_UNDO_FAILED: {
+    title: 'A lifecycle hook could not be undone',
+    hint: 'Its undo function threw, rejected, or did not finish before the stop signal aborted. The hook is in `path`, the original error in `cause`.',
+  },
+  INJECUTE_LIFECYCLE_STOPPED: {
+    title: 'The lifecycle of this container was stopped',
+    hint: 'A lifecycle runs once per container. To start again, create a new container or an isolated fork.',
   },
 } as const;
 

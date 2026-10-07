@@ -40,6 +40,12 @@ Containers implement `[Symbol.asyncDispose]`, so a fork can be disposed at the e
 
 A parent does not dispose its forks: dispose each fork you create (`await using` does that for you).
 
+## Stopping a running app
+
+To stop servers, consumers and schedulers before the connections they use are released, start the app
+with lifecycle hooks and stop it with `running.stop()`: it undoes the hooks in reverse, then calls
+`dispose()`. See [Startup and shutdown](./startup-shutdown.md).
+
 ## `reset()` vs `dispose()`
 
 `reset()` clears cached instances so they are created again on the next resolution. It does not dispose

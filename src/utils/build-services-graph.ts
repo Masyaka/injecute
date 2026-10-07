@@ -1,3 +1,4 @@
+import { TAGGED_KEYS } from '../internal.ts';
 import type {
   AsyncServiceProvider,
   RegistrationInfo,
@@ -48,6 +49,25 @@ function toTreeNode(
   const dependencies: Tree = {};
 
   for (const dependency of info ? finalRegistration(info).dependencies : []) {
+    if (dependency.type === 'collect') {
+      // every service under the tag, as collect() resolves them
+      const list = (
+        container as { [TAGGED_KEYS]?: (tag: string) => readonly ServiceKey[] }
+      )[TAGGED_KEYS];
+      const keys = list ? list.call(container, dependency.tag) : container.keys;
+      for (const tagged of keys) {
+        const k = String(tagged);
+        if (!k.endsWith(`:${dependency.tag}`)) continue;
+        dependencies[k] = {
+          depth: depth + 1,
+          namespace: k.split('.').slice(0, -1).join('.'),
+          title: k,
+          factoryType: 'dependency',
+          dependencies: {},
+        };
+      }
+      continue;
+    }
     const isFunction = dependency.type === 'function';
     const k =
       dependency.type === 'function' ? dependency.name : String(dependency.key);

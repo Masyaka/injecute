@@ -24,6 +24,20 @@ The container that **runs** a factory also **caches** the result (for singletons
 Caches are kept per registration: replacing a registration starts a new cache entry, and the previous
 instance is still disposed by `dispose()`.
 
+## Order
+
+Resolution follows dependencies, not registration order, with two exceptions where registration order
+is the order you get:
+
+- **`collect(tag)`** returns the services under the tag in registration order, the root's first, then
+  what forks below it added. A namespace's services come where `namespace()` was called.
+- **Lifecycle hooks** of one stage run in that order too (unless the stage is concurrent), and are
+  undone in reverse.
+
+So the order of `extend()` and `namespace()` calls in the composition root decides, for example, the
+order of routes and of hooks. When the order matters for correctness, express it with stages (or with
+a dependency), not with the order of the calls.
+
 ## Decoration
 
 A dependency on the key being registered is resolved to the **previous definition** of that key: the

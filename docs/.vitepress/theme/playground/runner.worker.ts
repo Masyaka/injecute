@@ -152,6 +152,9 @@ scope.onmessage = async ({ data }) => {
     container.use(tracer);
     let error;
     for (const key of container.keys) {
+      // keys under a tag (`name:tag`, e.g. lifecycle hooks of any stage) are resolved by their collector
+      // or by startLifecycle(): show them in the graph, don't run them here
+      if (typeof key === 'string' && /:[^.:]+$/.test(key)) continue;
       try {
         container.get(key);
       } catch (e) {

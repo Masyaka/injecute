@@ -1,4 +1,4 @@
-import { optionalKey } from './dependencies.ts';
+import { collectedTag, optionalKey } from './dependencies.ts';
 import {
   CircularDependencyError,
   InjecuteError,
@@ -7,10 +7,13 @@ import {
   suggestKeys,
 } from './errors.ts';
 import {
+  asyncDispose,
   callableOf,
   isClass,
   isThenable,
   SET_CACHE_INSTANCE,
+  syncDispose,
+  TAGGED_KEYS,
 } from './internal.ts';
 import type {
   ContainerEvents,
@@ -46,6 +49,7 @@ type InternalDependency =
   | { readonly type: 'key'; readonly key: ServiceKey }
   | { readonly type: 'optional'; readonly key: ServiceKey }
   | { readonly type: 'previous'; readonly key: ServiceKey }
+  | { readonly type: 'collect'; readonly tag: string }
   | { readonly type: 'function'; readonly fn: () => unknown };
 
 /** Internal: a registration is plain data; the executing container owns produced instances. */
@@ -71,12 +75,6 @@ interface Registration {
 }
 
 const NOT_FOUND: unique symbol = Symbol('injecute.notFound');
-
-// Well-known symbols with the same fallback TypeScript's `using` helper uses, for runtimes without them.
-const asyncDispose: typeof Symbol.asyncDispose = (Symbol.asyncDispose ??
-  Symbol.for('Symbol.asyncDispose')) as typeof Symbol.asyncDispose;
-const syncDispose: typeof Symbol.dispose = (Symbol.dispose ??
-  Symbol.for('Symbol.dispose')) as typeof Symbol.dispose;
 
 /** An instance this container created (or was asked to own), in creation order. */
 interface Owned {
@@ -145,6 +143,15 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   #disposing: Promise<void> | undefined;
   /** Namespace containers re-created inside this isolated fork, keyed by the namespace registration. */
   readonly #isolatedNamespaces = new Map<Registration, DIContainer<any>>();
+  /** Namespace containers this container owns (also re-created ones), by container: their names. */
+  readonly #namespaceNames = new Map<DIContainer<any>, string>();
+  /** collect(): keys under each tag, until a registration changes anywhere. */
+  readonly #taggedCache = new Map<
+    string,
+    { epoch: number; keys: ServiceKey[] }
+  >();
+  /** Bumped by every registration and namespace anywhere, so cached tag lookups are rebuilt. */
+  static #registrationEpoch = 0;
   #middlewareCache: { epoch: number; list: readonly Middleware[] } | undefined;
   /** Bumped by every use()/unuse() anywhere, so cached effective chains are rebuilt. */
   static #middlewareEpoch = 0;
@@ -175,6 +182,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     args: unknown[],
   ): unknown {
     return factory(...args);
+  }
+
+  /**
+   * @internal Combines the services a `collect()` dependency resolved. Subclasses (the async
+   * container) override it to await them.
+   */
+  protected collected(values: unknown[]): unknown {
+    return values;
   }
 
   // ------------------------------------------------------------------------------ ServiceProvider
@@ -434,6 +449,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         `Namespace "${name}" callback did not return a container.`,
       );
     }
+    this.#namespaceNames.set(result, name);
     this.#adoptNamespace(name, result, run);
     return this as any;
   }
@@ -694,6 +710,11 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     this.#overrides.set(key, value);
   }
 
+  /** @internal Used by the lifecycle and buildServicesGraph(): the keys collect(tag) resolves. */
+  [TAGGED_KEYS](tag: string): readonly ServiceKey[] {
+    return this.#taggedKeys(tag);
+  }
+
   // ---------------------------------------------------------------- internals
 
   /**
@@ -930,6 +951,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
 
   #register(reg: Registration, replace: boolean) {
     this.#assertNotDisposed();
+    DIContainer.#registrationEpoch++;
     const key = reg.key;
     const existing = this.#registrations.get(key);
     if (existing && !replace) {
@@ -1067,6 +1089,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
       }
       container = result;
       this.#isolatedNamespaces.set(reg, container);
+      this.#namespaceNames.set(container, reg.namespace!);
+      DIContainer.#registrationEpoch++;
     }
     return container;
   }
@@ -1142,6 +1166,8 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         return this.#get(d.key, false, path);
       case 'optional':
         return this.#get(d.key, true, path);
+      case 'collect':
+        return this.collected(this.#collect(d.tag, path));
       case 'previous': {
         if (reg?.previous) return this.#produce(reg.previous, path);
         // The previous definition lives above the registration's owner.
@@ -1159,6 +1185,56 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         return executor.#produce(found.reg, path);
       }
     }
+  }
+
+  /** Every service under a tag visible from this container (see #taggedKeys), resolved here. */
+  #collect(tag: string, path: ServiceKey[]): unknown[] {
+    return this.#taggedKeys(tag).map((key) => this.#get(key, false, path));
+  }
+
+  /**
+   * The keys of every service under a tag visible from this container, in registration order (the
+   * root's first), each service once. A namespace's own `key:tag` is the root's `Ns.key:tag`: keys are
+   * compared as the root writes them, and the root's (outermost) one is kept, so a replacement or a
+   * decoration in the root wins, and an isolated fork's re-created namespace isn't counted twice.
+   */
+  #taggedKeys(tag: string): ServiceKey[] {
+    const epoch = DIContainer.#registrationEpoch;
+    const cached = this.#taggedCache.get(tag);
+    if (cached?.epoch === epoch) return cached.keys;
+    const levels: DIContainer<any>[] = [];
+    for (
+      let level: DIContainer<any> | undefined = this;
+      level;
+      level = level.#parent
+    )
+      levels.unshift(level);
+    // the namespace path of each level: a namespace container and the forks it was built on
+    const prefixes = levels.map(() => '');
+    for (let i = levels.length - 1; i > 0; i--) {
+      for (let j = i - 1; j >= 0; j--) {
+        const name = levels[j]!.#namespaceNames.get(levels[i]!);
+        if (name === undefined) continue;
+        // every level below the owner is inside the namespace (deeper ones in nested namespaces too)
+        for (let k = j + 1; k < levels.length; k++)
+          prefixes[k] = prefixes[k] ? `${name}.${prefixes[k]}` : name;
+        break;
+      }
+    }
+    const suffix = `:${tag}`;
+    const seen = new Set<string>();
+    const keys: ServiceKey[] = [];
+    levels.forEach((level, i) => {
+      for (const key of level.#registrations.keys()) {
+        if (typeof key !== 'string' || !key.endsWith(suffix)) continue;
+        const absolute = prefixes[i] ? `${prefixes[i]}.${key}` : key;
+        if (seen.has(absolute)) continue;
+        seen.add(absolute);
+        keys.push(key);
+      }
+    });
+    this.#taggedCache.set(tag, { epoch, keys });
+    return keys;
   }
 
   #adoptNamespace(
@@ -1264,6 +1340,8 @@ function normalizeDependencies(
   return dependencies.map((d): InternalDependency => {
     const optional = optionalKey(d);
     if (optional !== undefined) return { type: 'optional', key: optional };
+    const tag = collectedTag(d);
+    if (tag !== undefined) return { type: 'collect', tag };
     if (isKey(d)) {
       return ownKey !== undefined && d === ownKey
         ? { type: 'previous', key: d }
@@ -1287,6 +1365,8 @@ function toInfo(reg: Registration, depth: number): RegistrationInfo {
         return { type: 'previous', key: d.key };
       case 'optional':
         return { type: 'optional', key: d.key };
+      case 'collect':
+        return { type: 'collect', tag: d.tag };
       case 'function':
         return { type: 'function', name: d.fn.name };
     }

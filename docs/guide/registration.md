@@ -30,6 +30,8 @@ A dependency is one of:
 
 - a **key**: the factory receives that service;
 - **`optional(key)`**: the service when it is registered, `undefined` otherwise;
+- **`collect(tag)`**: every service registered under a tag, as an array (see
+  [Extension points with tags](./tags.md));
 - a **function**: called on every resolution, the factory receives its result.
 
 When you need options, pass an object instead of the array:
@@ -91,6 +93,19 @@ What happens if you forget `construct()`:
 ## Keys
 
 Keys are strings, numbers or symbols. Use symbols for services that should stay private to a module.
-Keys containing dots are how [namespaces](./containers.md#namespaces) expose their services
-(`Billing.invoices`). Registering the same key twice in one container throws
+Registering the same key twice in one container throws
 [`INJECUTE_ALREADY_REGISTERED`](../errors/already-registered.md) unless you pass `replace: true`.
+
+### Reserved key forms
+
+Two forms of string keys have a meaning. Build them with the helpers instead of typing them:
+
+| Form       | Meaning                                                               | Built by                                                                      |
+| ---------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `Ns.key`   | the service `key` of the [namespace](./containers.md#namespaces) `Ns` | `namespace('Ns', …)`                                                          |
+| `name:tag` | a service under a [tag](./tags.md); `name:start` is a lifecycle hook  | `tag('name')`, `lifecycle.start('name')` ([lifecycle](./startup-shutdown.md)) |
+
+Other keys can contain `.` and `:` (`'db:primary'`, `'config.db'`), but avoid ending a key with `:` and
+the name of a tag or stage you use: `collect()` would collect it, and `startLifecycle()` would treat it
+as a hook (and reject it if it isn't a singleton). The two forms combine: `Orders.list:route` is the
+`list:route` service of the namespace `Orders`.

@@ -1,3 +1,8 @@
+interface AbortSignalLike
+  aborted: boolean
+  reason: unknown
+  addEventListener: (type: "abort", listener: () => void, options?: { once?: boolean; }) => void
+  removeEventListener: (type: "abort", listener: () => void) => void
 value addNamedResolvers: <T extends object>(resolvers: NamedResolvers<T>) => (registry: ServiceRegistry<{}, {}>) => ServiceRegistry<{}, T>
 type ArgumentsKey
 interface AsyncDIContainer
@@ -57,9 +62,11 @@ interface AsyncServiceRegistry
 value buildServicesGraph: (container: ServiceProvider | AsyncServiceProvider) => Tree
 class CircularDependencyError
   name: string
-  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
+  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY" | "INJECUTE_INVALID_HOOK" | "INJECUTE_UNDO_FAILED" | "INJECUTE_LIFECYCLE_STOPPED"
   path: readonly ServiceKey[]
   docs: string
+value collect: <T>(tag: Tag<T, string>) => CollectDependency<T>
+interface CollectDependency
 value construct: <A extends unknown[], I>(Class: new (...args: A) => I) => (...args: A) => I
 interface ContainerEvents
   add: { key: ServiceKey; replace: boolean; kind: RegistrationKind; container: ServiceProvider<any>; }
@@ -69,9 +76,11 @@ interface ContainerEvents
   produce: { key: ServiceKey; value: unknown; container: ServiceProvider<any>; }
   dispose: { container: ServiceProvider<any>; }
 type ContainerServices
+value createLifecycle: <const S extends readonly string[]>(stages: S) => Lifecycle<S[number]>
 value createNamedResolvers: <C extends ServiceProvider, const Keys extends readonly KeySpec<ContainerServices<C>>[]>(container: C, keys: Keys) => NamedResolversOf<ContainerServices<C>, Keys>
 value createProxyAccessor: <C extends ServiceProvider, const Keys extends readonly KeySpec<ContainerServices<C>>[] | undefined = undefined>(container: C, options?: ProxyAccessorOptions<Keys>) => Keys extends readonly unknown[] ? ProxyAccessor<ContainerServices<C>, Keys> : { readonly [K in keyof ContainerServices<C>]: ServiceType<ContainerServices<C>, K>; }
 value createResolversTuple: <C extends ServiceProvider, const Keys extends readonly (keyof ContainerServices<C>)[]>(container: C, keys: Keys) => ResolversTuple<ContainerServices<C>, Keys>
+value createTag: <const N extends string>(name: N) => Tag<unknown, N>
 value defer: <A extends unknown[], R>(factory: ((...args: A) => R) | (new (...args: A) => R)) => (...dependencies: MaybePromises<A>) => Promise<Awaited<R>>
 type DependenciesToTypes
 type Dependency
@@ -103,7 +112,7 @@ class DIContainer
   dispose: () => Promise<void>
   [Symbol.asyncDispose]: () => Promise<void>
 type DisposeOption
-value errorCodes: { readonly INJECUTE_NOT_REGISTERED: { readonly title: "No service is registered under this key"; readonly hint: "Register it (addSingleton / addTransient / addInstance) before resolving it, check the key for typos, or pass { optional: true } to get undefined instead."; }; readonly INJECUTE_ALREADY_REGISTERED: { readonly title: "The key is already registered in this container"; readonly hint: "Pass { replace: true } to replace the registration, or use another key. A child container (fork) may register a key its parent has without replace."; }; readonly INJECUTE_CIRCULAR_DEPENDENCY: { readonly title: "Services depend on each other in a cycle"; readonly hint: "Break the cycle: extract the shared part into its own service, or resolve one side lazily with a function dependency (() => container.get(key))."; }; readonly INJECUTE_NO_PREVIOUS_DEFINITION: { readonly title: "A service depends on itself but there is nothing to decorate"; readonly hint: "A dependency on the key being registered resolves its previous definition (the replaced one, or the parent one). Register the original service first."; }; readonly INJECUTE_INVALID_FACTORY: { readonly title: "The factory is not a function or class"; readonly hint: "Pass a function that creates the service, a class, or use addInstance() for a ready value."; }; readonly INJECUTE_INVALID_DEPENDENCY: { readonly title: "A dependency is not a key, optional(key) or a function"; readonly hint: "Dependencies are service keys, optional(key), or functions that return the value."; }; readonly INJECUTE_CLASS_NOT_CONSTRUCTED: { readonly title: "A class was called without new"; readonly hint: "Classes compiled to ES5 (Babel for old browsers, TypeScript target: es5) and bound classes cannot be detected. Register them with construct(MyClass)."; }; readonly INJECUTE_RESOLUTION_FAILED: { readonly title: "A factory threw (or its promise rejected) while creating a service"; readonly hint: "The original error is in `cause`; `path` shows which service needed it."; }; readonly INJECUTE_NOT_A_FUNCTION: { readonly title: "call() was used on a service that is not a function"; readonly hint: "Only function services can be called with call(); use get() for other services."; }; readonly INJECUTE_NAMESPACE_CONFLICT: { readonly title: "The namespace name is already used by a service"; readonly hint: "Choose another namespace name, or remove the service with that key."; }; readonly INJECUTE_NAMESPACE_RESULT: { readonly title: "A namespace callback returned something other than a new container"; readonly hint: "Return the registry the callback received (after adding services), a fork of it, or a new DIContainer."; }; readonly INJECUTE_EXTENSION_RESULT: { readonly title: "An extension returned a container that is not this one or its child"; readonly hint: "A module function must return the registry it received (after adding services) or a fork of it."; }; readonly INJECUTE_SEALED: { readonly title: "The container is sealed"; readonly hint: "Register every service before seal(). To add services later (per request, per test), register them in a fork: app.fork().addInstance(...)."; }; readonly INJECUTE_DISPOSED: { readonly title: "The container is disposed"; readonly hint: "Create a new container (or fork) instead of using one after dispose()."; }; readonly INJECUTE_DISPOSE_FAILED: { readonly title: "Some services failed to dispose"; readonly hint: "Every other service was still disposed. The failures are in `cause` (an AggregateError)."; }; readonly INJECUTE_INVALID_OPTION: { readonly title: "An option is not supported here"; readonly hint: "Transient services are not kept by the container, so they cannot have a dispose option."; }; readonly INJECUTE_UNKNOWN_EVENT: { readonly title: "Unknown event name"; readonly hint: "Supported events: add, replace, reset, get, produce, dispose."; }; readonly INJECUTE_READ_ONLY: { readonly title: "The object is read-only"; readonly hint: "Proxy accessors only read services. Register or replace services on the container."; }; }
+value errorCodes: { readonly INJECUTE_NOT_REGISTERED: { readonly title: "No service is registered under this key"; readonly hint: "Register it (addSingleton / addTransient / addInstance) before resolving it, check the key for typos, or pass { optional: true } to get undefined instead."; }; readonly INJECUTE_ALREADY_REGISTERED: { readonly title: "The key is already registered in this container"; readonly hint: "Pass { replace: true } to replace the registration, or use another key. A child container (fork) may register a key its parent has without replace."; }; readonly INJECUTE_CIRCULAR_DEPENDENCY: { readonly title: "Services depend on each other in a cycle"; readonly hint: "Break the cycle: extract the shared part into its own service, or resolve one side lazily with a function dependency (() => container.get(key))."; }; readonly INJECUTE_NO_PREVIOUS_DEFINITION: { readonly title: "A service depends on itself but there is nothing to decorate"; readonly hint: "A dependency on the key being registered resolves its previous definition (the replaced one, or the parent one). Register the original service first."; }; readonly INJECUTE_INVALID_FACTORY: { readonly title: "The factory is not a function or class"; readonly hint: "Pass a function that creates the service, a class, or use addInstance() for a ready value."; }; readonly INJECUTE_INVALID_DEPENDENCY: { readonly title: "A dependency is not a key, optional(key), collect(tag) or a function"; readonly hint: "Dependencies are service keys, optional(key), collect(tag) with a tag made by createTag(), or functions that return the value."; }; readonly INJECUTE_CLASS_NOT_CONSTRUCTED: { readonly title: "A class was called without new"; readonly hint: "Classes compiled to ES5 (Babel for old browsers, TypeScript target: es5) and bound classes cannot be detected. Register them with construct(MyClass)."; }; readonly INJECUTE_RESOLUTION_FAILED: { readonly title: "A factory threw (or its promise rejected) while creating a service"; readonly hint: "The original error is in `cause`; `path` shows which service needed it."; }; readonly INJECUTE_NOT_A_FUNCTION: { readonly title: "call() was used on a service that is not a function"; readonly hint: "Only function services can be called with call(); use get() for other services."; }; readonly INJECUTE_NAMESPACE_CONFLICT: { readonly title: "The namespace name is already used by a service"; readonly hint: "Choose another namespace name, or remove the service with that key."; }; readonly INJECUTE_NAMESPACE_RESULT: { readonly title: "A namespace callback returned something other than a new container"; readonly hint: "Return the registry the callback received (after adding services), a fork of it, or a new DIContainer."; }; readonly INJECUTE_EXTENSION_RESULT: { readonly title: "An extension returned a container that is not this one or its child"; readonly hint: "A module function must return the registry it received (after adding services) or a fork of it."; }; readonly INJECUTE_SEALED: { readonly title: "The container is sealed"; readonly hint: "Register every service before seal(). To add services later (per request, per test), register them in a fork: app.fork().addInstance(...)."; }; readonly INJECUTE_DISPOSED: { readonly title: "The container is disposed"; readonly hint: "Create a new container (or fork) instead of using one after dispose()."; }; readonly INJECUTE_DISPOSE_FAILED: { readonly title: "Some services failed to dispose"; readonly hint: "Every other service was still disposed. The failures are in `cause` (an AggregateError)."; }; readonly INJECUTE_INVALID_OPTION: { readonly title: "An option is not supported here"; readonly hint: "Transient services are not kept by the container, so they cannot have a dispose option. createTag() and createLifecycle() take unique, non-empty names without \":\" or \".\"; startLifecycle() takes a lifecycle made by createLifecycle() and only its stages in \"concurrent\"."; }; readonly INJECUTE_UNKNOWN_EVENT: { readonly title: "Unknown event name"; readonly hint: "Supported events: add, replace, reset, get, produce, dispose."; }; readonly INJECUTE_READ_ONLY: { readonly title: "The object is read-only"; readonly hint: "Proxy accessors only read services. Register or replace services on the container."; }; readonly INJECUTE_INVALID_HOOK: { readonly title: "A lifecycle hook is not registered correctly"; readonly hint: "A key that ends with \":<stage>\" is a lifecycle hook. Register it with addSingleton() under lifecycle.<stage>(name), and let it depend on services, never on other hooks: order hooks with stages. Rename a key that is not meant as a hook."; }; readonly INJECUTE_UNDO_FAILED: { readonly title: "A lifecycle hook could not be undone"; readonly hint: "Its undo function threw, rejected, or did not finish before the stop signal aborted. The hook is in `path`, the original error in `cause`."; }; readonly INJECUTE_LIFECYCLE_STOPPED: { readonly title: "The lifecycle of this container was stopped"; readonly hint: "A lifecycle runs once per container. To start again, create a new container or an isolated fork."; }; }
 type ExposedName
 type Factory
 interface ForkOptions
@@ -116,7 +125,7 @@ interface HasOptions
 type IDIContainer
 class InjecuteError
   name: string
-  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY"
+  code: "INJECUTE_NOT_REGISTERED" | "INJECUTE_ALREADY_REGISTERED" | "INJECUTE_CIRCULAR_DEPENDENCY" | "INJECUTE_NO_PREVIOUS_DEFINITION" | "INJECUTE_INVALID_FACTORY" | "INJECUTE_INVALID_DEPENDENCY" | "INJECUTE_CLASS_NOT_CONSTRUCTED" | "INJECUTE_RESOLUTION_FAILED" | "INJECUTE_NOT_A_FUNCTION" | "INJECUTE_NAMESPACE_CONFLICT" | "INJECUTE_NAMESPACE_RESULT" | "INJECUTE_EXTENSION_RESULT" | "INJECUTE_SEALED" | "INJECUTE_DISPOSED" | "INJECUTE_DISPOSE_FAILED" | "INJECUTE_INVALID_OPTION" | "INJECUTE_UNKNOWN_EVENT" | "INJECUTE_READ_ONLY" | "INJECUTE_INVALID_HOOK" | "INJECUTE_UNDO_FAILED" | "INJECUTE_LIFECYCLE_STOPPED"
   path: readonly ServiceKey[]
   docs: string
 type InjecuteErrorCode
@@ -127,6 +136,20 @@ interface InstanceOptions
   replace: R | undefined
   dispose: DisposeOption<T> | undefined
 type KeySpec
+value lifecycle: Lifecycle<"init" | "start" | "ready">
+type Lifecycle
+interface LifecycleErrorContext
+  key: ServiceKey | undefined
+  during: "dispose" | "start" | "rollback"
+type LifecycleHook
+interface LifecycleHookEvent
+  key: ServiceKey
+  stage: string
+  action: "start" | "undo"
+  ms: number
+  error: unknown
+type LifecycleSignal
+type LifecycleState
 type MaybePromises
 type Middleware
 interface MiddlewareContext
@@ -166,6 +189,11 @@ interface ResetOptions
 type ResolveDependencies
 type ResolveDependency
 type ResolversTuple
+interface RunningLifecycle
+  state: LifecycleState
+  hooks: readonly ServiceKey[]
+  stop: (options?: StopLifecycleOptions) => Promise<void>
+  [Symbol.asyncDispose]: () => Promise<void>
 interface SealedAsyncDIContainer
   use: (middleware: Middleware) => SealedAsyncDIContainer<S>
   unuse: (middleware: Middleware) => SealedAsyncDIContainer<S>
@@ -243,4 +271,22 @@ interface SingletonOptions
   dependencies: D | undefined
   replace: boolean | undefined
 type SpecKey
+value startable: <const K extends string, F extends (abstract new (...args: any) => unknown) | ((...args: any) => unknown), const D extends readonly unknown[], P extends string = "start">(key: K, factory: F, dependencies: D, hooks: StartableHooks<Awaited<Produced<F>>, P>) => (registry: ServiceRegistry<NeededServices<F, D>, {}>) => ServiceRegistry<any, { [Q in K]: Produced<F>; } & { [Q in `${K}:${P}`]: LifecycleHook; }>
+interface StartableHooks
+  start: ((service: T) => unknown) | undefined
+  stop: ((service: T, signal: LifecycleSignal) => unknown) | undefined
+  stage: Tag<LifecycleHook, P> | undefined
+value startLifecycle: <C extends LifecycleContainer, S extends string = "init" | "start" | "ready">(container: C & CheckHooks<C, S>, options?: StartLifecycleOptions<S>) => Promise<RunningLifecycle>
+interface StartLifecycleOptions
+  lifecycle: Lifecycle<S> | undefined
+  concurrent: boolean | readonly [S][S extends any ? 0 : never][] | undefined
+  dispose: boolean | undefined
+  signal: AbortSignalLike | undefined
+  onError: ((error: unknown, context: LifecycleErrorContext) => void) | undefined
+  onHook: ((event: LifecycleHookEvent) => void) | undefined
+interface StopLifecycleOptions
+  signal: AbortSignalLike | undefined
+interface Tag
+  tagName: N
+  of: <U>() => Tag<U, N>
 type Tree

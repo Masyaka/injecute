@@ -78,5 +78,8 @@ import { preload } from 'injecute';
 await preload(app); // resolves every service now, so configuration errors surface at boot
 ```
 
+To run modules' startup work (routes, subscriptions, consumers) and stop it gracefully, see
+[Startup and shutdown](./startup-shutdown.md).
+
 `buildServicesGraph(app)` returns every service with its dependencies, for tooling and diagrams; the
 [playground](../playground.md) uses it.

@@ -47,6 +47,11 @@ Declare only the services the module needs; `extend()` checks that the container
 
 <<< @/../examples/containers.ts#modules
 
+A module only registers. Work that must run when the app starts (adding routes to another module's
+router, subscribing to events, starting a consumer) goes in a
+[lifecycle hook](./startup-shutdown.md), not in the module function. To let other modules contribute
+to one of yours (routes, commands, health checks), give it an [extension point](./tags.md).
+
 If a required service is missing, the error names it:
 
 ```text

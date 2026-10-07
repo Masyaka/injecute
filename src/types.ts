@@ -18,10 +18,52 @@ export interface OptionalDependency<K extends ServiceKey = ServiceKey> {
   readonly [optionalDependencyBrand]: K;
 }
 
+declare const collectDependencyBrand: unique symbol;
+
+/**
+ * A dependency created by {@link collect}: resolves to every service registered under a tag.
+ *
+ * @example
+ * ```ts
+ * const routes: CollectDependency<Route> = collect(route);
+ * app.addSingleton('router', (all) => new Router(all), [routes]); // all: Route[]
+ * ```
+ */
+export interface CollectDependency<T = unknown> {
+  readonly [collectDependencyBrand]: T;
+}
+
+declare const tagType: unique symbol;
+
+/**
+ * A tag, made by {@link createTag}: a name for an extension point. Calling it builds the key of a
+ * service under the tag (`route('orders')` is `'orders:route'`); `collect(tag)` gives a factory every
+ * service registered under it, as an array of `T`.
+ *
+ * @example
+ * ```ts
+ * export const route = createTag('route').of<Route>();
+ *
+ * c.addSingleton(route('orders'), (): Route => ordersRoute); // the key 'orders:route'
+ * c.addSingleton('router', (routes) => new Router(routes), [collect(route)]); // routes: Route[]
+ * ```
+ */
+export interface Tag<T = unknown, N extends string = string> {
+  /** The key of a service under this tag: `name:<tag>`. */
+  <const K extends string>(name: K): `${K}:${N}`;
+  /** The tag's name: the suffix of the keys it builds. */
+  readonly tagName: N;
+  /** The same tag, typed for services of type `U`: `createTag('route').of<Route>()`. */
+  of<U>(): Tag<U, N>;
+  /** Type only: the type of the services under this tag. */
+  readonly [tagType]?: T;
+}
+
 /**
  * What a registration can depend on:
  * - a service key: the factory receives that service
  * - `optional(key)`: the service, or `undefined` when it is not registered
+ * - `collect(tag)`: every service registered under the tag, in registration order
  * - a function: called on each resolution, the factory receives its result
  *
  * `A` is a registry's own additions, on top of the services `S` it was given (see {@link ServiceRegistry}).
@@ -29,26 +71,28 @@ export interface OptionalDependency<K extends ServiceKey = ServiceKey> {
  * (`() => any` rather than `() => unknown` keeps typos in keys reported on the key itself.)
  */
 export type Dependency<S, A = {}> =
-  keyof S | keyof A | OptionalDependency | (() => any);
+  keyof S | keyof A | OptionalDependency | CollectDependency | (() => any);
 
 /**
  * The value a single {@link Dependency} resolves to. Keys are looked up in `A` (a registry's own
  * additions) first, then in `S`.
  */
 export type ResolveDependency<D, S, A = {}> =
-  D extends OptionalDependency<infer K>
-    ? K extends keyof A
-      ? ServiceType<A, K> | undefined
-      : K extends keyof S
-        ? ServiceType<S, K> | undefined
-        : undefined
-    : D extends () => infer R
-      ? R
-      : D extends keyof A
-        ? ServiceType<A, D>
-        : D extends keyof S
-          ? ServiceType<S, D>
-          : never;
+  D extends CollectDependency<infer T>
+    ? T[]
+    : D extends OptionalDependency<infer K>
+      ? K extends keyof A
+        ? ServiceType<A, K> | undefined
+        : K extends keyof S
+          ? ServiceType<S, K> | undefined
+          : undefined
+      : D extends () => infer R
+        ? R
+        : D extends keyof A
+          ? ServiceType<A, D>
+          : D extends keyof S
+            ? ServiceType<S, D>
+            : never;
 
 /** The factory arguments a dependency list resolves to (see {@link ResolveDependency} for `A`). */
 export type ResolveDependencies<D extends readonly unknown[], S, A = {}> = {
@@ -191,6 +235,7 @@ export type RegistrationKind =
 /** A dependency of a registration, as reported by {@link RegistrationInfo}. */
 export type DependencyInfo =
   | { readonly type: 'key'; readonly key: ServiceKey }
+  | { readonly type: 'collect'; readonly tag: string }
   | { readonly type: 'optional'; readonly key: ServiceKey }
   | { readonly type: 'previous'; readonly key: ServiceKey }
   | { readonly type: 'function'; readonly name: string };

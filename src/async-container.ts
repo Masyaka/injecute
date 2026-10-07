@@ -39,6 +39,10 @@ const AsyncDIContainerClass = class AsyncDIContainer extends DIContainer<any> {
     );
   }
 
+  protected override collected(values: unknown[]): unknown {
+    return Promise.all(values);
+  }
+
   override get(key: ServiceKey, options?: GetOptions): Promise<any> {
     return toPromise(() => super.get(key, options));
   }

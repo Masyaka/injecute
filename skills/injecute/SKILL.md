@@ -1,6 +1,6 @@
 ---
 name: injecute
-description: Writes, reviews and debugs TypeScript code that uses the injecute dependency injection container (DIContainer, addSingleton, fork, extend, ServiceRegistry, ServiceProvider). Use when a project depends on injecute, when wiring services, modules, request context (AsyncLocalStorage) or per-request forks, when writing tests that override container services, or when fixing INJECUTE_* errors.
+description: Writes, reviews and debugs TypeScript code that uses the injecute dependency injection container (DIContainer, addSingleton, fork, extend, ServiceRegistry, ServiceProvider). Use when a project depends on injecute, when wiring services, modules, extension points (createTag, collect), startup and shutdown (startLifecycle), request context (AsyncLocalStorage) or per-request forks, when writing tests that override container services, or when fixing INJECUTE_* errors.
 license: MIT
 metadata:
   library-version: '1.x'
@@ -147,42 +147,103 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     services are not kept, so they can't have a `dispose` option.
 19. `reset()` clears cached instances (`reset({ keys: ['db'] })` for some).
 
+**Extension points**
+
+20. When modules contribute to a service of another module (routes, CLI commands, health checks,
+    plugins), use a tag. The owner exports it, depends on `collect(tag)` and receives a typed array of
+    every contribution, also from namespaces:
+
+    ```ts
+    export const route = createTag('route').of<Route>();
+    c.addSingleton('router', (routes) => new Router(routes), [collect(route)]); // Route[]
+
+    // a contributor, in its own module: the key is 'orders:route'
+    c.addSingleton(route('orders'), (service): Route => ordersRoute(service), [
+      'service',
+    ]);
+    ```
+
+    Annotate contributions' return type (`(): Route =>`). Don't type `name:tag` keys by hand. For a
+    mutable registry (an event bus), push from an `init` lifecycle hook instead.
+
+**Startup and shutdown**
+
+21. Work a module runs when the app starts (start a consumer, listen, subscribe to an event bus, mark
+    the app ready) is a **lifecycle hook**: a singleton registered under a key made by
+    `lifecycle.<stage>(name)`. It may return a function that undoes it. Never do this work in the module
+    function's body. For a service that only starts and stops, use `startable()` (the default); for
+    contributions to another module (routes, commands), use a tag (rule 20), not a hook.
+
+    ```ts
+    import { lifecycle, startable, startLifecycle } from 'injecute';
+
+    const addOrders = (c: ServiceRegistry<{ bus: EventBus }>) =>
+      c
+        .addSingleton('service', OrderService)
+        .addSingleton(
+          lifecycle.init('subscriptions'),
+          (bus, service) => bus.on('paid', (e) => service.onPaid(e)),
+          ['bus', 'service'],
+        ) // returns the unsubscribe
+        .extend(
+          startable('consumer', OrderConsumer, ['bus'], {
+            start: (consumer) => consumer.start(),
+            stop: (consumer) => consumer.stop(),
+          }),
+        );
+
+    const running = await startLifecycle(app); // init → start → ready
+    process.once('SIGTERM', () => running.stop().catch((e) => logger.error(e))); // undo ready → start → init, then dispose; rejects if something failed
+    ```
+
+    Stages: `init` wires runtime registries (subscriptions) and warms up, `start` begins accepting work, `ready` announces
+    (readiness probe). Hooks depend on services, never on other hooks; a resource (a pool) is a service,
+    not a hook. Don't type hook keys by hand. Options: `concurrent: ['init']`, `dispose: false` (when
+    something else disposes the container), `signal` (bounds the start; `running.stop({ signal })` passes it
+    to undo functions), `onError` (failures after the first one of a failed start), `onHook` (each hook
+    and undo with its duration, for logs).
+    Custom stages:
+    `const stages = createLifecycle(['migrate', 'init', 'start'])`, `startLifecycle(app, { lifecycle: stages })`;
+    reusable packages use the default `lifecycle`. In tests: `await using running = await startLifecycle(app.fork({ isolated: true }))`.
+
 **Middlewares and events**
 
-20. A middleware is `(key, next, { container, path, depth }) => value`. Call `next()` to continue (or
+22. A middleware is `(key, next, { container, path, depth }) => value`. Call `next()` to continue (or
     `next(otherKey)`) and return its result. Arrow functions are fine; there is no `this`.
-21. Add middlewares on the root with `use()`; forks inherit them live. `fork({ middlewares: false })`
+23. Add middlewares on the root with `use()`; forks inherit them live. `fork({ middlewares: false })`
     opts out; `unuse(middleware)` removes one.
-22. `addEventListener('produce' | 'get' | 'add' | 'replace' | 'reset' | 'dispose', listener)` observes a
+24. `addEventListener('produce' | 'get' | 'add' | 'replace' | 'reset' | 'dispose', listener)` observes a
     container.
 
 **Async**
 
-23. In a `DIContainer`, a factory may return a promise; dependents then receive the promise. Wrap a
+25. In a `DIContainer`, a factory may return a promise; dependents then receive the promise. Wrap a
     factory with `defer(factory)` to await its promised arguments; `get()` of that service returns a
     promise. A rejected singleton is retried on the next `get()`; `dispose()` releases resolved values.
-24. When much of the graph is async, use `new AsyncDIContainer()`: factories receive resolved
+26. When much of the graph is async, use `new AsyncDIContainer()`: factories receive resolved
     dependencies, a factory returning `Promise<T>` registers `T`, and every `get()` returns a promise.
     Its modules take `AsyncServiceRegistry<{ … }>`, consumers `AsyncServiceProvider<{ … }>`; the sync
     `ServiceRegistry` / `ServiceProvider` types don't accept it. `await preload(app)` at startup.
 
 **Errors**
 
-25. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
+27. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
     Branch on `error.code`, never on the message. Errors thrown by factories arrive wrapped as
     `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`.
 
 ## Fixing errors
 
-| You see                                                         | Fix                                                                                            |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Type error on a dependency key, "Did you mean …?"               | The key is not registered before this call, or is misspelled. Register it earlier in the chain |
-| `injecute: extension requires services that are not registered` | Register the listed keys before `extend()` / `namespace()`                                     |
-| `INJECUTE_NOT_REGISTERED`                                       | Register the key, fix the typo (the message suggests keys), or resolve it as optional          |
-| `INJECUTE_ALREADY_REGISTERED`                                   | Pass `{ replace: true }`, or register in a fork                                                |
-| `INJECUTE_CIRCULAR_DEPENDENCY`                                  | Extract the shared part into its own service, or resolve one side lazily (`() => c.get(k)`)    |
-| `INJECUTE_CLASS_NOT_CONSTRUCTED`                                | The class is ES5-compiled or bound: register `construct(MyClass)`                              |
-| `INJECUTE_RESOLUTION_FAILED`                                    | A factory threw; read `error.cause` and `error.path`                                           |
+| You see                                                         | Fix                                                                                                                                                                     |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type error on a dependency key, "Did you mean …?"               | The key is not registered before this call, or is misspelled. Register it earlier in the chain                                                                          |
+| `injecute: extension requires services that are not registered` | Register the listed keys before `extend()` / `namespace()`                                                                                                              |
+| `INJECUTE_NOT_REGISTERED`                                       | Register the key, fix the typo (the message suggests keys), or resolve it as optional                                                                                   |
+| `INJECUTE_ALREADY_REGISTERED`                                   | Pass `{ replace: true }`, or register in a fork                                                                                                                         |
+| `INJECUTE_CIRCULAR_DEPENDENCY`                                  | Extract the shared part into its own service, or resolve one side lazily (`() => c.get(k)`)                                                                             |
+| `INJECUTE_CLASS_NOT_CONSTRUCTED`                                | The class is ES5-compiled or bound: register `construct(MyClass)`                                                                                                       |
+| `INJECUTE_RESOLUTION_FAILED`                                    | A factory threw; read `error.cause` and `error.path`                                                                                                                    |
+| `INJECUTE_INVALID_HOOK`                                         | A key ending in `:<stage>` isn't a singleton, or a hook depends on a hook: register hooks with `addSingleton`, depend on services, order with stages; or rename the key |
+| `INJECUTE_DISPOSE_FAILED` from `running.stop()`                 | Read `error.cause.errors`: each `INJECUTE_UNDO_FAILED` names the hook in `path`                                                                                         |
 
 Each code has a page: `node_modules/injecute/lib/docs/errors/<slug>.md` (for example
 `INJECUTE_NOT_REGISTERED` → `not-registered.md`), online at `https://masyaka.github.io/injecute/errors/<slug>`.

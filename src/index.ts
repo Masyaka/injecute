@@ -37,5 +37,5 @@ export {
   type InjecuteErrorCode,
   type InjecuteErrorOptions,
 } from './errors.ts';
-export { optional } from './dependencies.ts';
+export { collect, createTag, optional } from './dependencies.ts';
 export * from './utils/index.ts';

@@ -17,6 +17,18 @@ export const isClass = (f: unknown): boolean =>
   typeof f === 'function' &&
   Object.getOwnPropertyDescriptor(f, 'prototype')?.writable === false;
 
+// Well-known symbols with the same fallback TypeScript's `using` helper uses, for runtimes without them.
+// Kept in the declaration files: the container's declarations refer to them.
+/** `Symbol.asyncDispose`, or its fallback. */
+export const asyncDispose: typeof Symbol.asyncDispose = (Symbol.asyncDispose ??
+  Symbol.for('Symbol.asyncDispose')) as typeof Symbol.asyncDispose;
+/** `Symbol.dispose`, or its fallback. */
+export const syncDispose: typeof Symbol.dispose = (Symbol.dispose ??
+  Symbol.for('Symbol.dispose')) as typeof Symbol.dispose;
+
+/** @internal Symbol of the method that lists the keys collect(tag) resolves. */
+export const TAGGED_KEYS: unique symbol = Symbol('injecute.taggedKeys');
+
 /** @internal `true` for promises and other objects with a `then` method. */
 export const isThenable = (v: unknown): v is PromiseLike<unknown> =>
   (typeof v === 'object' || typeof v === 'function') &&

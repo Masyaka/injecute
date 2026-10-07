@@ -10,6 +10,23 @@ export {
 export { defer, type MaybePromises } from './defer.ts';
 export { preload } from './preload.ts';
 export {
+  createLifecycle,
+  lifecycle,
+  startLifecycle,
+  startable,
+  type AbortSignalLike,
+  type Lifecycle,
+  type LifecycleErrorContext,
+  type LifecycleHook,
+  type LifecycleHookEvent,
+  type LifecycleSignal,
+  type LifecycleState,
+  type RunningLifecycle,
+  type StartableHooks,
+  type StartLifecycleOptions,
+  type StopLifecycleOptions,
+} from './lifecycle.ts';
+export {
   createProxyAccessor,
   type ProxyAccessor,
   type ProxyAccessorOptions,

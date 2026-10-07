@@ -13,7 +13,7 @@ import {
   type ServiceProvider,
   type ServiceRegistry,
 } from '../../src/index.ts';
-import type { SET_CACHE_INSTANCE } from '../../src/internal.ts';
+import type { SET_CACHE_INSTANCE, TAGGED_KEYS } from '../../src/internal.ts';
 
 class Database {
   constructor(readonly url: string) {}
@@ -194,7 +194,7 @@ if (unknownValue instanceof AsyncDIContainer) {
 expectTypeOf<
   Exclude<
     keyof DIContainer<{}>,
-    keyof AsyncDIContainer<{}> | typeof SET_CACHE_INSTANCE
+    keyof AsyncDIContainer<{}> | typeof SET_CACHE_INSTANCE | typeof TAGGED_KEYS
   >
 >().toEqualTypeOf<never>();
 expectTypeOf<
