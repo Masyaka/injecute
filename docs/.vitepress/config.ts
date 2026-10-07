@@ -39,6 +39,18 @@ const guide: DefaultTheme.SidebarItem[] = [
     ],
   },
   {
+    text: 'Frameworks',
+    items: [
+      { text: 'Overview', link: '/frameworks/' },
+      { text: 'Express', link: '/frameworks/express' },
+      { text: 'Fastify', link: '/frameworks/fastify' },
+      { text: 'Hono', link: '/frameworks/hono' },
+      { text: 'Next.js', link: '/frameworks/nextjs' },
+      { text: 'GraphQL', link: '/frameworks/graphql' },
+      { text: 'Coming from NestJS', link: '/frameworks/nestjs' },
+    ],
+  },
+  {
     text: 'Concepts',
     items: [
       { text: 'Design principles', link: '/concepts/principles' },

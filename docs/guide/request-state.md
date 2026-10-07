@@ -78,6 +78,8 @@ instance per [context](./request-context.md):
 - Outside a request, `current()` throws, so code that needs a request fails loudly instead of sharing
   one instance.
 - The instances are not disposed. For instances that must be released, use a factory and `using`.
+- For DataLoaders that only resolvers use, a GraphQL server's per-request context is enough: see
+  [GraphQL](../frameworks/graphql.md).
 
 ## A different implementation per tenant
 

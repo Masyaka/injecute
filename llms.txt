@@ -30,6 +30,16 @@
 - [Recipes](./lib/docs/guide/recipes.md): A unit of work per operation, a fork per request, configuration-driven implementations, feature modules, sharing services between containers.
 - [Using injecute with AI agents](./lib/docs/guide/ai-agents.md): The docs in this package, the Agent Skill, llms.txt and Context7.
 
+## Frameworks
+
+- [Frameworks](./lib/docs/frameworks/index.md): How injecute fits into a web framework: the composition root, routes from modules, request context, startup and shutdown, and tests.
+- [Express](./lib/docs/frameworks/express.md): Typed services in handlers without app.locals, routers contributed by modules, request context, graceful shutdown, tests with supertest.
+- [Fastify](./lib/docs/frameworks/fastify.md): Fastify plugins for HTTP and the container for services, route plugins from modules, request context in preValidation, graceful shutdown, tests with inject().
+- [Hono](./lib/docs/frameworks/hono.md): One application module for Node.js, Bun, Deno and Cloudflare Workers, routes from modules, request context, graceful shutdown, tests with app.request().
+- [Next.js](./lib/docs/frameworks/nextjs.md): A platform container for connections that survives hot reloads, the app's services in server components, route handlers and server actions, shutdown in instrumentation.ts.
+- [GraphQL](./lib/docs/frameworks/graphql.md): GraphQL Yoga and Apollo Server with a DataLoader per request, resolvers that close over services, a schema assembled from modules.
+- [Coming from NestJS](./lib/docs/frameworks/nestjs.md): NestJS concepts mapped to injecute, plain classes without legacy decorators or reflect-metadata, and moving step by step.
+
 ## Concepts
 
 - [Design principles](./lib/docs/concepts/principles.md): The principles injecute is built on, what they mean for your code, their known exceptions, and the design tests a new feature has to pass.

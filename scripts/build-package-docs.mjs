@@ -16,7 +16,7 @@ import { dirname, join, posix } from 'node:path';
 const site = 'https://masyaka.github.io/injecute/';
 const docs = 'docs';
 const out = 'lib/docs';
-const sections = ['guide', 'concepts', 'errors', 'migration'];
+const sections = ['guide', 'frameworks', 'concepts', 'errors', 'migration'];
 
 if (!existsSync(join(docs, 'errors', 'index.md')))
   throw new Error('docs/errors/*.md are missing: run `npm run docs:errors`');

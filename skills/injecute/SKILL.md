@@ -233,6 +233,20 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     Branch on `error.code`, never on the message. Errors thrown by factories arrive wrapped as
     `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`.
 
+## Frameworks
+
+Express, Fastify, Hono, Next.js, GraphQL and coming from NestJS: `lib/docs/frameworks/<name>.md`. The
+shape is the same in each: a module contributes its routes under a tag, built by a factory whose
+handlers close over the services (never pass the container to handlers); a middleware runs each request
+in `storage.run()`; the server listens in a `lifecycle.start` hook whose undo closes it; tests send
+requests to the app built from an isolated fork, without starting the lifecycle.
+
+- Fastify: register a function that creates the server, not the instance. A Fastify instance is
+  thenable, so a factory returning it is treated as async and `get()` returns a promise.
+- Next.js: keep connections in a platform container cached on `globalThis`, and build the app as
+  `platform.fork().extend(addApp)`, so hot reloads don't open new connections.
+- Cloudflare Workers: no connections in singletons (I/O belongs to one request), and no shutdown.
+
 ## Fixing errors
 
 | You see                                                         | Fix                                                                                                                                                                     |

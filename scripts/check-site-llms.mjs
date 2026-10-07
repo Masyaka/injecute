@@ -24,12 +24,18 @@ for (const href of links) {
   if (!file.endsWith('.md') || !existsSync(file))
     problems.push(`link to a missing Markdown page: ${href}`);
 }
-for (const section of ['guide', 'concepts', 'migration']) {
+for (const section of ['guide', 'frameworks', 'concepts', 'migration']) {
   for (const page of readdirSync(join('docs', section)).filter((f) =>
     f.endsWith('.md'),
-  ))
-    if (!links.includes(`${site}${section}/${page}`))
+  )) {
+    // the plugin publishes a section's index.md as <section>.md
+    const url =
+      page === 'index.md'
+        ? `${site}${section}.md`
+        : `${site}${section}/${page}`;
+    if (!links.includes(url))
       problems.push(`llms.txt does not list ${section}/${page}`);
+  }
 }
 const full = readFileSync(join(dist, 'llms-full.txt'), 'utf8');
 if (full.includes('<<< @/'))

@@ -58,6 +58,9 @@ await using test = app
 **[masyaka.github.io/injecute](https://masyaka.github.io/injecute/)**: guides, recipes, API reference,
 error codes and a [playground](https://masyaka.github.io/injecute/playground).
 
+Using a framework? See [Express, Fastify, Hono, Next.js and GraphQL](https://masyaka.github.io/injecute/frameworks/),
+or [Coming from NestJS](https://masyaka.github.io/injecute/frameworks/nestjs).
+
 Upgrading from 0.x? Read the [migration guide](https://masyaka.github.io/injecute/migration/0.x-to-1.0).
 
 ## Using injecute with AI coding agents

@@ -61,40 +61,11 @@ Every entry point runs its work in `storage.run()`, so the application code is t
 
 <<< @/../examples/request-context/server.ts#job
 
-### Fastify
+### Frameworks
 
-```ts
-import Fastify from 'fastify';
-import { app, storage } from './container.ts';
-
-const server = Fastify();
-
-// preValidation runs after the body is parsed: later hooks and the handler see the context
-server.addHook('preValidation', (request, _reply, done) => {
-  storage.run(
-    {
-      traceId: request.id,
-      tenantId: request.headers['x-tenant-id'] as string | undefined,
-    },
-    done,
-  );
-});
-server.post('/orders', () => app.get('orders').place('book'));
-server.addHook('onClose', () => app.dispose());
-
-await server.listen({ port: 3000 });
-```
-
-::: warning Start the context after the body is parsed
-For requests with a body, Fastify runs the hooks after parsing from the request stream's `end` event, in
-a different async context, so a context started in `onRequest` can be lost by the handler. Start it in
-`preValidation`, or use [`@fastify/request-context`](https://github.com/fastify/fastify-request-context),
-which re-enters its context there, and read it in the accessor:
-`{ current: () => requestContext.get('context') }`.
-:::
-
-Other frameworks work the same way: start the context in the earliest middleware that runs in the
-request's async context, and wrap the rest of the request with `storage.run(context, next)`.
+Start the context in a middleware that runs before your handlers, and wrap the rest of the request with
+`storage.run(context, next)`. The [framework pages](../frameworks/index.md) show where: [Express](../frameworks/express.md), [Fastify](../frameworks/fastify.md#request-context) (after
+the body is parsed), [Hono](../frameworks/hono.md) and [Next.js](../frameworks/nextjs.md#request-context).
 
 ## Logging
 
@@ -118,8 +89,9 @@ const addLogger = (
   );
 ```
 
-Fastify's `request.log` already carries the request id, but only where you pass it. A logger that reads
-the context works in every service, including code that doesn't know it runs in a request.
+A framework's request logger (Fastify's `request.log`) carries the request id, but only where you pass
+the request. A logger that reads the context works in every service, including code that doesn't know it
+runs in a request.
 
 ## Create long-lived services at startup
 
