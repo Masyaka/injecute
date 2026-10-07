@@ -35,8 +35,13 @@ any service, with its own dependencies:
 - **Registration order.** Contributions come in the order they were registered, the root's first.
   Contributions registered after the collector are included too: they are collected when the collector
   is created.
-- **Annotate the return type.** The tag declares the type, but registering under it doesn't check it:
-  write `(): Route => …` so a wrong contribution is a compile error at the place you register it.
+- **Contributions are type-checked.** A key built by the tag carries the tag's type, so `addSingleton`,
+  `addTransient` and `addInstance` check the service against it: a factory that doesn't produce a
+  `Route` is a compile error at the factory, and its parameters stay typed. An alias under a tag
+  (`addAlias(route('start'), route('home'))`) must point to a service of the tag's type. Keys typed by
+  hand (`'list:route'`) aren't checked: build them with the tag.
+- **The key works for lookups too.** `app.get(route('list'))`, `[route('list')]` in a dependency list
+  and `optional(route('list'))` resolve the contribution like its plain key `'list:route'`.
 - **Each contribution is a service.** A singleton contribution is created once and shared with anything
   else that resolves it; middlewares, the services graph and error paths (`router → Orders.list:route`)
   see it like any dependency.
@@ -53,9 +58,9 @@ own replacements and additions; the app is untouched:
 - **Lifetime.** A singleton collector keeps the array it received. A contribution registered after it
   was created (for example in a fork that doesn't re-create it) is not added. An isolated fork
   re-creates it.
-- **Async.** In an `AsyncDIContainer`, the collector receives the resolved services. In a `DIContainer`,
-  an async contribution arrives as a promise; type the tag accordingly (`.of<Promise<Route>>()`) or use
-  `defer()`.
+- **Async.** In an `AsyncDIContainer`, a contribution may be async: the collector receives the resolved
+  services. In a `DIContainer`, an async contribution would arrive as a promise, so the check rejects it;
+  type the tag accordingly (`.of<Promise<Route>>()`) if you want promises.
 - **Cycles.** A contribution that depends on its collector is a circular dependency, reported with the
   path when the collector is resolved.
 - **Introspection.** `getRegistration('router')` lists the dependency as `{ type: 'collect', tag: 'route' }`,

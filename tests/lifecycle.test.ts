@@ -9,6 +9,7 @@ import {
   lifecycle,
   startLifecycle,
   startable,
+  startSignal,
   type LifecycleErrorContext,
   type LifecycleHookEvent,
 } from '../src/index.ts';
@@ -818,6 +819,87 @@ describe('startLifecycle()', () => {
       const running = await startLifecycle(app);
       expect(running.hooks).toEqual(['pool:init']);
       expect(log).toEqual(['warm true']);
+    });
+  });
+
+  describe('startSignal()', () => {
+    it('gives hooks the start signal, which aborts with the start', async () => {
+      const seen: AbortSignal[] = [];
+      const app = new DIContainer()
+        .addSingleton(
+          lifecycle.init('a'),
+          (signal) => {
+            seen.push(signal);
+          },
+          [startSignal],
+        )
+        .addSingleton(
+          lifecycle.start('hanging'),
+          (signal) =>
+            new Promise<void>((_, reject) =>
+              signal.addEventListener('abort', () => reject(signal.reason)),
+            ),
+          [startSignal],
+        );
+      const controller = new AbortController();
+      const starting = startLifecycle(app, { signal: controller.signal });
+      await sleep(1);
+      expect(seen[0]!.aborted).toBe(false);
+      controller.abort(new Error('timeout'));
+      // the hook stopped its own work when the signal aborted: its error is the failure
+      await expect(starting).rejects.toThrow(
+        'Failed to create "hanging:start": timeout',
+      );
+      expect(seen[0]).toBe(controller.signal);
+    });
+
+    it('never aborts without a signal option, or outside a start', async () => {
+      const seen: AbortSignal[] = [];
+      const app = new DIContainer().addSingleton(
+        lifecycle.init('a'),
+        (signal) => void seen.push(signal),
+        [startSignal],
+      );
+      await startLifecycle(app);
+      expect(seen[0]!.aborted).toBe(false);
+      expect(startSignal().aborted).toBe(false);
+    });
+
+    it('reaches startable() hooks', async () => {
+      const seen: AbortSignal[] = [];
+      const app = new DIContainer().extend(
+        startable('worker', class Worker {}, [], {
+          start: (_worker, signal) => void seen.push(signal),
+        }),
+      );
+      const signal = new AbortController().signal;
+      await startLifecycle(app, { signal });
+      expect(seen).toEqual([signal]);
+    });
+  });
+
+  describe('startable() in an AsyncDIContainer', () => {
+    it('starts and stops the resolved service', async () => {
+      const log: string[] = [];
+      const app = new AsyncDIContainer()
+        .addSingleton('url', async () => 'amqp://broker')
+        .extend(
+          startable(
+            'consumer',
+            class Consumer {
+              constructor(readonly url: string) {}
+            },
+            ['url'],
+            {
+              start: (consumer) => void log.push(`start ${consumer.url}`),
+              stop: async (consumer) => void log.push(`stop ${consumer.url}`),
+            },
+          ),
+        );
+      expect((await app.get('consumer')).url).toBe('amqp://broker');
+      const running = await startLifecycle(app);
+      await running.stop();
+      expect(log).toEqual(['start amqp://broker', 'stop amqp://broker']);
     });
   });
 });

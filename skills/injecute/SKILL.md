@@ -163,8 +163,9 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     ]);
     ```
 
-    Annotate contributions' return type (`(): Route =>`). Don't type `name:tag` keys by hand. For a
-    mutable registry (an event bus), push from an `init` lifecycle hook instead.
+    Registering under `route('…')` checks the service against `Route` at compile time; keys typed by hand
+    aren't checked, so don't type `name:tag` keys by hand. For a mutable registry (an event bus), push
+    from an `init` lifecycle hook instead.
 
 **Startup and shutdown**
 
@@ -200,8 +201,9 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     (readiness probe). Hooks depend on services, never on other hooks; a resource (a pool) is a service,
     not a hook. Don't type hook keys by hand. Options: `concurrent: ['init']`, `dispose: false` (when
     something else disposes the container), `signal` (bounds the start; `running.stop({ signal })` passes it
-    to undo functions), `onError` (failures after the first one of a failed start), `onHook` (each hook
-    and undo with its duration, for logs).
+    to undo functions; a hook gets it by depending on `startSignal`, and `startable()` passes it to
+    `start`), `onError` (failures after the first one of a failed start), `onHook` (each hook and undo
+    with its duration, for logs). `startable()` works in a `DIContainer` and an `AsyncDIContainer`.
     Custom stages:
     `const stages = createLifecycle(['migrate', 'init', 'start'])`, `startLifecycle(app, { lifecycle: stages })`;
     reusable packages use the default `lifecycle`. In tests: `await using running = await startLifecycle(app.fork({ isolated: true }))`.

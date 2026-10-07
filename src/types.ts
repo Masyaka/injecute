@@ -1,5 +1,12 @@
 import type { AsyncDIContainer } from './async-container.ts';
 import type { DIContainer } from './container.ts';
+import type {
+  AliasTarget,
+  AsyncExpectedService,
+  ExpectedService,
+  RegisteredKey,
+  TaggedKey,
+} from './tagged-keys.ts';
 
 // ------------------------------------------------------------------------------------------- keys
 
@@ -49,8 +56,11 @@ declare const tagType: unique symbol;
  * ```
  */
 export interface Tag<T = unknown, N extends string = string> {
-  /** The key of a service under this tag: `name:<tag>`. */
-  <const K extends string>(name: K): `${K}:${N}`;
+  /**
+   * The key of a service under this tag: `name:<tag>`. It carries the tag's type, so `addSingleton()`
+   * checks the service registered under it.
+   */
+  <const K extends string>(name: K): `${K}:${N}` & TaggedKey<T, `${K}:${N}`>;
   /** The tag's name: the suffix of the keys it builds. */
   readonly tagName: N;
   /** The same tag, typed for services of type `U`: `createTag('route').of<Route>()`. */
@@ -81,17 +91,17 @@ export type ResolveDependency<D, S, A = {}> =
   D extends CollectDependency<infer T>
     ? T[]
     : D extends OptionalDependency<infer K>
-      ? K extends keyof A
-        ? ServiceType<A, K> | undefined
-        : K extends keyof S
-          ? ServiceType<S, K> | undefined
+      ? RegisteredKey<K> extends infer P extends keyof A
+        ? ServiceType<A, P> | undefined
+        : RegisteredKey<K> extends infer P extends keyof S
+          ? ServiceType<S, P> | undefined
           : undefined
       : D extends () => infer R
         ? R
-        : D extends keyof A
-          ? ServiceType<A, D>
-          : D extends keyof S
-            ? ServiceType<S, D>
+        : RegisteredKey<D> extends infer P extends keyof A // a key built by a tag: its plain key
+          ? ServiceType<A, P>
+          : RegisteredKey<D> extends infer P extends keyof S
+            ? ServiceType<S, P>
             : never;
 
 /** The factory arguments a dependency list resolves to (see {@link ResolveDependency} for `A`). */
@@ -109,11 +119,12 @@ export type DependenciesToTypes<
 
 /**
  * Creates a service from its resolved dependencies: a function, or a class (called with `new`).
- * `A` is a registry's own additions (see {@link ResolveDependency}).
+ * `A` is a registry's own additions (see {@link ResolveDependency}); `R` is what it must produce (the
+ * tag's type, for a key built by a tag).
  */
-export type Factory<D extends readonly unknown[], S, A = {}> =
-  | ((...args: ResolveDependencies<D, S, A>) => unknown)
-  | (new (...args: ResolveDependencies<D, S, A>) => unknown);
+export type Factory<D extends readonly unknown[], S, A = {}, R = unknown> =
+  | ((...args: ResolveDependencies<D, S, A>) => R)
+  | (new (...args: ResolveDependencies<D, S, A>) => R);
 
 /** What a {@link Factory} produces: the instance type of a class, or the return type of a function. */
 export type Produced<F> = F extends abstract new (...args: any) => infer I
@@ -347,7 +358,7 @@ export interface ServiceProvider<S extends object = {}> {
    * Resolves a service. Throws when the key is not registered, unless `{ optional: true }` is passed.
    */
   get<K extends keyof S, O extends GetOptions = {}>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     options?: O,
   ): O extends { optional: true }
     ? ServiceType<S, K> | undefined
@@ -357,11 +368,13 @@ export interface ServiceProvider<S extends object = {}> {
   has(key: ServiceKey, options?: HasOptions): boolean;
 
   /** Returns a function that resolves `key` when called. */
-  createResolver<K extends keyof S>(key: K): () => ServiceType<S, K>;
+  createResolver<K extends keyof S>(
+    key: K | TaggedKey<any, K>,
+  ): () => ServiceType<S, K>;
 
   /** Resolves a function service and calls it with `args`. */
   call<K extends keyof S>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
     thisArg?: unknown,
   ): ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>>;
@@ -507,39 +520,52 @@ export interface ServiceRegistry<
    */
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, S, A>,
+    F extends Factory<D, S, A, ExpectedService<K>>,
     D extends Dependency<S, A>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
-  ): ServiceRegistry<S, Registered<A, { [P in K]: Produced<F> }, R>>;
+  ): ServiceRegistry<
+    S,
+    Registered<A, { [P in RegisteredKey<K>]: Produced<F> }, R>
+  >;
 
   /** Registers a service created on every resolution. */
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, S, A>,
+    F extends Factory<D, S, A, ExpectedService<K>>,
     D extends Dependency<S, A>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | RegistrationOptions<[...D], R>,
-  ): ServiceRegistry<S, Registered<A, { [P in K]: Produced<F> }, R>>;
+  ): ServiceRegistry<
+    S,
+    Registered<A, { [P in RegisteredKey<K>]: Produced<F> }, R>
+  >;
 
   /** Registers an existing value. */
-  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+  addInstance<
+    K extends ServiceKey,
+    T extends ExpectedService<K>,
+    const R extends boolean = false,
+  >(
     key: K,
     value: T,
     options?: InstanceOptions<Awaited<T>, R>,
-  ): ServiceRegistry<S, Registered<A, { [P in K]: T }, R>>;
+  ): ServiceRegistry<S, Registered<A, { [P in RegisteredKey<K>]: T }, R>>;
 
   /** Makes `key` resolve to the service registered under `target`. */
-  addAlias<K extends ServiceKey, T extends keyof S | keyof A>(
+  addAlias<K extends ServiceKey, T extends AliasTarget<K, S & A>>(
     key: K,
     target: T,
-  ): ServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A> }>;
+  ): ServiceRegistry<
+    S,
+    A & { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }
+  >;
 
   /**
    * Registers the services added by `extension` under `name.`: `name.key` for each of them, and `name`
@@ -615,7 +641,7 @@ export interface AsyncServiceProvider<S extends object = {}> {
    * Resolves a service. Rejects when the key is not registered, unless `{ optional: true }` is passed.
    */
   get<K extends keyof S, O extends GetOptions = {}>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     options?: O,
   ): Promise<
     O extends { optional: true }
@@ -627,11 +653,13 @@ export interface AsyncServiceProvider<S extends object = {}> {
   has(key: ServiceKey, options?: HasOptions): boolean;
 
   /** Returns a function that resolves `key` when called. */
-  createResolver<K extends keyof S>(key: K): () => Promise<ServiceType<S, K>>;
+  createResolver<K extends keyof S>(
+    key: K | TaggedKey<any, K>,
+  ): () => Promise<ServiceType<S, K>>;
 
   /** Resolves a function service and calls it with `args`. */
   call<K extends keyof S>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
     thisArg?: unknown,
   ): Promise<
@@ -690,7 +718,7 @@ export interface AsyncServiceRegistry<
    */
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, S, A>,
+    F extends Factory<D, S, A, AsyncExpectedService<K>>,
     D extends Dependency<S, A>[] = [],
     const R extends boolean = false,
   >(
@@ -699,13 +727,13 @@ export interface AsyncServiceRegistry<
     dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
   ): AsyncServiceRegistry<
     S,
-    Registered<A, { [P in K]: Awaited<Produced<F>> }, R>
+    Registered<A, { [P in RegisteredKey<K>]: Awaited<Produced<F>> }, R>
   >;
 
   /** Registers a service created on every resolution. */
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, S, A>,
+    F extends Factory<D, S, A, AsyncExpectedService<K>>,
     D extends Dependency<S, A>[] = [],
     const R extends boolean = false,
   >(
@@ -714,21 +742,31 @@ export interface AsyncServiceRegistry<
     dependencies?: [...D] | RegistrationOptions<[...D], R>,
   ): AsyncServiceRegistry<
     S,
-    Registered<A, { [P in K]: Awaited<Produced<F>> }, R>
+    Registered<A, { [P in RegisteredKey<K>]: Awaited<Produced<F>> }, R>
   >;
 
   /** Registers an existing value (or a promise of it). */
-  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+  addInstance<
+    K extends ServiceKey,
+    T extends AsyncExpectedService<K>,
+    const R extends boolean = false,
+  >(
     key: K,
     value: T,
     options?: InstanceOptions<Awaited<T>, R>,
-  ): AsyncServiceRegistry<S, Registered<A, { [P in K]: Awaited<T> }, R>>;
+  ): AsyncServiceRegistry<
+    S,
+    Registered<A, { [P in RegisteredKey<K>]: Awaited<T> }, R>
+  >;
 
   /** Makes `key` resolve to the service registered under `target`. */
-  addAlias<K extends ServiceKey, T extends keyof S | keyof A>(
+  addAlias<K extends ServiceKey, T extends AliasTarget<K, S & A>>(
     key: K,
     target: T,
-  ): AsyncServiceRegistry<S, A & { [P in K]: ResolveDependency<T, S, A> }>;
+  ): AsyncServiceRegistry<
+    S,
+    A & { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }
+  >;
 
   /**
    * Registers the services added by `extension` under `name.`: `name.key` for each of them, and `name`

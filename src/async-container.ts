@@ -1,5 +1,12 @@
 import { DIContainer } from './container.ts';
 import { InjecuteError } from './errors.ts';
+
+import type {
+  AliasTarget,
+  AsyncExpectedService,
+  RegisteredKey,
+  TaggedKey,
+} from './tagged-keys.ts';
 import type {
   AsyncNamespacedServices,
   AsyncServiceRegistry,
@@ -43,8 +50,11 @@ const AsyncDIContainerClass = class AsyncDIContainer extends DIContainer<any> {
     return Promise.all(values);
   }
 
-  override get(key: ServiceKey, options?: GetOptions): Promise<any> {
-    return toPromise(() => super.get(key, options));
+  override get(
+    key: ServiceKey | TaggedKey<any, any>,
+    options?: GetOptions,
+  ): Promise<any> {
+    return toPromise(() => super.get(key as ServiceKey, options));
   }
 
   override injecute(factory: any, dependencies: any[]): any {
@@ -52,7 +62,7 @@ const AsyncDIContainerClass = class AsyncDIContainer extends DIContainer<any> {
   }
 
   override call(
-    key: ServiceKey,
+    key: ServiceKey | TaggedKey<any, any>,
     args: unknown[],
     thisArg: unknown = undefined,
   ): Promise<any> {
@@ -99,36 +109,48 @@ export interface AsyncDIContainer<
 > extends AsyncServiceRegistry<{}, S> {
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, {}, S>,
+    F extends Factory<D, {}, S, AsyncExpectedService<K>>,
     D extends Dependency<{}, S>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
-  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>> }, R>>;
+  ): AsyncDIContainer<
+    Registered<S, { [P in RegisteredKey<K>]: Awaited<Produced<F>> }, R>
+  >;
 
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, {}, S>,
+    F extends Factory<D, {}, S, AsyncExpectedService<K>>,
     D extends Dependency<{}, S>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | RegistrationOptions<[...D], R>,
-  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<Produced<F>> }, R>>;
+  ): AsyncDIContainer<
+    Registered<S, { [P in RegisteredKey<K>]: Awaited<Produced<F>> }, R>
+  >;
 
-  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+  addInstance<
+    K extends ServiceKey,
+    T extends AsyncExpectedService<K>,
+    const R extends boolean = false,
+  >(
     key: K,
     value: T,
     options?: InstanceOptions<Awaited<T>, R>,
-  ): AsyncDIContainer<Registered<S, { [P in K]: Awaited<T> }, R>>;
+  ): AsyncDIContainer<
+    Registered<S, { [P in RegisteredKey<K>]: Awaited<T> }, R>
+  >;
 
-  addAlias<K extends ServiceKey, T extends keyof S>(
+  addAlias<K extends ServiceKey, T extends AliasTarget<K, S>>(
     key: K,
     target: T,
-  ): AsyncDIContainer<S & { [P in K]: ResolveDependency<T, {}, S> }>;
+  ): AsyncDIContainer<
+    S & { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }
+  >;
 
   namespace<const N extends string, NA extends object, Req extends object = S>(
     name: N,

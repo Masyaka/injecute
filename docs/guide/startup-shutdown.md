@@ -27,17 +27,19 @@ const addPayments = (c: ServiceRegistry<{ bus: EventBus }>) =>
   );
 ```
 
-It registers `consumer` and the hook `consumer:start` (in a namespace, `Payments.consumer:start`).
-`start` may return a promise; pass `stage: lifecycle.init` to start in another stage. The services it
-needs come from the factory's parameter types (annotate them on a function factory), and `extend()`
-checks that the container has them.
+It registers `consumer` and the hook `consumer:start` (in a namespace, `Payments.consumer:start`), in a
+`DIContainer` or an `AsyncDIContainer`. `start` receives the service and the
+[start signal](#timeouts-and-cancellation), and may return a promise; pass `stage: lifecycle.init` to
+start in another stage. The services it needs come from the factory's parameter types (annotate them on
+a function factory), and `extend()` checks that the container has them.
 
 ## Writing a hook
 
-For anything else (subscribing to events, marking the app ready, running migrations), or in an
-`AsyncDIContainer`, write the hook yourself. `lifecycle.start('server')` is the key `'server:start'`.
-Register the hook under it with `addSingleton`: the factory is the hook, its dependencies are what it
-needs, and it may return a function that **undoes** it.
+For anything else (subscribing to events, marking the app ready, running migrations), write the hook
+yourself. `lifecycle.start('server')` is the key `'server:start'`. Register the hook under it with
+`addSingleton`: the factory is the hook, its dependencies are what it needs, and it may return a
+function that **undoes** it (or a promise of it). A factory that returns anything else is a compile
+error at the factory.
 
 <<< @/../examples/startup-shutdown.ts#platform
 
@@ -176,6 +178,21 @@ the rollback. Its undo functions also run concurrently; stages are still undone 
 ## Timeouts and cancellation
 
 Pass an `AbortSignal` to bound the start or the stop:
+
+- **Hooks get the signal.** Depend on `startSignal` to receive it, and pass it on to the work the hook
+  waits for, so that work stops too:
+
+  ```ts
+  c.addSingleton(
+    lifecycle.init('config'),
+    async (client, signal) => {
+      await client.load({ signal }); // cancelled when the start times out
+    },
+    ['configClient', startSignal],
+  );
+  ```
+
+  `startable()` passes it to `start` as the second argument. Without a `signal` option it never aborts.
 
 - **Start.** When the signal aborts, `startLifecycle()` stops waiting for the pending hooks and rolls
   back: the undo functions of what ran receive the aborted signal (their cue to be quick) and are waited

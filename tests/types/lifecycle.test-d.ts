@@ -11,14 +11,19 @@ import {
   type LifecycleSignal,
   type RunningLifecycle,
   type ServiceRegistry,
+  type TaggedKey,
 } from '../../src/index.ts';
 
 // ---- stage keys
-expectTypeOf(lifecycle.start('server')).toEqualTypeOf<'server:start'>();
+expectTypeOf(lifecycle.start('server')).toEqualTypeOf<
+  'server:start' & TaggedKey<LifecycleHook, 'server:start'>
+>();
 expectTypeOf(lifecycle).toEqualTypeOf<Lifecycle<'init' | 'start' | 'ready'>>();
 const stages = createLifecycle(['migrate', 'init']);
 expectTypeOf(stages).toEqualTypeOf<Lifecycle<'migrate' | 'init'>>();
-expectTypeOf(stages.migrate('schema')).toEqualTypeOf<'schema:migrate'>();
+expectTypeOf(stages.migrate('schema')).toEqualTypeOf<
+  'schema:migrate' & TaggedKey<LifecycleHook, 'schema:migrate'>
+>();
 // @ts-expect-error: no stage "strat"
 lifecycle.strat('server');
 // @ts-expect-error: not a stage of `stages`
@@ -63,14 +68,21 @@ void startLifecycle(app, { concurrent: ['inti'] });
 // @ts-expect-error: "start" is not a stage of `stages`
 void startLifecycle(app, { lifecycle: stages, concurrent: ['start'] });
 
-// ---- a key with a stage suffix must produce a hook
-const wrong = new DIContainer().addSingleton(lifecycle.init('db'), () => ({
+// ---- a hook must produce nothing or an undo function: checked when it is registered…
+// @ts-expect-error: 'db:init' produces an object, not a hook
+new DIContainer().addSingleton(lifecycle.init('db'), () => ({ query: 1 }));
+// …and by startLifecycle() for keys typed by hand
+const wrong = new DIContainer().addSingleton('db:init', () => ({
   query: () => 1,
 }));
 // @ts-expect-error: 'db:init' produces an object, not a hook
 void startLifecycle(wrong);
 // …but only for the stages being run
 void startLifecycle(wrong, { lifecycle: createLifecycle(['migrate']) });
+// the service map has the plain key
+expectTypeOf(
+  new DIContainer().addSingleton(lifecycle.init('a'), () => {}),
+).toEqualTypeOf<DIContainer<{ 'a:init': void }>>();
 
 // ---- async containers and the hook type
 const asyncApp = new AsyncDIContainer()

@@ -14,6 +14,7 @@ export {
   lifecycle,
   startLifecycle,
   startable,
+  startSignal,
   type AbortSignalLike,
   type Lifecycle,
   type LifecycleErrorContext,
@@ -21,8 +22,10 @@ export {
   type LifecycleHookEvent,
   type LifecycleSignal,
   type LifecycleState,
+  type LifecycleUndo,
   type RunningLifecycle,
   type StartableHooks,
+  type StartableModule,
   type StartLifecycleOptions,
   type StopLifecycleOptions,
 } from './lifecycle.ts';

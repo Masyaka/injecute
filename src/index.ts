@@ -28,6 +28,7 @@
  * @module
  */
 export type * from './types.ts';
+export type { TaggedKey } from './tagged-keys.ts';
 export { DIContainer } from './container.ts';
 export { AsyncDIContainer } from './async-container.ts';
 export {

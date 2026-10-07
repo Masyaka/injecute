@@ -3,6 +3,7 @@ import { InjecuteError } from '../errors.ts';
 import { asyncDispose, isThenable, TAGGED_KEYS } from '../internal.ts';
 import type {
   AsyncServiceProvider,
+  AsyncServiceRegistry,
   ContainerServices,
   Produced,
   RegistrationInfo,
@@ -69,7 +70,19 @@ export type LifecycleSignal = typeof globalThis extends {
  * }, ['server']);
  * ```
  */
-export type LifecycleHook = void | ((signal: LifecycleSignal) => unknown);
+export type LifecycleHook =
+  void | LifecycleUndo | PromiseLike<void | LifecycleUndo>;
+
+/**
+ * The function a lifecycle hook may return: it undoes the hook when the app stops. It receives the
+ * `signal` passed to `running.stop()`, aborted when stopping takes too long.
+ *
+ * @example
+ * ```ts
+ * const close: LifecycleUndo = (signal) => server.close({ force: signal.aborted });
+ * ```
+ */
+export type LifecycleUndo = (signal: LifecycleSignal) => unknown;
 
 /**
  * Lifecycle stages, made by {@link createLifecycle}: one {@link Tag} of {@link LifecycleHook} per stage.
@@ -612,6 +625,31 @@ function validate(
   }
 }
 
+/** The signal of the start that is resolving a hook right now (resolution is synchronous). */
+let currentStart: AbortSignalLike | undefined;
+
+/**
+ * A dependency that gives a lifecycle hook the start signal: the `signal` passed to `startLifecycle()`,
+ * which aborts when the start takes too long. Pass it on to the work the hook waits for (a connection, a
+ * request), so that work stops too. Outside a start, and without a `signal` option, it never aborts.
+ *
+ * @example
+ * ```ts
+ * app.addSingleton(
+ *   lifecycle.init('config'),
+ *   async (client, signal) => {
+ *     await client.load({ signal }); // cancelled when the start times out
+ *   },
+ *   ['configClient', startSignal],
+ * );
+ *
+ * await startLifecycle(app, { signal: AbortSignal.timeout(30_000) });
+ * ```
+ */
+export function startSignal(): LifecycleSignal {
+  return (currentStart ?? neverAborted()) as LifecycleSignal;
+}
+
 const runs = new WeakMap<object, Promise<RunningLifecycle>>();
 const stopped = new WeakSet<object>();
 
@@ -725,6 +763,8 @@ async function start(
   const ran: StageRun[] = [];
   const order: ServiceKey[] = [];
 
+  /** What `startSignal()` gives the hooks of this run. */
+  const startSignalOfRun: AbortSignalLike = signal ?? neverAborted();
   /** Hooks the start signal gave up on, still running: undone when they settle. */
   const late: Promise<unknown>[] = [];
 
@@ -772,7 +812,13 @@ async function start(
     const failures: Failure[] = [];
     const call = (key: string) => {
       const begin = now();
-      return { begin, promise: attempt(() => provider.get(key)) };
+      const previous = currentStart;
+      currentStart = startSignalOfRun;
+      try {
+        return { begin, promise: attempt(() => provider.get(key)) };
+      } finally {
+        currentStart = previous;
+      }
     };
     const settle = (
       key: string,
@@ -887,12 +933,40 @@ type NeededServices<F, D extends readonly unknown[]> = {
  * ```
  */
 export interface StartableHooks<T, P extends string = 'start'> {
-  /** Starts the service; may return a promise. */
-  start?: (service: T) => unknown;
+  /** Starts the service; may return a promise. `signal` is the start signal (see {@link startSignal}). */
+  start?: (service: T, signal: LifecycleSignal) => unknown;
   /** Stops the service when the app stops (or rolls back a failed start). */
   stop?: (service: T, signal: LifecycleSignal) => unknown;
   /** The stage to start in. Default: `lifecycle.start`. */
   stage?: Tag<LifecycleHook, P>;
+}
+
+/**
+ * The module {@link startable} returns: apply it with `extend()` (or `namespace()`) to a `DIContainer`
+ * or an `AsyncDIContainer`. `Needs` are the services it requires; `Added` and `AsyncAdded` what it
+ * registers in each.
+ *
+ * @example
+ * ```ts
+ * const consumer: StartableModule<{ bus: Bus }, { consumer: Consumer }, { consumer: Consumer }> =
+ *   startable('consumer', Consumer, ['bus'], { start: (c) => c.start() });
+ * app.extend(consumer);
+ * ```
+ */
+export interface StartableModule<
+  Needs extends object,
+  Added extends object,
+  AsyncAdded extends object,
+> {
+  /**
+   * Registers the service and its hook in a `DIContainer`'s or an `AsyncDIContainer`'s registry (or a
+   * module's).
+   */
+  <R extends ServiceRegistry<Needs, {}> | AsyncServiceRegistry<Needs, {}>>(
+    registry: R,
+  ): R extends AsyncServiceRegistry<any, any>
+    ? AsyncServiceRegistry<any, AsyncAdded>
+    : ServiceRegistry<any, Added>;
 }
 
 /**
@@ -901,7 +975,8 @@ export interface StartableHooks<T, P extends string = 'start'> {
  * the service when the app starts and `stop` when it stops.
  *
  * The services it needs are typed by the factory's parameters: annotate them on a function factory.
- * For an `AsyncDIContainer`, register the hook yourself (`addSingleton(lifecycle.start(key), …)`).
+ * It works with a `DIContainer` and an `AsyncDIContainer`; `start` receives the resolved service and the
+ * start signal.
  *
  * @example
  * ```ts
@@ -925,15 +1000,14 @@ export function startable<
   factory: F,
   dependencies: D,
   hooks: StartableHooks<Awaited<Produced<F>>, P>,
-): (
-  registry: ServiceRegistry<NeededServices<F, D>, {}>,
-) => ServiceRegistry<
-  any,
-  { [Q in K]: Produced<F> } & { [Q in `${K}:${P}`]: LifecycleHook }
+): StartableModule<
+  NeededServices<F, D>,
+  { [Q in K]: Produced<F> } & { [Q in `${K}:${P}`]: LifecycleHook },
+  { [Q in K]: Awaited<Produced<F>> } & { [Q in `${K}:${P}`]: LifecycleHook }
 > {
   const stage = (hooks.stage ?? lifecycle.start) as Tag<LifecycleHook, string>;
-  const begin = (service: Awaited<Produced<F>>) => {
-    const started = hooks.start?.(service);
+  const begin = (service: Awaited<Produced<F>>, signal: LifecycleSignal) => {
+    const started = hooks.start?.(service, signal);
     const undo = hooks.stop
       ? (signal: LifecycleSignal) => hooks.stop!(service, signal)
       : undefined;
@@ -941,17 +1015,18 @@ export function startable<
       ? Promise.resolve(started).then(() => undo)
       : undo;
   };
-  return (registry) =>
-    (registry as unknown as ServiceRegistry<any, any>)
+  const module = (registry: ServiceRegistry<any, any>) =>
+    registry
       .addSingleton(key, factory as never, [...dependencies] as never)
       .addSingleton(
         stage(key),
-        (service: unknown) =>
+        ((service: unknown, signal: LifecycleSignal) =>
           isThenable(service)
             ? Promise.resolve(service).then((s) =>
-                begin(s as Awaited<Produced<F>>),
+                begin(s as Awaited<Produced<F>>, signal),
               )
-            : begin(service as Awaited<Produced<F>>),
-        [key],
-      ) as never;
+            : begin(service as Awaited<Produced<F>>, signal)) as never,
+        [key, startSignal],
+      );
+  return module as never;
 }

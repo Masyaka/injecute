@@ -15,6 +15,13 @@ import {
   syncDispose,
   TAGGED_KEYS,
 } from './internal.ts';
+
+import type {
+  AliasTarget,
+  ExpectedService,
+  RegisteredKey,
+  TaggedKey,
+} from './tagged-keys.ts';
 import type {
   ContainerEvents,
   Dependency,
@@ -210,13 +217,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * ```
    */
   get<K extends keyof S, O extends GetOptions = {}>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     options?: O,
   ): O extends { optional: true }
     ? ServiceType<S, K> | undefined
     : ServiceType<S, K> {
     this.#assertNotDisposed();
-    return this.#get(key, options?.optional ?? false, []) as any;
+    // a key built by a tag is a plain string at runtime
+    return this.#get(key as ServiceKey, options?.optional ?? false, []) as any;
   }
 
   /** `true` when a service is registered under `key`, here or (unless `local: true`) in a parent. */
@@ -226,7 +234,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   }
 
   /** Returns a function that resolves `key` when called. */
-  createResolver<K extends keyof S>(key: K): () => ServiceType<S, K> {
+  createResolver<K extends keyof S>(
+    key: K | TaggedKey<any, K>,
+  ): () => ServiceType<S, K> {
     return () => this.get(key);
   }
 
@@ -240,7 +250,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * ```
    */
   call<K extends keyof S>(
-    key: K,
+    key: K | TaggedKey<any, K>,
     args: Parameters<Extract<ServiceType<S, K>, (...args: any[]) => any>>,
     thisArg: unknown = undefined,
   ): ReturnType<Extract<ServiceType<S, K>, (...args: any[]) => any>> {
@@ -248,7 +258,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
     if (typeof value !== 'function') {
       throw new InjecuteError(
         'INJECUTE_NOT_A_FUNCTION',
-        `Service "${describeKey(key)}" is not a function, so it cannot be called.`,
+        `Service "${describeKey(key as ServiceKey)}" is not a function, so it cannot be called.`,
       );
     }
     return value.apply(thisArg, args);
@@ -311,14 +321,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    */
   addSingleton<
     K extends ServiceKey,
-    F extends Factory<D, {}, S>,
+    F extends Factory<D, {}, S, ExpectedService<K>>,
     D extends Dependency<{}, S>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | SingletonFactoryOptions<[...D], F, R>,
-  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
+  ): DIContainer<Registered<S, { [P in RegisteredKey<K>]: Produced<F> }, R>> {
     this.#addFactory('singleton', key, factory, dependencies);
     return this as any;
   }
@@ -338,14 +348,14 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    */
   addTransient<
     K extends ServiceKey,
-    F extends Factory<D, {}, S>,
+    F extends Factory<D, {}, S, ExpectedService<K>>,
     D extends Dependency<{}, S>[] = [],
     const R extends boolean = false,
   >(
     key: K,
     factory: F,
     dependencies?: [...D] | RegistrationOptions<[...D], R>,
-  ): DIContainer<Registered<S, { [P in K]: Produced<F> }, R>> {
+  ): DIContainer<Registered<S, { [P in RegisteredKey<K>]: Produced<F> }, R>> {
     this.#addFactory('transient', key, factory, dependencies);
     return this as any;
   }
@@ -358,11 +368,15 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * app.addInstance('config', loadConfig());
    * ```
    */
-  addInstance<K extends ServiceKey, T, const R extends boolean = false>(
+  addInstance<
+    K extends ServiceKey,
+    T extends ExpectedService<K>,
+    const R extends boolean = false,
+  >(
     key: K,
     value: T,
     options?: InstanceOptions<Awaited<T>, R>,
-  ): DIContainer<Registered<S, { [P in K]: T }, R>> {
+  ): DIContainer<Registered<S, { [P in RegisteredKey<K>]: T }, R>> {
     this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     const dispose = options?.dispose ?? false;
     this.#register(
@@ -381,10 +395,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    * app.addAlias('logger', config.production ? 'jsonLogger' : 'prettyLogger');
    * ```
    */
-  addAlias<K extends ServiceKey, T extends keyof S>(
+  addAlias<K extends ServiceKey, T extends AliasTarget<K, S>>(
     key: K,
     target: T,
-  ): DIContainer<S & { [P in K]: ResolveDependency<T, {}, S> }> {
+  ): DIContainer<S & { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }> {
     this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     this.#register(
       {
