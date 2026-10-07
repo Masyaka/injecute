@@ -1,6 +1,6 @@
 ---
 title: Frameworks
-description: How injecute fits into a web framework (the composition root, routes from modules, request context, startup and shutdown, tests), with pages for Express, Fastify, Hono, Next.js, GraphQL and NestJS users.
+description: How injecute fits into a web framework (the composition root, routes from modules, request context, startup and shutdown, tests), with pages for Express, Fastify, Hono, Next.js, GraphQL, React, Vue, Solid and NestJS users.
 ---
 
 # Frameworks
@@ -28,14 +28,18 @@ These pages put the framework in the container: routes are services, and the ser
 hook. For most apps, keeping the framework out of the core is the better default; see
 [Keep the web framework out of the core](../guide/app-structure.md#keep-the-web-framework-out-of-the-core).
 
+The UI frameworks are different: the container builds the core behind the components, and the
+framework's context passes it down. See [React, Vue and Solid](./ui-frameworks.md).
+
 Your services import neither the framework nor injecute, so the same modules run under an HTTP server, a
 queue worker, a cron job or a CLI.
 
-| Page                              | For                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| [Express](./express.md)           | Express 5 apps                                                         |
-| [Fastify](./fastify.md)           | Fastify 5 apps: plugins for HTTP, the container for services           |
-| [Hono](./hono.md)                 | Hono on Node.js, Bun, Deno and Cloudflare Workers                      |
-| [Next.js](./nextjs.md)            | The App Router: server components, route handlers and server actions   |
-| [GraphQL](./graphql.md)           | GraphQL Yoga and Apollo Server, with a DataLoader per request          |
-| [Coming from NestJS](./nestjs.md) | Moving from NestJS's dependency injection, all at once or step by step |
+| Page                                       | For                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [Express](./express.md)                    | Express 5 apps                                                                            |
+| [Fastify](./fastify.md)                    | Fastify 5 apps: plugins for HTTP, the container for services                              |
+| [Hono](./hono.md)                          | Hono on Node.js, Bun, Deno and Cloudflare Workers                                         |
+| [Next.js](./nextjs.md)                     | The App Router: server components, route handlers and server actions                      |
+| [GraphQL](./graphql.md)                    | GraphQL Yoga and Apollo Server, with a DataLoader per request                             |
+| [React, Vue and Solid](./ui-frameworks.md) | When a UI app needs a container; the core behind the UI, TanStack Query, state management |
+| [Coming from NestJS](./nestjs.md)          | Moving from NestJS's dependency injection, all at once or step by step                    |

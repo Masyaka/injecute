@@ -250,6 +250,14 @@ requests to the app built from an isolated fork, without starting the lifecycle.
 - Next.js: keep connections in a platform container cached on `globalThis`, and build the app as
   `platform.fork().extend(addApp)`, so hot reloads don't open new connections.
 - Cloudflare Workers: no connections in singletons (I/O belongs to one request), and no shutdown.
+- React, Vue and Solid (`lib/docs/frameworks/ui-frameworks.md`): most data-fetching SPAs don't need a
+  container (imports, TanStack Query and MSW are enough). Use it for one core per widget, request or
+  test, a client-side service graph with lifetimes, or implementations chosen at startup. Then: a
+  framework-free core from `createCore()`, passed down as a `ServiceProvider` and read with a
+  `useService(key)` hook; the `QueryClient` and each state store (`zustand/vanilla`, Redux
+  `configureStore` with services as the thunk's `extraArgument`, a Jotai store) are singletons of the
+  core, created by factories; never stores at the top of a module, never values instead of stores;
+  no fork per component.
 
 ## Fixing errors
 

@@ -59,6 +59,7 @@ await using test = app
 error codes and a [playground](https://masyaka.github.io/injecute/playground).
 
 Using a framework? See [Express, Fastify, Hono, Next.js and GraphQL](https://masyaka.github.io/injecute/frameworks/),
+[React, Vue and Solid](https://masyaka.github.io/injecute/frameworks/ui-frameworks),
 or [Coming from NestJS](https://masyaka.github.io/injecute/frameworks/nestjs).
 
 Upgrading from 0.x? Read the [migration guide](https://masyaka.github.io/injecute/migration/0.x-to-1.0).

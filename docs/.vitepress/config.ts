@@ -48,6 +48,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Hono', link: '/frameworks/hono' },
       { text: 'Next.js', link: '/frameworks/nextjs' },
       { text: 'GraphQL', link: '/frameworks/graphql' },
+      { text: 'React, Vue and Solid', link: '/frameworks/ui-frameworks' },
       { text: 'Coming from NestJS', link: '/frameworks/nestjs' },
     ],
   },

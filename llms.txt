@@ -39,6 +39,7 @@
 - [Hono](./lib/docs/frameworks/hono.md): One application module for Node.js, Bun, Deno and Cloudflare Workers, routes from modules, request context, graceful shutdown, tests with app.request().
 - [Next.js](./lib/docs/frameworks/nextjs.md): A platform container for connections that survives hot reloads, the app's services in server components, route handlers and server actions, shutdown in instrumentation.ts.
 - [GraphQL](./lib/docs/frameworks/graphql.md): GraphQL Yoga and Apollo Server with a DataLoader per request, resolvers that close over services, a schema assembled from modules.
+- [React, Vue and Solid](./lib/docs/frameworks/ui-frameworks.md): When a UI app needs a container and when imports, TanStack Query and MSW are enough; one core per widget, request or test, components that resolve services through the framework's context, the QueryClient in the core, stores (Zustand, Redux, Jotai, Pinia) created per core.
 - [Coming from NestJS](./lib/docs/frameworks/nestjs.md): NestJS concepts mapped to injecute, plain classes without legacy decorators or reflect-metadata, and moving step by step.
 
 ## Concepts
