@@ -89,6 +89,10 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     ```
 
     Return the registry the function received (the `add*` chain does that).
+    Keep registrations in wiring files (`orders.container.ts` exporting `addOrders`, `container.ts`
+    exporting `createApp()`) that contain nothing else: no classes, no logic, no side effects on import.
+    Keep the web framework out of the core container by default: the web layer receives the core as a
+    `ServiceProvider` and mounts its routers.
     When the host has a dependency under another key or in another shape, adapt it in a namespace
     instead of renaming the host's keys or the module's:
     `app.namespace('Audit', (c) => c.addSingleton('dbUrl', (config) => config.auditDb, ['config']).addAlias('log', 'logger').extend(addAudit))`.

@@ -19,6 +19,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Getting started', link: '/guide/getting-started' },
       { text: 'Registering services', link: '/guide/registration' },
       { text: 'Containers, forks, modules', link: '/guide/containers' },
+      { text: 'Structuring an app', link: '/guide/app-structure' },
       { text: 'Extension points with tags', link: '/guide/tags' },
       { text: 'Lifecycle and dispose', link: '/guide/lifecycle' },
       { text: 'Startup and shutdown', link: '/guide/startup-shutdown' },

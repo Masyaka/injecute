@@ -45,6 +45,9 @@ const app = new DIContainer()
   .extend(addBilling);
 ```
 
+Keep each module in a wiring file of its own; see
+[Keep the wiring in files of its own](./app-structure.md#keep-the-wiring-in-files-of-its-own).
+
 When a module expects a service under another key or in another shape, see
 [Adapting a module's dependencies](./containers.md#adapting-a-module-s-dependencies).
 

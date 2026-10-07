@@ -52,6 +52,9 @@ router, subscribing to events, starting a consumer) goes in a
 [lifecycle hook](./startup-shutdown.md), not in the module function. To let other modules contribute
 to one of yours (routes, commands, health checks), give it an [extension point](./tags.md).
 
+Keep each module in a wiring file of its own, next to the feature it wires. See
+[Keep the wiring in files of its own](./app-structure.md#keep-the-wiring-in-files-of-its-own).
+
 If a required service is missing, the error names it:
 
 ```text

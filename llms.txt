@@ -17,6 +17,7 @@
 - [Getting started](./lib/docs/guide/getting-started.md): Install injecute, register services with explicit dependency keys, and resolve them with full types.
 - [Registering services](./lib/docs/guide/registration.md): Lifetimes (singleton, transient, instance), dependency keys, optional dependencies, aliases, decoration and classes.
 - [Containers, forks and modules](./lib/docs/guide/containers.md): Forks, isolated forks for tests, modules with extend(), and namespaces.
+- [Structuring an app](./lib/docs/guide/app-structure.md): Keep the web framework out of the application core, and keep the container wiring in files of its own: what each gives you, what it costs, and when to do otherwise.
 - [Extension points with tags](./lib/docs/guide/tags.md): Let modules contribute services to an extension point (routes, commands, health checks, plugins) with createTag(), and give the owner all of them as a typed array with collect().
 - [Lifecycle and dispose](./lib/docs/guide/lifecycle.md): Release connections and other resources with dispose() and await using, in reverse creation order.
 - [Startup and shutdown](./lib/docs/guide/startup-shutdown.md): Lifecycle hooks with createLifecycle() and startLifecycle(): modules start work in stages at startup (consumers, servers, subscriptions) and stop gracefully in reverse.

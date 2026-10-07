@@ -24,6 +24,10 @@ follows the same shape:
 6. **Tests use an isolated fork.** Replace the database in a fork, build the server from it and send it
    requests with the framework's own test helper, without listening on a port.
 
+These pages put the framework in the container: routes are services, and the server is a lifecycle
+hook. For most apps, keeping the framework out of the core is the better default; see
+[Keep the web framework out of the core](../guide/app-structure.md#keep-the-web-framework-out-of-the-core).
+
 Your services import neither the framework nor injecute, so the same modules run under an HTTP server, a
 queue worker, a cron job or a CLI.
 
