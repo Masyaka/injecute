@@ -1,15 +1,12 @@
-import { expect } from 'chai';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   ArgumentsKey,
   CircularDependencyError,
   DIContainer,
   IDIContainer,
-  IDIContainerExtension,
-  NamespaceServices,
-  optionalDependencySkipKey,
-} from '../src';
-import { construct } from '../src';
+  optional,
+  type ServiceProvider,
+} from '../src/index.ts';
 
 describe('injecute container', () => {
   describe('DI container general', () => {
@@ -21,10 +18,10 @@ describe('injecute container', () => {
         };
         const container = new DIContainer().addEventListener('add', handler);
         container.addInstance('instance', 'instance value');
-        expect(added).to.be.eq('instance');
+        expect(added).toBe('instance');
         container.removeEventListener('add', handler);
         container.addSingleton('singleton', () => 'singleton value', []);
-        expect(added).to.be.eq('instance');
+        expect(added).toBe('instance');
       });
       it('emit reset event', () => {
         let resetContainer: any;
@@ -32,8 +29,8 @@ describe('injecute container', () => {
           resetContainer = container;
         };
         const parentHandler = (e: any) => {
-          expect(e.keys?.[0]).to.be.eq('singleton');
-          expect(e.resetParent).to.be.true;
+          expect(e.keys?.[0]).toBe('singleton');
+          expect(e.resetParent).toBe(true);
         };
         const container = new DIContainer()
           .addSingleton('singleton', () => 'parent singleton')
@@ -42,11 +39,11 @@ describe('injecute container', () => {
           .addEventListener('reset', handler)
           .addSingleton('singleton', () => 'singleton value', []);
         container.reset({ keys: ['singleton'], resetParent: true });
-        expect(resetContainer).to.be.eq(container);
+        expect(resetContainer).toBe(container);
         container.removeEventListener('reset', handler);
         resetContainer = undefined;
         container.reset();
-        expect(resetContainer).to.be.undefined;
+        expect(resetContainer).toBeUndefined();
       });
       it('emit get event', () => {
         let requested: ArgumentsKey = '';
@@ -66,8 +63,8 @@ describe('injecute container', () => {
           .addInstance('instance', 'instance value');
 
         container.get('instance');
-        expect(requested).to.be.eq('instance');
-        expect(gotValue).to.be.eq('instance value');
+        expect(requested).toBe('instance');
+        expect(gotValue).toBe('instance value');
 
         // should return new value after override
         container.addSingleton('instance', () => 'new value', {
@@ -75,16 +72,16 @@ describe('injecute container', () => {
           replace: true,
         });
         container.get('instance');
-        expect(requested).to.be.eq('instance');
-        expect(gotValue).to.be.eq('new value');
+        expect(requested).toBe('instance');
+        expect(gotValue).toBe('new value');
 
         // after remove handler
         container.removeEventListener('get', handler);
         requested = '';
         gotValue = undefined;
         container.get('instance');
-        expect(requested).to.be.eq('');
-        expect(gotValue).to.be.undefined;
+        expect(requested).toBe('');
+        expect(gotValue).toBeUndefined();
       });
       it('emit produce event', () => {
         const instances: any = {};
@@ -103,22 +100,25 @@ describe('injecute container', () => {
         container.get('instance');
         container.get('singleton');
         container.get('singleton');
-        expect(instances.singleton[0]).to.be.eql({ type: 'singletonInstance' });
-        expect(instances.singleton[1]).to.be.undefined;
-        expect(instances.instance).to.be.undefined;
-        expect(instances.transient[0]).to.be.eql({ type: 'transientInstance' });
-        expect(instances.transient[1]).to.be.eql({ type: 'transientInstance' });
-        expect(instances.transient[0] !== instances.transient[1]).to.be.true;
+        expect(instances.singleton[0]).toEqual({ type: 'singletonInstance' });
+        expect(instances.singleton[1]).toBeUndefined();
+        expect(instances.instance).toBeUndefined();
+        expect(instances.transient[0]).toEqual({ type: 'transientInstance' });
+        expect(instances.transient[1]).toEqual({ type: 'transientInstance' });
+        expect(instances.transient[0] !== instances.transient[1]).toBe(true);
       });
       it('throws when event is wrong', () => {
         const container = new DIContainer();
-        expect(() => container.addEventListener('add', () => {})).to.not.throw;
-        expect(() => container.removeEventListener('add', () => {})).to.not
-          .throw;
+        expect(() => container.addEventListener('add', () => {})).not.toThrow();
+        expect(() =>
+          container.removeEventListener('add', () => {}),
+        ).not.toThrow();
         // @ts-expect-error event not exists
-        expect(() => container.addEventListener('added', () => {})).to.throw;
-        // @ts-expect-error event not exists
-        expect(() => container.removeEventListener('added', () => {})).to.throw;
+        expect(() => container.addEventListener('added', () => {})).toThrow();
+        expect(() =>
+          // @ts-expect-error event not exists
+          container.removeEventListener('added', () => {}),
+        ).toThrow();
       });
     });
 
@@ -150,9 +150,12 @@ describe('injecute container', () => {
             createNamespaceContainer(c.createResolver('parentService')),
           );
 
-        expect(parentContainer.get('Namespace.namespaceService'))
-          .to.have.property('name')
-          .eq('namespace uses service from parent container');
+        expect(
+          parentContainer.get('Namespace.namespaceService'),
+        ).toHaveProperty(
+          'name',
+          'namespace uses service from parent container',
+        );
       });
       it('creates namespace container with added services', () => {
         const container = new DIContainer()
@@ -178,18 +181,20 @@ describe('injecute container', () => {
           container
             .get('Domain.Context.domainFeatureService')
             .businessMethod(41),
-        ).to.be.eq(42);
-        expect(container.get('Domain.Context')).to.be.instanceOf(DIContainer);
+        ).toBe(42);
+        expect(container.get('Domain.Context')).toBeInstanceOf(DIContainer);
         expect(
           container
             .get('Domain.Context')
             .get('domainFeatureService')
             .businessMethod(41),
-        ).to.be.eq(42);
+        ).toBe(42);
 
-        expect(container.get('Domain.Context').get('Generic.value')).to.be.eq(
-          '23',
-        );
+        // At runtime a namespace provider also sees the parent's services (typed: only its own).
+        const domainContext = container.get(
+          'Domain.Context',
+        ) as ServiceProvider<any>;
+        expect(domainContext.get('Generic.value')).toBe('23');
       });
       it('replaces namespace entry when parent container replaces entry', () => {
         let c = 0;
@@ -207,14 +212,14 @@ describe('injecute container', () => {
             ),
           );
 
-        expect(container.get('NS.service')).to.eq('original0');
-        expect(container.get('NS.service')).to.eq('original0');
+        expect(container.get('NS.service')).toBe('original0');
+        expect(container.get('NS.service')).toBe('original0');
         container.addTransient('NS.service', (count) => 'replaced' + count, {
           replace: true,
           dependencies: ['count'],
         });
-        expect(container.get('NS.service')).to.eq('replaced1');
-        expect(container.get('NS').get('service')).to.eq('replaced2');
+        expect(container.get('NS.service')).toBe('replaced1');
+        expect(container.get('NS').get('service')).toBe('replaced2');
 
         container.addTransient(
           'NS.service',
@@ -224,15 +229,17 @@ describe('injecute container', () => {
             dependencies: ['count'],
           },
         );
-        expect(container.get('NS.service')).to.eq('over-replaced-3');
-        expect(container.get('NS').get('service')).to.eq('over-replaced-4');
+        expect(container.get('NS.service')).toBe('over-replaced-3');
+        expect(container.get('NS').get('service')).toBe('over-replaced-4');
 
-        container.get('NS').addTransient('service', () => 'final-replacement', {
-          replace: true,
-          dependencies: [],
-        });
-        expect(container.get('NS.service')).to.eq('final-replacement');
-        expect(container.get('NS').get('service')).to.eq('final-replacement');
+        // `get('NS')` is typed read-only; the namespace container itself can still register.
+        (container.get('NS') as unknown as DIContainer<any>).addTransient(
+          'service',
+          () => 'final-replacement',
+          { replace: true, dependencies: [] },
+        );
+        expect(container.get('NS.service')).toBe('final-replacement');
+        expect(container.get('NS').get('service')).toBe('final-replacement');
       });
       it('replaces deep nested namespace entry', () => {
         const container = new DIContainer()
@@ -254,15 +261,15 @@ describe('injecute container', () => {
               ),
           );
 
-        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+        expect(container.get('NS1.NS2.ns2Service')).toBe(
           'ns2Service(rootVal, ns1Service(rootVal))',
         );
         container.addInstance('rootVal', 'newRootVal', { replace: true });
-        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+        expect(container.get('NS1.NS2.ns2Service')).toBe(
           'ns2Service(rootVal, ns1Service(rootVal))',
         );
         container.reset();
-        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+        expect(container.get('NS1.NS2.ns2Service')).toBe(
           'ns2Service(newRootVal, ns1Service(newRootVal))',
         );
         container.addSingleton(
@@ -274,10 +281,10 @@ describe('injecute container', () => {
           },
         );
         container.reset();
-        expect(container.get('NS1.NS2.ns2Service')).to.be.eq(
+        expect(container.get('NS1.NS2.ns2Service')).toBe(
           'ns2Service(newRootVal, ns1ServiceUpdated(newRootVal))',
         );
-        expect(container.get('NS1.ns1Service')).to.be.eq(
+        expect(container.get('NS1.ns1Service')).toBe(
           'ns1ServiceUpdated(newRootVal)',
         );
         container.addSingleton(
@@ -288,7 +295,7 @@ describe('injecute container', () => {
             dependencies: ['rootVal'],
           },
         );
-        expect(container.get('NS1').get('NS2.ns2Service')).to.be.eq(
+        expect(container.get('NS1').get('NS2.ns2Service')).toBe(
           'ns2ServiceUpdated2(newRootVal)',
         );
       });
@@ -309,17 +316,17 @@ describe('injecute container', () => {
 
         container.get('service1');
         container.get('service2');
-        expect(factory1Calls).to.eq(1);
-        expect(factory2Calls).to.eq(1);
+        expect(factory1Calls).toBe(1);
+        expect(factory2Calls).toBe(1);
         container.get('service1');
         container.get('service2');
-        expect(factory1Calls).to.eq(1);
-        expect(factory2Calls).to.eq(1);
+        expect(factory1Calls).toBe(1);
+        expect(factory2Calls).toBe(1);
         container.reset({ keys: ['service2'] });
         container.get('service1');
         container.get('service2');
-        expect(factory1Calls).to.eq(1);
-        expect(factory2Calls).to.eq(2);
+        expect(factory1Calls).toBe(1);
+        expect(factory2Calls).toBe(2);
       });
 
       it('removes cached singleton instances', () => {
@@ -348,14 +355,14 @@ describe('injecute container', () => {
 
         container.get('singleton');
         container.get('singleton');
-        expect(singletonFactoryRuns).to.be.eq(1);
-        expect(depFactoryRuns).to.be.eq(1);
+        expect(singletonFactoryRuns).toBe(1);
+        expect(depFactoryRuns).toBe(1);
         container.reset();
         container.get('singleton');
         container.get('singleton');
 
-        expect(singletonFactoryRuns).to.be.eq(2);
-        expect(depFactoryRuns).to.be.eq(2);
+        expect(singletonFactoryRuns).toBe(2);
+        expect(depFactoryRuns).toBe(2);
       });
 
       it('removes cached singleton instances from parent', () => {
@@ -381,7 +388,7 @@ describe('injecute container', () => {
         container.get('singleton');
         container.get('singleton');
 
-        expect(singletonFactoryRuns).to.be.eq(2);
+        expect(singletonFactoryRuns).toBe(2);
       });
     });
 
@@ -397,7 +404,7 @@ describe('injecute container', () => {
             ['dep'],
           );
 
-        expect(container.call('functor', [1])).to.be.eq('functorResult=42');
+        expect(container.call('functor', [1])).toBe('functorResult=42');
       });
 
       it('throws when non functor entry called', () => {
@@ -408,15 +415,15 @@ describe('injecute container', () => {
           .addSingleton('nonFunctor', (dep) => dep() + 1, ['dep']);
 
         // @ts-expect-error call for non function type entries not allowed
-        expect(() => container.call('nonFunctor', [1])).to.throw(
-          'Entry "nonFunctor" is not a function and can not be invoked',
+        expect(() => container.call('nonFunctor', [1])).toThrow(
+          'Service "nonFunctor" is not a function, so it cannot be called.',
         );
       });
     });
 
     it('should allow to override parent service using parent service', () => {
       const parent = new DIContainer().addTransient('s', () => ({ x: 1 }), []);
-      const child = new DIContainer({ parentContainer: parent }).extend((c) => {
+      const child = parent.fork().extend((c) => {
         return c.addTransient(
           's',
           () => {
@@ -426,7 +433,7 @@ describe('injecute container', () => {
           [],
         );
       });
-      expect(child.get('s')).to.be.eql({ x: 1, y: 2 });
+      expect(child.get('s')).toEqual({ x: 1, y: 2 });
     });
 
     it('should allow to override service using prev value', () => {
@@ -435,9 +442,9 @@ describe('injecute container', () => {
       }));
       const initialInstance1 = container.get('service');
       const initialInstance2 = container.get('service');
-      expect(initialInstance1).to.be.eql({ name: 'initial service' });
-      expect(initialInstance2).to.be.eql({ name: 'initial service' });
-      expect(initialInstance1 === initialInstance2).to.be.false;
+      expect(initialInstance1).toEqual({ name: 'initial service' });
+      expect(initialInstance2).toEqual({ name: 'initial service' });
+      expect(initialInstance1 === initialInstance2).toBe(false);
       container.addSingleton(
         'service',
         (initialService) => ({ name: 'replaced service', initialService }),
@@ -448,18 +455,18 @@ describe('injecute container', () => {
       );
       const replacedInstance1 = container.get('service');
       const replacedInstance2 = container.get('service');
-      expect(replacedInstance1).to.be.eql({
+      expect(replacedInstance1).toEqual({
         name: 'replaced service',
         initialService: { name: 'initial service' },
       });
-      expect(replacedInstance2).to.be.eql({
+      expect(replacedInstance2).toEqual({
         name: 'replaced service',
         initialService: { name: 'initial service' },
       });
-      expect(replacedInstance1 === replacedInstance2).to.be.true;
+      expect(replacedInstance1 === replacedInstance2).toBe(true);
     });
 
-    it('should not allow to depend on self key without replace option', () => {
+    it('should not allow to re-register an own key without replace option', () => {
       const container = new DIContainer().addTransient('service', () => ({
         name: 'initial service',
       }));
@@ -469,22 +476,26 @@ describe('injecute container', () => {
           (initialService) => ({ name: 'replaced service', initialService }),
           ['service'],
         ),
-      ).to.throw(CircularDependencyError);
+      ).toThrow(/already registered/);
+    });
+
+    it('should not allow a self dependency when there is no previous definition', () => {
+      expect(() =>
+        new DIContainer().addSingleton(
+          'service',
+          ((self: unknown) => ({ self })) as any,
+          ['service'] as any,
+        ),
+      ).toThrow(/no previous definition of "service"/);
     });
 
     it('should prevent creating of circular dependencies', () => {
       expect(() => {
-        const c = new DIContainer()
-          .addTransient(
-            'z',
-            function () {
-              return { y: arguments[0] };
-            },
-            ['y'] as any,
-          )
+        new DIContainer()
+          .addTransient('z', (...args: any[]) => ({ y: args[0] }), ['y'] as any)
           .addTransient('x', (z: any) => ({ ...z, x: 1 }), ['z'])
           .addTransient('y', (x) => ({ ...x, y: 1 }), ['x']);
-      }).to.throw(CircularDependencyError);
+      }).toThrow(CircularDependencyError);
     });
   });
   describe('explicit keys providing container', () => {
@@ -492,7 +503,7 @@ describe('injecute container', () => {
       const container = new DIContainer().addSingleton('x', () => ({
         name: 'I am the X.',
       }));
-      expect(container.get('x')).to.have.property('name').eq('I am the X.');
+      expect(container.get('x')).toHaveProperty('name', 'I am the X.');
     });
     it('will lead to compilation error if third argument not provided for when actually needed', () => {
       const container = new DIContainer()
@@ -500,54 +511,42 @@ describe('injecute container', () => {
         .addSingleton('x', (name: string) => ({
           name,
         }));
-      expect(container.get('x')).to.have.property('name').undefined;
+      expect(container.get('x')).toHaveProperty('name', undefined);
     });
-    it('will allow to not provide optional dependency key', () => {
+    it('passes undefined for optional dependencies that are not registered', () => {
       class SrvWithOptionalConstructorArgument {
         constructor(public readonly val: undefined | string = undefined) {}
       }
 
       const c = new DIContainer().addSingleton(
         's',
-        construct(SrvWithOptionalConstructorArgument),
-        ['undefined'],
+        SrvWithOptionalConstructorArgument,
+        [optional('missing')],
       );
-      expect(c.get('s')).to.be.instanceOf(SrvWithOptionalConstructorArgument);
+      expect(c.get('s')).toBeInstanceOf(SrvWithOptionalConstructorArgument);
+      expect(c.get('s').val).toBeUndefined();
     });
 
-    it('will not allow to add service with optional dependency key', () => {
-      const addSingletonUndefinedKey = () =>
-        new DIContainer().addSingleton(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-          [],
-        );
-      expect(addSingletonUndefinedKey).to.throw;
-
-      const addInstanceUndefinedKey = () =>
-        new DIContainer().addInstance(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-        );
-      expect(addInstanceUndefinedKey).to.throw;
-
-      const addTransientUndefinedKey = () =>
-        new DIContainer().addTransient(
-          optionalDependencySkipKey as any,
-          () => optionalDependencySkipKey,
-          [],
-        );
-      expect(addTransientUndefinedKey).to.throw;
+    it('passes optional dependencies that are registered', () => {
+      const c = new DIContainer()
+        .addInstance('name', 'value')
+        .addSingleton('s', (name) => ({ name }), [optional('name')]);
+      expect(c.get('s').name).toBe('value');
     });
 
-    it('will restrict adding to container without explicit keys providing', () => {
+    it('accepts "undefined" as an ordinary key (0.x reserved it)', () => {
+      const c = new DIContainer().addInstance('undefined', 1);
+      expect(c.get('undefined')).toBe(1);
+    });
+
+    it('will restrict adding to container without explicit keys providing (type-level only)', () => {
       const c = new DIContainer();
+      // The restriction is enforced by the types (@ts-expect-error below); at runtime the
+      // registration succeeds and the factory receives no arguments.
       expect(() =>
-        // @ts-expect-error
-        c.addTransient('d', (arg: any) => {
-          console.log(arg);
-        }),
-      ).to.throw;
+        // @ts-expect-error factory expects an argument but no dependency keys are given
+        c.addTransient('d', (arg: any) => arg),
+      ).not.toThrow();
     });
     it('will add service with explicit keys provided', () => {
       const c = new DIContainer<{}>();
@@ -556,7 +555,7 @@ describe('injecute container', () => {
           .addTransient('multiplier', () => 2, { dependencies: [] })
           .addTransient('multiplied2', (n) => 2 * n, ['multiplier'])
           .get('multiplied2');
-      expect(getMultiplied2By2()).to.be.eql(4);
+      expect(getMultiplied2By2()).toEqual(4);
     });
     it('should allow to use symbols as keys', () => {
       const c = new DIContainer<{}>();
@@ -572,7 +571,7 @@ describe('injecute container', () => {
             dependencies: [multiplierKey],
           })
           .get('multiplied2');
-      expect(getMultiplied2By2()).to.be.eql(4);
+      expect(getMultiplied2By2()).toEqual(4);
     });
     it('Should allow to provide dependency with callable', () => {
       const getMultiplied2By2 = () =>
@@ -585,7 +584,7 @@ describe('injecute container', () => {
             [() => 2],
           )
           .get('withCustomResolver');
-      expect(getMultiplied2By2()).to.be.eql(4);
+      expect(getMultiplied2By2()).toEqual(4);
     });
   });
   describe('middlewares', () => {
@@ -607,7 +606,7 @@ describe('injecute container', () => {
         .addSingleton('x', () => 'y', [])
         .get('x');
 
-      expect(checkpoints).to.be.eql(['before2', 'before1', 'after1', 'after2']);
+      expect(checkpoints).toEqual(['before2', 'before1', 'after1', 'after2']);
     });
     it('child container will use parent middlewares', () => {
       const checkpoints: string[] = [];
@@ -623,8 +622,8 @@ describe('injecute container', () => {
         .addSingleton('x', () => 'y', [])
         .get('x');
 
-      expect(r).to.be.eql('y');
-      expect(checkpoints).to.be.eql(['before1', 'after1']);
+      expect(r).toEqual('y');
+      expect(checkpoints).toEqual(['before1', 'after1']);
     });
   });
 });
