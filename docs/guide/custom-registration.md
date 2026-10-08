@@ -111,6 +111,16 @@ What this costs:
 
 <<< @/../vitest.config.ts#standard-decorators
 
+## Testing
+
+Services registered by a module are ordinary registrations, however the module found them. Tests work
+as described in [Testing](./testing.md): replace a dependency in an isolated fork, and everything
+resolved through the fork uses the replacement.
+
+<<< @/../examples/custom-registration/decorators.ts#testing
+
+The same works for services registered from files.
+
 ## Keys nobody can list: a middleware
 
 When the keys come from outside and can't be listed at startup, such as environment variables or

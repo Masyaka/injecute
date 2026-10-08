@@ -138,8 +138,9 @@ describe('examples', () => {
   });
 
   it('custom registration: decorators', async () => {
-    const { app, services, Clock, Greeter } =
+    const { app, greeting, services, Clock, Greeter } =
       await import('../examples/custom-registration/decorators.ts');
+    expect(greeting).toBe('Hello, Ada (2030-01-01T00:00:00.000Z)');
     expect(app.get('greeter')).toBeInstanceOf(Greeter);
     expect(app.get('clock')).toBeInstanceOf(Clock);
     expect(app.get('greeter').greet('Ada')).toBe(

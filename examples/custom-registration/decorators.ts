@@ -91,4 +91,18 @@ const app = new DIContainer()
 app.get('greeter').greet('Ada'); // "Hello, Ada (1970-01-01T00:00:00.000Z)"
 // #endregion decorators
 
-export { app, services, Clock, Greeter };
+// #region testing
+// The decorated classes are ordinary registrations: an isolated fork replaces the clock for the test.
+await using testContainer = app
+  .fork({ isolated: true })
+  .addInstance(
+    'clock',
+    { now: () => new Date('2030-01-01') },
+    { replace: true },
+  );
+
+const greeting = testContainer.get('greeter').greet('Ada'); // "Hello, Ada (2030-01-01T00:00:00.000Z)"
+app.get('greeter').greet('Ada'); // "Hello, Ada (1970-01-01T00:00:00.000Z)": the app is untouched
+// #endregion testing
+
+export { app, greeting, services, Clock, Greeter };
