@@ -23,6 +23,7 @@
 - [Startup and shutdown](./lib/docs/guide/startup-shutdown.md): Lifecycle hooks with createLifecycle() and startLifecycle(): modules start work in stages at startup (consumers, servers, subscriptions) and stop gracefully in reverse.
 - [Testing](./lib/docs/guide/testing.md): Replace dependencies in tests with isolated forks, clean up with await using, and assert error codes.
 - [Middlewares and events](./lib/docs/guide/middleware-events.md): Wrap resolution with middlewares (tracing, fallbacks, deprecations, guards, test doubles) and observe containers with events.
+- [Custom registration](./lib/docs/guide/custom-registration.md): Build your own way to register services (files in a directory, standard decorators) as a module applied with extend(), what the compiler still checks, and when a middleware fits instead.
 - [Async services](./lib/docs/guide/async.md): Services created asynchronously, in a DIContainer with defer() or in an AsyncDIContainer that awaits every dependency.
 - [Request context](./lib/docs/guide/request-context.md): Give every service the trace id, tenant and user of the current request with a context accessor backed by AsyncLocalStorage.
 - [Per-request state](./lib/docs/guide/request-state.md): Patterns for state that belongs to one request (arguments, a unit of work, a context, one instance per request, a strategy per tenant) and when a fork per request is still the right tool.

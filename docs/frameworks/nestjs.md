@@ -80,6 +80,8 @@ export const addOrders = (c: ServiceRegistry<{ db: Database }>) =>
 - A `StripeGateway` that doesn't implement `PaymentGateway` is a compile error at the registration.
 - Remove `experimentalDecorators` and `emitDecoratorMetadata` from `tsconfig.json`, and
   `import 'reflect-metadata'` from the entry point, once the last decorator is gone.
+- To keep a decorator on each class, standard decorators can register classes under typed keys. See
+  [Custom registration](../guide/custom-registration.md#services-from-decorators).
 
 ## Concepts
 

@@ -128,6 +128,33 @@ describe('examples', () => {
     expect(real).toBeGreaterThan(0);
   });
 
+  it('custom registration: file system', async () => {
+    const { app } =
+      await import('../examples/custom-registration/file-system.ts');
+    expect(app.get('greeter').greet('Ada')).toBe(
+      'Hello, Ada (1970-01-01T00:00:00.000Z)',
+    );
+    expect(app.get('clock')).toBe(app.get('clock'));
+  });
+
+  it('custom registration: decorators', async () => {
+    const { app, services, Clock, Greeter } =
+      await import('../examples/custom-registration/decorators.ts');
+    expect(app.get('greeter')).toBeInstanceOf(Greeter);
+    expect(app.get('clock')).toBeInstanceOf(Clock);
+    expect(app.get('greeter').greet('Ada')).toBe(
+      'Hello, Ada (1970-01-01T00:00:00.000Z)',
+    );
+    // the decorators only register: each container that applies them gets its own instances
+    const other = new DIContainer()
+      .addInstance('config', { greeting: 'Hi' })
+      .extend(services);
+    expect(other.get('greeter').greet('Bo')).toBe(
+      'Hi, Bo (1970-01-01T00:00:00.000Z)',
+    );
+    expect(other.get('clock')).not.toBe(app.get('clock'));
+  });
+
   it('events', async () => {
     const { events } = await import('../examples/events.ts');
     expect(events).toEqual(['added db', 'created db']);

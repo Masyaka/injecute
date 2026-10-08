@@ -20,9 +20,15 @@ import type {
 } from './playground/protocol.ts';
 import './playground/playground.css';
 
-// request-context/ uses relative imports, which the worker can't run
+// request-context/ and the file-system example use relative imports and Node.js APIs, which the
+// worker can't run
 const examples = import.meta.glob(
-  ['../../../examples/**/*.ts', '!../../../examples/request-context/**'],
+  [
+    '../../../examples/**/*.ts',
+    '!../../../examples/request-context/**',
+    '!../../../examples/custom-registration/file-system.ts',
+    '!../../../examples/custom-registration/services/**',
+  ],
   { query: '?raw', import: 'default' },
 ) as Record<string, () => Promise<string>>;
 const exampleNames = Object.keys(examples)

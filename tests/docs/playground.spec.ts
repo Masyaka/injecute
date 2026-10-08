@@ -82,6 +82,12 @@ test('loads an example from ?example=', async ({ page }) => {
   await expect(status(page)).toHaveText(/\d+ services/, { timeout: 30_000 });
 });
 
+test('runs standard decorators', async ({ page }) => {
+  await page.goto('playground?example=custom-registration/decorators');
+  await expect(status(page)).toHaveText('3 services', { timeout: 30_000 });
+  await expect(page.locator('.playground-error')).toHaveCount(0);
+});
+
 test('errors show their code and a docs link', async ({ page }) => {
   await page.goto(
     shared(`import { DIContainer } from 'injecute';

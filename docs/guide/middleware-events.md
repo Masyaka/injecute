@@ -31,7 +31,8 @@ registered. An **event listener** only observes. Reach for events first.
 <<< @/../examples/middleware/fallback.ts#fallback
 
 Keys a middleware provides are not in the container's type. When the values are known up front, a
-registration is simpler and typed.
+registration is simpler and typed. To register services found at startup (files in a directory,
+decorated classes), see [Custom registration](./custom-registration.md).
 
 ## Keeping renamed keys working
 
