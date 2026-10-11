@@ -110,6 +110,20 @@ expectTypeOf(
   app.namespace('Billing', addBilling).get('Billing.billing'),
 ).toEqualTypeOf<number>();
 
+// private services: symbol keys registered in a namespace stay out of the container's map
+const secret = Symbol('secret');
+const withPrivate = app.namespace('Vault', (vault) =>
+  vault
+    .addInstance(secret, 'hidden')
+    .addSingleton('reveal', (value) => value.length, [secret]),
+);
+expectTypeOf(withPrivate.get('Vault.reveal')).toEqualTypeOf<number>();
+expectTypeOf<
+  Extract<keyof ContainerServices<typeof withPrivate>, symbol>
+>().toEqualTypeOf<never>();
+// @ts-expect-error a private service can't be resolved from outside its namespace
+withPrivate.get(secret);
+
 // nested namespaces: the map keeps each service once, under its full key, and a marker per namespace
 const nested = app.namespace('Outer', (outer) =>
   outer

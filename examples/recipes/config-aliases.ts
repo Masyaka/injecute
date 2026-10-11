@@ -5,6 +5,7 @@ interface Mailer {
 }
 
 // #region config-aliases
+// Hey, try change mailer value to 'console', see the graph on right side
 const config = { mailer: 'smtp' as 'smtp' | 'console' };
 
 const app = new DIContainer()

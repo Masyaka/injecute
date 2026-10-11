@@ -92,7 +92,9 @@ What happens if you forget `construct()`:
 
 ## Keys
 
-Keys are strings, numbers or symbols. Use symbols for services that should stay private to a module.
+Keys are strings, numbers or symbols. Use symbols for services that should stay private to a module:
+in a namespace, they can't be resolved from outside it (see
+[Private services](./containers.md#private-services)).
 Registering the same key twice in one container throws
 [`INJECUTE_ALREADY_REGISTERED`](../errors/already-registered.md) unless you pass `replace: true`.
 

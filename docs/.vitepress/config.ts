@@ -31,6 +31,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Testing', link: '/guide/testing' },
       { text: 'Middlewares and events', link: '/guide/middleware-events' },
       { text: 'Custom registration', link: '/guide/custom-registration' },
+      { text: 'Building an SDK', link: '/guide/sdk' },
       { text: 'Async services', link: '/guide/async' },
       { text: 'Request context', link: '/guide/request-context' },
       { text: 'Per-request state', link: '/guide/request-state' },

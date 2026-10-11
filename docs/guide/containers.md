@@ -73,6 +73,31 @@ receives a fork of the container, so it can use every service registered there.
 (`ContainerServices<typeof app>`), `Reports` is a `Namespace` marker next to the `Reports.*` keys;
 `NamespaceServices<typeof app, 'Reports'>` gives the namespace's services.
 
+## Private services
+
+A module often has services that only its own services use: a cache, a client, a retry policy. Register
+them under a symbol key, and apply the module as a namespace. Don't export the symbol:
+
+<<< @/../examples/containers.ts#private
+
+- **What makes them private.** A namespace adds its string and number keys to the container as
+  `Name.key`, but not its symbol keys. Inside the namespace, services depend on the symbol like on any
+  key. Outside it, `get()` with the symbol is a compile error and fails with
+  [`INJECUTE_NOT_REGISTERED`](../errors/not-registered.md), and `keys` doesn't list it.
+- **Tests still reach them.** Replace a dependency of the module in an
+  [isolated fork](#isolated-forks), and its private services use the replacement too. To replace a
+  private service itself, the test needs the symbol: replace the public dependencies instead, or export
+  the symbol from a file only tests import.
+- **Only with `namespace()`.** With `extend()`, a symbol key is registered in the container itself.
+  Then only the unexported symbol keeps others out, and `keys` lists it.
+- **Not a security boundary.** `get('Catalog')` returns a provider of the namespace for inspection,
+  and its `keys` include the symbols. Code that enumerates them can resolve them, as code can read
+  symbol properties of an object with `Object.getOwnPropertySymbols()`.
+
+A naming convention such as `_cache` doesn't do this: keys are names
+([principle 8](../concepts/principles.md#_8-keys-are-names)), so `Catalog._cache` is linked and resolved
+like any other key.
+
 ## Adapting a module's dependencies
 
 A module names the services it needs under its own keys. When the container has them under other
@@ -110,4 +135,5 @@ readable types (see [TypeScript](./typescript.md#seal-the-composition-root)).
 | replace a dependency for everything, without touching the original | `fork({ isolated: true })`                                   |
 | split registrations by feature                                     | modules with `extend()`                                      |
 | group services under a name, e.g. `Billing.*`                      | `namespace()`                                                |
+| keep a module's helper services out of reach of other modules      | [symbol keys in a namespace](#private-services)              |
 | apply a module that names its dependencies differently             | [adapters in a namespace](#adapting-a-module-s-dependencies) |

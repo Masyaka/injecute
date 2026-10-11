@@ -102,6 +102,8 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
 12. `namespace('Billing', (c) => c.addSingleton(...))` registers `Billing.key` for each service and
     `Billing` for the namespace's provider (`app.get('Billing')`). In `ContainerServices`, `Billing` is a
     `Namespace` marker; `NamespaceServices<typeof app, 'Billing'>` is the namespace's service map.
+    A module's private services use symbol keys (`const cache = Symbol('cache')`, not exported): a
+    namespace doesn't add symbol keys to the container, so nothing outside resolves them.
 13. `ContainerServices<typeof app>` is the service map of a container type. End the composition root
     with `.seal()`: no more registrations in it (forks stay open), and its type is one flat, faster
     service map. A package that exports a container also names the map,
@@ -258,6 +260,18 @@ requests to the app built from an isolated fork, without starting the lifecycle.
   `configureStore` with services as the thunk's `extraArgument`, a Jotai store) are singletons of the
   core, created by factories; never stores at the top of a module, never values instead of stores;
   no fork per component.
+
+## SDKs
+
+An SDK built on injecute (`lib/docs/guide/sdk.md`) hides its container: `createPlatform(options)`
+builds a new sealed core per call and returns an object typed by the SDK's own interface, with one
+getter per exposed service (`get api() { return core.get('api'); }`) and `start()`, `stop()` and
+`[Symbol.asyncDispose]` over `startLifecycle()`. Plugins are modules,
+`(c: ServiceRegistry<PluginServices>) => …`, applied with `extend()` after the SDK's registrations and
+before `seal()`: they replace (`replace: true`), decorate (depend on the key itself) or contribute under
+an exported tag. `PluginServices` and the tags are public API; the SDK re-exports the helpers plugins
+use (`lifecycle`, `optional`). `injecute` is a regular dependency, not a peer. The testing entry's
+`createTestPlatform(fakes)` applies the fakes as the first plugin.
 
 ## Fixing errors
 

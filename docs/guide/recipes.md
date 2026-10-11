@@ -1,6 +1,6 @@
 ---
 title: Recipes
-description: A unit of work per operation, a fork per request, configuration-driven implementations, feature modules, sharing services between containers.
+description: A unit of work per operation, a fork per request, configuration-driven implementations, feature modules, a module's private services, an SDK for other teams, sharing services between containers.
 ---
 
 # Recipes
@@ -50,6 +50,33 @@ Keep each module in a wiring file of its own; see
 
 When a module expects a service under another key or in another shape, see
 [Adapting a module's dependencies](./containers.md#adapting-a-module-s-dependencies).
+
+## A module's private services
+
+Register services only a module uses under symbol keys, and apply the module as a namespace:
+
+```ts
+const cache = Symbol('cache'); // not exported
+
+const addCatalog = (c: ServiceRegistry<{ db: Database }>) =>
+  c
+    .addSingleton(cache, () => new Map<string, string>())
+    .addSingleton('products', ProductService, ['db', cache]);
+
+app.namespace('Catalog', addCatalog); // 'Catalog.products' resolves; the cache doesn't
+```
+
+See [Private services](./containers.md#private-services).
+
+## An SDK for other teams
+
+Build the SDK's services in a container of its own (a new one per call), and give consumers an object
+typed by the SDK's interface:
+
+<<< @/../examples/sdk/platform-sdk.ts#create
+
+Consumers get lazy services, `start()` and `stop()`, plugins that replace, decorate or extend its
+services, and a test kit. See [Building an SDK](./sdk.md).
 
 ## Sharing services between independent containers
 

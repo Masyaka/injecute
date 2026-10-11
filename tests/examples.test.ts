@@ -33,6 +33,8 @@ describe('examples', () => {
       testScope,
       withBilling,
       withNamespace,
+      shop,
+      cache,
       host,
       root,
       perRequest,
@@ -44,6 +46,15 @@ describe('examples', () => {
     expect(withBilling.get('invoices').db).toBeInstanceOf(Database);
     expect(withNamespace.get('Reports.daily').kind).toBe('daily');
     expect(withNamespace.get('Reports').get('timezone')).toBe('UTC');
+    expect(shop.get('Catalog.products').prices).toBeInstanceOf(Map);
+    expect(shop.keys).toEqual(['dbUrl', 'db', 'Catalog', 'Catalog.products']);
+    expect(() => (shop as unknown as DIContainer<any>).get(cache)).toThrow(
+      expect.objectContaining({ code: 'INJECUTE_NOT_REGISTERED' }),
+    );
+    const shopTest = shop
+      .fork({ isolated: true })
+      .addInstance('dbUrl', 'postgres://test', { replace: true });
+    expect(shopTest.get('Catalog.products').db.url).toBe('postgres://test');
     expect(host.get('Audit.audit').dbUrl).toBe('postgres://audit');
     expect(host.get('Audit.audit').log).toBe(host.get('logger'));
     expect(host.has('dbUrl')).toBe(false);
@@ -305,6 +316,119 @@ describe('examples', () => {
       'smtp → ada@example.com',
     );
   });
+  it('sdk: the platform SDK and its consumer', async () => {
+    const { testCheckout, testApp, createApp } =
+      await import('../examples/sdk/consumer.ts');
+    const telemetry = {
+      method: 'POST',
+      path: '/telemetry',
+      body: {
+        service: 'test',
+        events: [{ name: 'checkout.started', data: { flow: 'one-click' } }],
+      },
+    };
+    expect(await testCheckout()).toEqual([
+      { method: 'GET', path: '/flags', body: undefined },
+      telemetry,
+    ]);
+    const { flow, sent } = await testApp();
+    expect(flow).toBe('one-click');
+    expect(sent).toEqual([
+      { method: 'GET', path: '/flags', body: undefined },
+      telemetry,
+    ]);
+    // registering the SDK starts nothing
+    expect(createApp().has('platform')).toBe(true);
+  });
+
+  it('sdk: plugins', async () => {
+    const { testPlugins, viaGateway, recordRequests, FakeTransport } =
+      await import('../examples/sdk/consumer.ts');
+    const { createTestPlatform } =
+      await import('../examples/sdk/platform-sdk.ts');
+
+    // decorate and contribute
+    const { requests, received } = await testPlugins();
+    expect(requests).toEqual(['GET /flags', 'POST /telemetry']);
+    expect(received).toEqual([
+      { name: 'checkout.started', data: { flow: 'one-click' } },
+    ]);
+
+    // replace: the gateway gets every request, and a later plugin decorates the gateway
+    const fake = new FakeTransport();
+    const gateway = new FakeTransport({ beta: true });
+    const log: string[] = [];
+    const platform = createTestPlatform(
+      { transport: fake },
+      { plugins: [viaGateway(gateway), recordRequests(log)] },
+    );
+    await platform.start();
+    expect(platform.flags.isEnabled('beta')).toBe(true);
+    expect(fake.sent).toEqual([]);
+    expect(log).toEqual(['GET /flags']);
+    await platform.stop();
+  });
+
+  it('sdk: the SDK object', async () => {
+    const { createPlatform, createTestPlatform } =
+      await import('../examples/sdk/platform-sdk.ts');
+    const { FakeTransport } = await import('../examples/sdk/consumer.ts');
+
+    // lazy: nothing is sent before a service is used or start() is called
+    const fetch = vi.fn(async () => Response.json({ beta: true }));
+    const platform = createPlatform({
+      service: 'checkout',
+      apiUrl: 'https://platform.test',
+      token: 't',
+      fetch,
+    });
+    expect(Object.keys(platform)).toEqual([
+      'api',
+      'flags',
+      'telemetry',
+      'start',
+      'stop',
+    ]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await platform.api.get('/flags')).toEqual({ beta: true });
+    const [url, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit];
+    expect(String(url)).toBe('https://platform.test/flags');
+    expect(init.headers).toMatchObject({
+      authorization: 'Bearer t',
+      'x-service': 'checkout',
+    });
+
+    // stop() without start() disposes; twice is fine; services are gone afterwards
+    await platform.stop();
+    await platform.stop();
+    expect(() => platform.api).toThrow(
+      expect.objectContaining({ code: 'INJECUTE_DISPOSED' }),
+    );
+
+    // a failing transport: flags keep their values and warn, stop() still works
+    const warn = vi.fn();
+    const failing = createTestPlatform(
+      {
+        transport: {
+          send: async () => {
+            throw new Error('offline');
+          },
+        },
+      },
+      { logger: { warn } },
+    );
+    await failing.start();
+    expect(failing.flags.isEnabled('beta')).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('offline'));
+    await failing.stop();
+
+    // instances share nothing
+    const a = createTestPlatform({ transport: new FakeTransport() });
+    const b = createTestPlatform({ transport: new FakeTransport() });
+    expect(a.flags).not.toBe(b.flags);
+    await Promise.all([a.stop(), b.stop()]);
+  });
+
   it('real world: context, logger, tracer and namespaces', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { responses, traces } = await import('../examples/real-world.ts');

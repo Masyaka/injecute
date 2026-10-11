@@ -51,6 +51,24 @@ withNamespace.get('Reports.daily'); // { users, kind: 'daily' }
 withNamespace.get('Reports').get('timezone'); // "UTC"
 // #endregion namespaces
 
+// #region private
+const cache = Symbol('cache'); // not exported: only this module has the key
+
+const addCatalog = (c: ServiceRegistry<{ db: Database }>) =>
+  c
+    .addSingleton(cache, () => new Map<string, string>())
+    .addSingleton('products', (db, prices) => ({ db, prices }), ['db', cache]);
+
+const shop = new DIContainer()
+  .addInstance('dbUrl', 'postgres://prod')
+  .addSingleton('db', Database, ['dbUrl'])
+  .namespace('Catalog', addCatalog);
+
+shop.get('Catalog.products'); // resolves, with the private cache
+shop.keys; // ['dbUrl', 'db', 'Catalog', 'Catalog.products']: no cache
+// shop.get(cache); // type error, and INJECUTE_NOT_REGISTERED at runtime
+// #endregion private
+
 // #region adapt
 interface Logger {
   info(message: string): void;
@@ -96,6 +114,8 @@ export {
   testScope,
   withBilling,
   withNamespace,
+  shop,
+  cache,
   host,
   root,
   perRequest,
