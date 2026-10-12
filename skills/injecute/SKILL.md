@@ -132,12 +132,16 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     as an argument; register a factory and let the caller own the instance with `using`
     (`using work = unitOfWork.begin()`, a unit of work for a transaction); read it from the context
     accessor; keep one instance per context in a singleton (a `WeakMap` keyed by the context object, for
-    caches and DataLoaders); pick a per-tenant implementation in a singleton by the context (Strategy).
-    Forks per request make the container structure hard to follow.
+    caches and DataLoaders); for a resource several layers share and the request must release (a
+    transaction), add it to a per-request resources object the host releases with `await using`; pick a
+    per-tenant implementation in a singleton by the context (Strategy). Forks per request make the
+    container structure hard to follow.
 16. `app.fork()` is a child container: it sees the parent's services and shares the parent's singletons;
     what it registers stays in the fork, and parent services can't depend on it. Fork per request only
     for a group of services that share per-request instances and depend on the app's services; fork the
-    root in one place and dispose it: `await using scope = app.fork().addSingleton('tx', …)`.
+    root in one place and dispose it: `await using scope = app.fork().addSingleton('tx', …)`. With
+    modules, give each feature a root module and a request module, and apply every request module in
+    that one place. There is no scoped lifetime: a singleton must not depend on a request service.
 17. In tests, override with an isolated fork. Every service it resolves is built inside the fork, so the
     override reaches the whole graph and `app` is untouched:
 

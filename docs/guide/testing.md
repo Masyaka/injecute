@@ -16,6 +16,10 @@ everything resolved through it uses the replacement; the app container is untouc
 
 `await using` disposes whatever the test created, even when an assertion throws.
 
+Forks made from the isolated fork, such as one fork per request, get the replacement too. To replace a
+service that a fork per request registers, see
+[Testing per-request services](./request-state.md#testing-per-request-services).
+
 ## Override one cached value: `setCacheInstance`
 
 <<< @/../examples/testing.ts#set-cache-instance

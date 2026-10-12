@@ -244,6 +244,75 @@ describe('examples', () => {
     ]);
   });
 
+  it('recipes: request resources', async () => {
+    const { handle, log, perRequest, RequestResources } =
+      await import('../examples/recipes/request-resources.ts');
+    await Promise.all([handle('book', 1), handle('cup', 2)]);
+    await expect(handle('pen', 0)).rejects.toThrow('at least 1');
+    expect(log).toEqual([
+      'tx1: insert book',
+      'tx2: insert cup',
+      'tx1: charge 10',
+      'tx1: commit',
+      'tx2: charge 20',
+      'tx2: commit',
+      'tx3: insert pen',
+      'tx3: rollback',
+    ]);
+
+    // outside a request
+    const tx = perRequest({ current: () => undefined }, () => ({
+      [Symbol.dispose]() {},
+    }));
+    expect(() => tx.current()).toThrow(/No request context/);
+
+    // releases in reverse, all of them, and reports the failures together
+    const released: string[] = [];
+    const resources = new RequestResources();
+    resources.add({ [Symbol.dispose]: () => void released.push('a') });
+    resources.add({
+      [Symbol.asyncDispose]: async () => {
+        released.push('b');
+        throw new Error('b failed');
+      },
+    });
+    resources.add({ [Symbol.dispose]: () => void released.push('c') });
+    await expect(resources[Symbol.asyncDispose]()).rejects.toThrow(
+      AggregateError,
+    );
+    expect(released).toEqual(['c', 'b', 'a']);
+  });
+
+  it('recipes: request modules', async () => {
+    const { handle, log, charged, app } =
+      await import('../examples/recipes/request-modules.ts');
+    // the example's own test runs
+    expect(charged).toEqual([20]);
+    expect(log).toEqual([
+      'tx1: begin on memory',
+      'tx1: insert book',
+      'tx1: charge 10 via stripe',
+      'tx1: commit',
+      'tx1: begin on postgres',
+      'tx1: insert pen',
+      'tx1: commit',
+    ]);
+    log.length = 0;
+    await handle('book', 1);
+    await expect(handle('pen', 0)).rejects.toThrow('at least 1');
+    expect(log).toEqual([
+      'tx2: begin on postgres',
+      'tx2: insert book',
+      'tx2: charge 10 via stripe',
+      'tx2: commit',
+      'tx3: begin on postgres',
+      'tx3: insert pen',
+      'tx3: rollback',
+    ]);
+    // the root has no per-request services
+    expect(app.has('tx')).toBe(false);
+  });
+
   it('request context: host', async () => {
     const { lines } = await import('../examples/request-context/app.ts');
     const { app, handle, consume } =

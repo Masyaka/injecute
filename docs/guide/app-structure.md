@@ -137,6 +137,10 @@ export const createApp = () =>
     .seal();
 ```
 
+A feature with services that belong to one request, registered in a fork per request, exports a
+second module for the fork; see
+[Per-request registrations in modules](./request-state.md#per-request-registrations-in-modules).
+
 What belongs in a wiring file: imports of classes and factories, registrations, and small adapters
 (`(config) => config.port`). What doesn't: business logic, classes, side effects on import, and built
 containers. Export a module function or `createApp()`, never a container created at the top of the file.
