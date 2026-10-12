@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://masyaka.github.io/injecute/
+    about: Guides, recipes, the API reference and every error code.
+  - name: Report a security vulnerability
+    url: https://github.com/Masyaka/injecute/security/advisories/new
+    about: Please report vulnerabilities privately, not as an issue.

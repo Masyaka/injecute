@@ -1,33 +1,42 @@
-import { ArgumentsKey, ContainerServices, IDIContainer } from '../types';
+import { isThenable } from '../internal.ts';
+import type {
+  AsyncServiceProvider,
+  ContainerServices,
+  ServiceKey,
+  ServiceProvider,
+} from '../types.ts';
 
 /**
- * Use for warm up listed or predicated services.
- * Can be useful to check services for right configuration.
- * @example ```
- * preload(container, (k) => k.startsWith('Feature.Domain.'))
- * ```
+ * Resolves services up front, for example at startup, so configuration errors surface immediately.
+ * Without `keys` it resolves every visible service; pass a list of keys or a predicate to narrow it.
  *
- * @param container
- * @param keys
+ * The returned promise settles once the async services (factories that return promises, and every
+ * service of an {@link AsyncDIContainer}) are created, and rejects with the first failure: `await` it.
+ * Synchronous failures of a sync container still throw immediately.
+ *
+ * @example
+ * ```ts
+ * await preload(app); // everything
+ * await preload(app, ['db', 'cache']);
+ * await preload(app, (key) => String(key).startsWith('Billing.'));
+ * ```
  */
-export const preload = <
-  C extends IDIContainer<any>,
-  S extends ContainerServices<C>,
-  K extends keyof S,
->(
+export function preload<C extends ServiceProvider | AsyncServiceProvider>(
   container: C,
-  keys?: K[] | ((k: K) => boolean),
-) => {
-  let toPreload: ArgumentsKey[];
-  if (keys === undefined) {
-    toPreload = container.keys;
-  } else if (Array.isArray(keys)) {
-    toPreload = keys;
-  } else {
-    toPreload = (container.keys as K[]).filter(keys);
+  keys?:
+    readonly (keyof ContainerServices<C>)[] | ((key: ServiceKey) => boolean),
+): Promise<void> {
+  const selected =
+    keys === undefined
+      ? container.keys
+      : typeof keys === 'function'
+        ? container.keys.filter(keys)
+        : keys;
+  const provider = container as unknown as ServiceProvider<any>;
+  const pending: PromiseLike<unknown>[] = [];
+  for (const key of selected) {
+    const value: unknown = provider.get(key);
+    if (isThenable(value)) pending.push(value);
   }
-
-  for (const key of toPreload) {
-    container.get(key);
-  }
-};
+  return Promise.all(pending).then(() => undefined);
+}

@@ -1,0 +1,170 @@
+// Compiled by tests/types-consumer/run.mjs against the packed tarball with skipLibCheck: false,
+// on the oldest supported TypeScript version and the latest one. Keep it using every public API.
+import {
+  addNamedResolvers,
+  AsyncDIContainer,
+  buildServicesGraph,
+  collect,
+  construct,
+  createLifecycle,
+  createTag,
+  createNamedResolvers,
+  createProxyAccessor,
+  createResolversTuple,
+  defer,
+  DIContainer,
+  lifecycle,
+  optional,
+  preload,
+  setCacheInstance,
+  startLifecycle,
+  startable,
+  type LifecycleHook,
+  type RunningLifecycle,
+  type AsyncServiceProvider,
+  type AsyncServiceRegistry,
+  type Middleware,
+  type ServiceProvider,
+  type ServiceRegistry,
+} from 'injecute';
+
+class Logger {
+  log(message: string): string {
+    return message;
+  }
+}
+class Repo {
+  constructor(
+    readonly logger: Logger,
+    readonly url: string,
+  ) {}
+}
+
+const timing: Middleware = (_key, next, { depth }) =>
+  depth >= 0 ? next() : undefined;
+
+const addBilling = (c: ServiceRegistry<{ url: string }>) =>
+  c.addSingleton('billing', (url) => url.length, ['url']);
+
+const app = new DIContainer()
+  .addInstance('url', 'postgres://')
+  .addSingleton('logger', Logger)
+  .addSingleton('repo', Repo, ['logger', 'url'])
+  .addSingleton('legacyRepo', construct(Repo), ['logger', 'url'])
+  .addSingleton('maybe', (m) => m, [optional('missing')])
+  .addSingleton('conn', () => ({ close() {} }), {
+    dependencies: [],
+    dispose: (conn) => conn.close(),
+  })
+  .addAlias('log', 'logger')
+  .addTransient(
+    'asyncUrl',
+    defer((repo: Repo) => repo.url),
+    ['repo'],
+  )
+  .extend(addBilling)
+  .namespace('Domain', (d) =>
+    d.addSingleton('svc', (repo) => ({ repo }), ['repo']),
+  )
+  .use(timing);
+
+const repo: Repo = app.get('repo');
+const logger: Logger = app.get('log');
+const maybe: undefined = app.get('maybe');
+const asyncUrl: Promise<string> = app.get('asyncUrl');
+const billing: number = app.get('billing');
+const svc: { repo: Repo } = app.get('Domain.svc');
+const domainSvc: { repo: Repo } = app.get('Domain').get('svc');
+const sealedApp = new DIContainer().addInstance('url', 'x').seal();
+const sealedUrl: string = sealedApp.fork().addInstance('n', 1).get('url');
+const [getRepo] = createResolversTuple(app, ['repo']);
+const named = createNamedResolvers(app, ['url', ['logger', 'lg']]);
+const lg: Logger = named.lg();
+const proxy = createProxyAccessor(app, { keys: ['repo', ['url', 'dsn']] });
+const dsn: string = proxy.dsn;
+preload(app, ['repo']);
+setCacheInstance(app, 'url', 'mysql://');
+const graph = buildServicesGraph(app);
+const shared = new DIContainer().extend(
+  addNamedResolvers(createNamedResolvers(app, ['url'])),
+);
+const sharedUrl: string = shared.get('url');
+const scope = app.fork({ isolated: true }).addInstance('request', { id: 1 });
+const id: number = scope.get('request').id;
+const consume = (p: ServiceProvider<{ url: string }>) => p.get('url');
+consume(app);
+void app.dispose();
+
+// @ts-expect-error unknown key
+app.get('nope');
+// @ts-expect-error wrong dependency type
+app.addSingleton('bad', (n: number) => n, ['url']);
+// @ts-expect-error a provider cannot register
+(app as ServiceProvider<{ url: string }>).addInstance('x', 1);
+
+const addAsyncRepo = (
+  c: AsyncServiceRegistry<{ logger: Logger; url: string }>,
+) => c.addSingleton('repo', Repo, ['logger', 'url']);
+const asyncApp = new AsyncDIContainer()
+  .addSingleton('logger', Logger)
+  .addSingleton('url', async () => 'postgres://')
+  .extend(addAsyncRepo);
+const readAsync = (p: AsyncServiceProvider<{ repo: Repo }>) => p.get('repo');
+const asyncRepo: Promise<Repo> = readAsync(asyncApp.fork());
+const asyncPreload: Promise<void> = preload(asyncApp);
+const asyncGraph = buildServicesGraph(asyncApp);
+// @ts-expect-error an async container is not a sync ServiceProvider
+consume(asyncApp);
+
+// lifecycle: works without DOM or Node.js types (the signal falls back to AbortSignalLike)
+const stages = createLifecycle(['migrate', 'start']);
+const withHooks = new DIContainer()
+  .addSingleton(lifecycle.start('server'), (): LifecycleHook => () => undefined)
+  .addSingleton(stages.migrate('schema'), () => {});
+const running: Promise<RunningLifecycle> = startLifecycle(withHooks, {
+  concurrent: ['start'],
+  onError: (error, { during }) => [error, during],
+});
+const customRunning = startLifecycle(withHooks, { lifecycle: stages });
+const stopped = running.then((r) => r.stop());
+
+// tags, collect() and startable()
+const route = createTag('route').of<{ path: string }>();
+class Worker {
+  start(): void {}
+}
+const withTags = new DIContainer()
+  .addSingleton(route('home'), () => ({ path: '/' }))
+  .addSingleton('paths', (routes) => routes.map((r) => r.path), [
+    collect(route),
+  ])
+  .extend(startable('worker', Worker, [], { start: (w) => w.start() }));
+const paths: string[] = withTags.get('paths');
+const timed = startLifecycle(withTags, {
+  onHook: ({ key, ms }) => [key, ms],
+});
+
+export {
+  paths,
+  timed,
+  running,
+  customRunning,
+  stopped,
+  asyncRepo,
+  asyncPreload,
+  asyncGraph,
+  repo,
+  logger,
+  maybe,
+  asyncUrl,
+  billing,
+  svc,
+  domainSvc,
+  sealedUrl,
+  getRepo,
+  lg,
+  dsn,
+  graph,
+  sharedUrl,
+  id,
+};

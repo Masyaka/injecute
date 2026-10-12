@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>raw ESM</title>
+<pre id="out">pending</pre>
+<script type="module">
+  import { DIContainer, construct } from '/lib/index.js';
+  class Repo {
+    constructor(db) {
+      this.db = db;
+    }
+  }
+  const container = new DIContainer()
+    .addInstance('db', 'indexeddb')
+    .addSingleton('repo', construct(Repo), ['db']);
+  document.getElementById('out').textContent =
+    container.get('repo').db === 'indexeddb' ? 'ok' : 'wrong';
+</script>

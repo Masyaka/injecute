@@ -2,23 +2,155 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, next]
   pull_request:
-    branches: [main]
+    branches: [main, next]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  check:
+    name: Check (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20.x]
-
+        node-version: [22, 24, 26]
     steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
+          cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npm run check
+
+  changeset:
+    name: Changeset present
+    if: github.event_name == 'pull_request' && github.base_ref == 'next'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Fails when the PR changes the package without a changeset.
+      # Docs/CI-only PRs add an empty one: `npx changeset --empty`.
+      - run: npx changeset status --since=origin/${{ github.base_ref }}
+
+  package:
+    name: Package (publint, attw, JSR)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: npm ci
+      - run: npm run check:package
+      - run: deno check src/index.ts
+      - run: npm run check:jsr
+
+  smoke:
+    name: Smoke (Node ${{ matrix.node-version }}, Deno, Bun)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+      - run: npm run test:smoke
+        env:
+          SMOKE_RUNTIMES: node,deno,bun
+
+  types-consumer:
+    name: Consumer types (TypeScript ${{ matrix.typescript }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        typescript: ['5.2', latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:types-consumer
+        env:
+          TS_VERSION: ${{ matrix.typescript }}
+
+  browser:
+    name: Browsers (no bundler)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build
+      - run: npm run test:browser
+
+  docs:
+    name: Docs (build, links, llms.txt, playground)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # library, package docs (lib/docs, checked against llms.txt), API reference, error pages, site;
+      # VitePress fails on dead internal links
+      - run: npm run docs:build
+      - run: npm run docs:check
+      - name: Check external links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml --no-progress README.md SECURITY.md CONTRIBUTING.md llms.txt 'docs/**/*.md' 'skills/**/*.md' 'lib/docs/**/*.md' 'examples/**/*.ts' 'src/**/*.ts'
+          fail: true
+      - run: npx playwright install --with-deps chromium firefox
+      - run: npm run test:docs
+
+  type-perf:
+    name: Type-check cost (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # A 300-registration chain: ~0.84M instantiations today; 16 nested namespaces: ~0.54M;
+      # 150 extend()/namespace() calls: ~0.51M (fails outright if the types hit the depth limit).
+      - run: npm run bench:types
+        env:
+          TYPE_PERF_BUDGET: '1000000'
+          TYPE_PERF_NAMESPACE_BUDGET: '800000'
+          TYPE_PERF_BOUNDARY_BUDGET: '750000'
