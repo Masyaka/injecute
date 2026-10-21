@@ -987,6 +987,12 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         `"${describeKey(key)}" is already registered in this container.`,
       );
     }
+    if (replace && !existing && !this.#parent?.has(key)) {
+      throw new InjecuteError(
+        'INJECUTE_NOTHING_TO_REPLACE',
+        `"${describeKey(key)}" is registered with { replace: true }, but no container has "${describeKey(key)}" to replace.`,
+      );
+    }
     if (!existing && !replace && this.#parent?.has(key)) {
       throw new InjecuteError(
         'INJECUTE_ALREADY_REGISTERED',

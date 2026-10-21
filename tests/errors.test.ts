@@ -95,6 +95,10 @@ describe('InjecuteError', () => {
     const c = new DIContainer().addInstance('a', 1).addInstance('fn', 2);
     expectCode(() => c.addInstance('a', 2), 'INJECUTE_ALREADY_REGISTERED');
     expectCode(
+      () => c.addInstance('missing', 2, { replace: true }),
+      'INJECUTE_NOTHING_TO_REPLACE',
+    );
+    expectCode(
       () => c.addSingleton('bad', 42 as never),
       'INJECUTE_INVALID_FACTORY',
     );

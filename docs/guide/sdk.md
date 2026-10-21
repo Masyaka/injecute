@@ -127,7 +127,9 @@ A consumer writes plugins with the same calls as any module:
 <<< @/../examples/sdk/consumer.ts#plugins
 
 - **Replace** a service with `replace: true`. The core applies plugins after its own registrations,
-  so the API client, the flags and the telemetry buffer use the new transport.
+  so the API client, the flags and the telemetry buffer use the new transport. Replacing a key the SDK
+  doesn't have throws `INJECUTE_NOTHING_TO_REPLACE`, so a plugin written for another version of the SDK
+  fails at startup instead of adding an unused service.
 - **Decorate** a service by depending on its own key: `inner` is the previous definition. Plugins
   apply in order, so a later plugin decorates what an earlier one registered.
 - **Contribute** to an extension point: the SDK collects every `telemetrySink(…)` with

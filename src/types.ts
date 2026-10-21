@@ -154,6 +154,9 @@ export interface RegistrationOptions<D, R extends boolean = boolean> {
    * In a plain fork the replacement applies to services resolved in the fork: services registered in a
    * parent keep the parent's instance. In an isolated fork it applies to every service resolved through
    * the fork.
+   *
+   * There must be something to replace: `replace: true` for a key that no container has throws
+   * `INJECUTE_NOTHING_TO_REPLACE`.
    */
   replace?: R;
 }
