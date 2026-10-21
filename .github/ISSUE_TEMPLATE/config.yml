@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ask a question
+    url: https://github.com/Masyaka/injecute/discussions/categories/q-a
+    about: Questions about using injecute. Answers stay searchable for others.
+  - name: Propose an idea
+    url: https://github.com/Masyaka/injecute/discussions/categories/ideas
+    about: Discuss a feature or a change of direction before opening an issue.
   - name: Documentation
     url: https://masyaka.github.io/injecute/
     about: Guides, recipes, the API reference and every error code.
