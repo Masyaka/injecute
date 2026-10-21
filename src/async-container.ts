@@ -24,6 +24,7 @@ import type {
   ServiceKey,
   SingletonFactoryOptions,
   Registered,
+  AliasOptions,
   SealedAsyncDIContainer,
 } from './types.ts';
 
@@ -145,11 +146,16 @@ export interface AsyncDIContainer<
     Registered<S, { [P in RegisteredKey<K>]: Awaited<T> }, R>
   >;
 
-  addAlias<K extends ServiceKey, T extends AliasTarget<K, S>>(
+  addAlias<
+    K extends ServiceKey,
+    T extends AliasTarget<K, S>,
+    const R extends boolean = false,
+  >(
     key: K,
     target: T,
+    options?: AliasOptions<R>,
   ): AsyncDIContainer<
-    S & { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }
+    Registered<S, { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }, R>
   >;
 
   namespace<const N extends string, NA extends object, Req extends object = S>(

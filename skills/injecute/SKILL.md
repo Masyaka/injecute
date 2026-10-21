@@ -69,7 +69,9 @@ const users = app.get('users'); // UserRepository
 c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain, or reassign:
    `const c2 = c.addInstance('a', 1)`.
 5. Registering a key twice in the same container throws `INJECUTE_ALREADY_REGISTERED`. Pass
-   `{ replace: true }` to replace it. A fork may register a key its parent has without `replace`.
+   `{ replace: true }` to replace it. A fork needs `{ replace: true }` too, to register a key its parent
+   has; in a plain fork the override reaches only services resolved in the fork (parent services keep
+   the parent's instance), in an isolated fork every service.
 6. A dependency on the key being registered receives its **previous definition**, so decoration is:
    `.addSingleton('logger', (logger) => withPrefix(logger), { replace: true, dependencies: ['logger'] })`.
 7. Optional dependencies are `optional('key')` (the service, or `undefined`). A function dependency

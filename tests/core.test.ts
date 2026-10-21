@@ -62,11 +62,14 @@ describe('core resolution model', () => {
   });
 
   describe('decorating with a self dependency (C4)', () => {
-    it('a child decorates a parent service without replace', () => {
+    it('a child decorates a parent service with replace', () => {
       const parent = new DIContainer().addInstance('log', 'L');
       const child = parent
         .fork()
-        .addSingleton('log', (log) => `wrapped(${log})`, ['log']);
+        .addSingleton('log', (log) => `wrapped(${log})`, {
+          dependencies: ['log'],
+          replace: true,
+        });
       expect(child.get('log')).toBe('wrapped(L)');
       expect(parent.get('log')).toBe('L');
     });
@@ -99,7 +102,7 @@ describe('core resolution model', () => {
       const c = new DIContainer()
         .addInstance('a', 1)
         .fork()
-        .addInstance('a', 2);
+        .addInstance('a', 2, { replace: true });
       expect(c.keys).toEqual(['a']);
     });
   });

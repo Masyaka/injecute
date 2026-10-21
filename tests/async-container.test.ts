@@ -169,7 +169,10 @@ describe('AsyncDIContainer', () => {
     );
     const child = app
       .fork()
-      .addSingleton('greeting', (previous) => `${previous}!`, ['greeting']);
+      .addSingleton('greeting', (previous) => `${previous}!`, {
+        dependencies: ['greeting'],
+        replace: true,
+      });
     expect(await child.get('greeting')).toBe('hello!');
   });
 
