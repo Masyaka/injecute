@@ -3,7 +3,10 @@
   "name": "@masyaka/injecute",
   "version": "1.0.0-rc.1",
   "license": "MIT",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hints": "./src/hints-entry.ts"
+  },
   "publish": {
     "include": ["src/**/*.ts", "README.md", "LICENSE"]
   }

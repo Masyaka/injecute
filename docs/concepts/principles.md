@@ -121,12 +121,14 @@ typecheck.
 
 Places where injecute bends a principle on purpose. Each one is documented where it applies.
 
-| Principle                     | Exception                                                                                          | Why                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 8. Keys are names             | `name:tag` keys: `collect()` gathers them, and `startLifecycle()` runs and validates them as hooks | extension points and hooks without a registry API, typed through tags    |
-| 9. Resolution follows deps    | `collect(tag)` results and the hooks of one stage come in registration order (the root's first)    | an order that is predictable, without priorities                         |
-| Keeping the direction, test 6 | `setCacheInstance()`, the lifecycle and `buildServicesGraph()` use internal container symbols      | they need state the public API doesn't expose                            |
-| Keeping the direction, test 7 | `startLifecycle()` remembers each container's run outside the container                            | a running lifecycle is not a service, and must not be reset by `reset()` |
+| Principle                      | Exception                                                                                          | Why                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 8. Keys are names              | `name:tag` keys: `collect()` gathers them, and `startLifecycle()` runs and validates them as hooks | extension points and hooks without a registry API, typed through tags    |
+| 9. Resolution follows deps     | `collect(tag)` results and the hooks of one stage come in registration order (the root's first)    | an order that is predictable, without priorities                         |
+| Keeping the direction, test 6  | `setCacheInstance()`, the lifecycle and `buildServicesGraph()` use internal container symbols      | they need state the public API doesn't expose                            |
+| Keeping the direction, test 7  | `startLifecycle()` remembers each container's run outside the container                            | a running lifecycle is not a service, and must not be reset by `reset()` |
+| 11. Errors say how to fix them | browser production bundles print no hint line; the message, `code` and `docs` link stay            | about 1.5 kB gzipped less in browser bundles; `injecute/hints` adds them |
+| Keeping the direction, test 7  | `import 'injecute/hints'` registers the hints in module state, for every container                 | it configures how errors print, not a service                            |
 
 ## Keeping the direction
 

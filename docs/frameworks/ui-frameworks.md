@@ -375,6 +375,13 @@ An app that lives as long as the page doesn't need to dispose its core: the brow
 when the page closes. Dispose it when the UI is removed and the page stays; see
 [Widgets](#widgets-one-core-per-mount).
 
+::: tip Error hints in the browser
+Production builds leave the "how to fix it" hints out of injecute's error messages; development builds
+with Vite or webpack keep them. With another bundler, or to have them in any build, import
+`injecute/hints` in the entry point: see
+[Hints in browser bundles](../errors/index.md#hints-in-browser-bundles).
+:::
+
 ## Tests
 
 Render the component with an isolated fork of the core that replaces a service. The fork creates

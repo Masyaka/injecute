@@ -13,5 +13,5 @@
     "stripInternal": true
   },
   "include": [],
-  "files": ["./src/index.ts"]
+  "files": ["./src/index.ts", "./src/hints-entry.ts"]
 }

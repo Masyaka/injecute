@@ -27,7 +27,9 @@
     "functional",
     "fp"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./lib/hints-entry.js"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -38,7 +40,20 @@
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./hints": {
+      "types": "./lib/hints-entry.d.ts",
+      "default": "./lib/hints-entry.js"
+    },
     "./package.json": "./package.json"
+  },
+  "imports": {
+    "#injecute-browser-hints": {
+      "development": "./lib/hints-full.js",
+      "default": "./lib/hints-none.js"
+    }
+  },
+  "browser": {
+    "./lib/hints.js": "./lib/hints.browser.js"
   },
   "files": [
     "lib",
@@ -62,7 +77,7 @@
     "check:versions": "node scripts/sync-jsr-version.mjs --check",
     "check:jsr": "deno publish --dry-run --allow-dirty",
     "version-packages": "changeset version && node scripts/sync-jsr-version.mjs && prettier --write CHANGELOG.md jsr.json",
-    "check:package": "npm run build && publint --strict && attw --pack . --profile esm-only && node scripts/check-tarball.mjs",
+    "check:package": "npm run build && publint --strict && attw --pack . --profile esm-only && node scripts/check-tarball.mjs && node scripts/check-browser-hints.mjs",
     "test:smoke": "node tests/smoke/run.mjs",
     "test:types-consumer": "node tests/types-consumer/run.mjs",
     "test:browser": "playwright test -c tests/browser/playwright.config.ts",

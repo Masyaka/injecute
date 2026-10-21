@@ -1,4 +1,5 @@
-// Adds declarations for Symbol.dispose / Symbol.asyncDispose to the npm type declarations.
+// Adds declarations for Symbol.dispose / Symbol.asyncDispose to the npm type declarations, and
+// writes lib/hints.browser.js (below).
 //
 // The sources are compiled with the ESNext.Disposable lib, so the emitted .d.ts files reference
 // `typeof Symbol.asyncDispose`. Projects whose `lib` lacks those symbols (e.g. "ES2022") would then
@@ -44,3 +45,16 @@ for (const file of files(lib)) {
 console.log(
   `postbuild: disposal symbol declarations referenced from ${patched} file(s)`,
 );
+
+// Browser bundles: the "browser" field in package.json swaps lib/hints.js for this file, and the
+// `#injecute-browser-hints` import picks the hints in development builds and none otherwise. Written
+// here, not compiled from src/: TypeScript can't rewrite a `#` import of the package's own build.
+writeFileSync(
+  join(lib, 'hints.browser.js'),
+  `// Added by scripts/postbuild.mjs: the hints of error messages in browser bundles. Development
+// builds (the "development" condition) get every hint, other builds none unless
+// \`import 'injecute/hints'\` registers them. See "Hints in browser bundles" on the Errors page.
+export { hintOf } from '#injecute-browser-hints';
+`,
+);
+console.log('postbuild: wrote lib/hints.browser.js');

@@ -76,6 +76,32 @@ Branch on \`code\`, not on message text.
 | Code | Meaning |
 | --- | --- |
 ${rows.join('\n')}
+
+## Hints in browser bundles
+
+Bundlers that build for browsers leave the hints out of error messages, to keep the bundle small (about
+1.5 kB gzipped). Messages keep what happened and the docs link; \`error.code\` and \`error.docs\` are the
+same everywhere.
+
+| Where it runs | Hints in messages |
+| --- | --- |
+| Node.js, Deno, Bun, server-side rendering, browsers without a bundler | always |
+| Vite and webpack, development (the dev server, \`--mode development\`) | yes |
+| Vite and webpack, production builds | no |
+| esbuild, Rolldown | no, unless you add the \`development\` condition (\`conditions: ['development']\`) |
+
+To have them in any build, import \`injecute/hints\` where you want them:
+
+\`\`\`ts
+// in development only, with any bundler
+if (import.meta.env.DEV) await import('injecute/hints');
+
+// or in every build (staging, or debugging a production build)
+import 'injecute/hints';
+\`\`\`
+
+Without a bundler, and on servers, the import does nothing: those messages have the hints already. An
+error thrown before a dynamic \`import()\` finishes has no hint; a static import doesn't have that gap.
 `,
 );
 console.log(`generated ${rows.length} error pages`);

@@ -244,7 +244,9 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
 
 27. Every error is an `InjecuteError` with a stable `code`, the resolution `path` and a `docs` link.
     Branch on `error.code`, never on the message. Errors thrown by factories arrive wrapped as
-    `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`.
+    `INJECUTE_RESOLUTION_FAILED`; the original error is `error.cause`. Browser production bundles
+    print no `Hint:` line (Vite and webpack development builds do); `import 'injecute/hints'` adds the
+    hints to any build, and `error.docs` links to them.
 
 ## Frameworks
 
