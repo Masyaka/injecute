@@ -1,5 +1,17 @@
 # injecute
 
+## 1.0.0-rc.2
+
+### Major Changes
+
+- [#15](https://github.com/Masyaka/injecute/pull/15) [`f655b3e`](https://github.com/Masyaka/injecute/commit/f655b3ed3ce68eb3c30a4ccf8086f6a1ca26043c) Thanks [@Masyaka](https://github.com/Masyaka)! - **A fork needs `replace: true` to override a parent's key.** Registering a key that a parent container has now throws `INJECUTE_ALREADY_REGISTERED` unless `{ replace: true }` is passed, in plain forks, isolated forks, modules applied to a fork and `namespace()` callbacks. Before, the fork registered it silently, and services registered in the parent kept the parent's instance without anything saying so. The error now says what the override reaches: in a plain fork it names the parent services that depend on the key (directly or through other services) and keep the parent's instance, and how to give them the fork's one. `addAlias()` takes `{ replace: true }` too.
+  
+  Before → after: `app.fork().addInstance('logger', requestLogger)` → `app.fork().addInstance('logger', requestLogger, { replace: true })`. Decorating a parent's service in a fork needs it as well. See [A fork needs `replace: true` to override a parent's key](https://masyaka.github.io/injecute/migration/0.x-to-1.0#a-fork-needs-replace-true-to-override-a-parent-s-key).
+
+- [#17](https://github.com/Masyaka/injecute/pull/17) [`dbcfd55`](https://github.com/Masyaka/injecute/commit/dbcfd552d1a5d95152e6762e2fa8c34a7dfadda4) Thanks [@Masyaka](https://github.com/Masyaka)! - **`replace: true` needs something to replace.** Registering a key with `{ replace: true }` when neither the container nor a parent has that key now throws the new `INJECUTE_NOTHING_TO_REPLACE` error. Before, it quietly registered a new service, so a typo in a test override, or a module that wasn't applied, left the original in place without anything saying so. This applies to `addSingleton`, `addTransient`, `addInstance` and `addAlias`, in every kind of container, module and namespace.
+  
+  Before → after: `new DIContainer().addInstance('config', cfg, { replace: true })` (first registration) → `new DIContainer().addInstance('config', cfg)`. See [A fork needs `replace: true` to override a parent's key](https://masyaka.github.io/injecute/migration/0.x-to-1.0#a-fork-needs-replace-true-to-override-a-parent-s-key).
+
 ## 1.0.0-rc.1
 
 ### Minor Changes
