@@ -1,0 +1,133 @@
+import { DIContainer, type ServiceRegistry } from 'injecute';
+
+class Database {
+  constructor(readonly url: string) {}
+}
+class UserRepository {
+  constructor(readonly db: Database) {}
+}
+
+// #region fork
+const app = new DIContainer()
+  .addInstance('dbUrl', 'postgres://prod')
+  .addSingleton('db', Database, ['dbUrl'])
+  .addSingleton('users', UserRepository, ['db']);
+
+// A fork sees every service of its parent; what it adds stays in the fork.
+const requestScope = app.fork().addInstance('requestId', 'req-1');
+requestScope.get('users') === app.get('users'); // true: parent singletons are shared
+// #endregion fork
+
+// #region fork-override
+// `users` (registered in `app`) depends on `db`: an override in a plain fork doesn't reach it.
+const overridden = app
+  .fork()
+  .addSingleton('db', Database, { dependencies: ['dbUrl'], replace: true });
+overridden.get('users') === app.get('users'); // true: `users` keeps the parent's `db`
+// without { replace: true }: INJECUTE_ALREADY_REGISTERED,
+// "users" (registered in a parent) depends on "db" and keeps the parent's "db"
+// #endregion fork-override
+
+// #region isolated
+// An isolated fork runs every service it resolves itself, so overrides reach the whole graph
+// and nothing leaks back into the parent.
+const testScope = app
+  .fork({ isolated: true })
+  .addInstance('dbUrl', 'postgres://test', { replace: true });
+
+testScope.get('users').db.url; // "postgres://test"
+app.get('users').db.url; // "postgres://prod"
+// #endregion isolated
+
+// #region modules
+// A module declares only the services it needs.
+const addBilling = (c: ServiceRegistry<{ db: Database }>) =>
+  c.addSingleton('invoices', (db) => ({ db, list: () => [] as string[] }), [
+    'db',
+  ]);
+
+const withBilling = app.extend(addBilling); // type error if `db` were missing
+withBilling.get('invoices');
+// #endregion modules
+
+// #region namespaces
+const withNamespace = app.namespace('Reports', (reports) =>
+  reports
+    .addSingleton('daily', (users) => ({ users, kind: 'daily' }), ['users'])
+    .addInstance('timezone', 'UTC'),
+);
+
+withNamespace.get('Reports.daily'); // { users, kind: 'daily' }
+withNamespace.get('Reports').get('timezone'); // "UTC"
+// #endregion namespaces
+
+// #region private
+const cache = Symbol('cache'); // not exported: only this module has the key
+
+const addCatalog = (c: ServiceRegistry<{ db: Database }>) =>
+  c
+    .addSingleton(cache, () => new Map<string, string>())
+    .addSingleton('products', (db, prices) => ({ db, prices }), ['db', cache]);
+
+const shop = new DIContainer()
+  .addInstance('dbUrl', 'postgres://prod')
+  .addSingleton('db', Database, ['dbUrl'])
+  .namespace('Catalog', addCatalog);
+
+shop.get('Catalog.products'); // resolves, with the private cache
+shop.keys; // ['dbUrl', 'db', 'Catalog', 'Catalog.products']: no cache
+// shop.get(cache); // type error, and INJECUTE_NOT_REGISTERED at runtime
+// #endregion private
+
+// #region adapt
+interface Logger {
+  info(message: string): void;
+}
+
+// The module declares the services it needs under its own keys.
+const addAudit = (c: ServiceRegistry<{ dbUrl: string; log: Logger }>) =>
+  c.addSingleton('audit', (dbUrl, log) => ({ dbUrl, log }), ['dbUrl', 'log']);
+
+// The host has them under other keys, or in another shape.
+const host = new DIContainer()
+  .addInstance('config', { auditDb: 'postgres://audit' })
+  .addInstance('logger', { info: () => {} } as Logger)
+  .namespace('Audit', (audit) =>
+    audit
+      .addSingleton('dbUrl', (config) => config.auditDb, ['config']) // derive a value
+      .addAlias('log', 'logger') // the same service under another key
+      .extend(addAudit),
+  );
+
+host.get('Audit.audit').dbUrl; // "postgres://audit"
+host.has('dbUrl'); // false: the adapters stay in the namespace
+// #endregion adapt
+
+// #region seal
+// Register everything, then seal the composition root.
+const root = new DIContainer()
+  .addInstance('dbUrl', 'postgres://prod')
+  .addSingleton('db', Database, ['dbUrl'])
+  .addSingleton('users', UserRepository, ['db'])
+  .seal();
+
+root.get('users'); // resolves as before
+// root.addInstance('flag', true); // type error, and INJECUTE_SEALED at runtime
+
+// Per request or per test, fork it: forks are open for registrations.
+const perRequest = root.fork().addInstance('requestId', 'req-2');
+// #endregion seal
+
+export {
+  app,
+  requestScope,
+  testScope,
+  withBilling,
+  withNamespace,
+  shop,
+  cache,
+  host,
+  root,
+  perRequest,
+  Database,
+};

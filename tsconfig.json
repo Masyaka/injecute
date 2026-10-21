@@ -1,18 +1,20 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "ES2015",
-    "lib": ["es2019"],
-    "esModuleInterop": false,
-    "forceConsistentCasingInFileNames": true,
+    "target": "ES2022",
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": false,
+    "types": ["node"],
+    "noEmit": true,
     "skipLibCheck": true,
-    "allowJs": false,
-    "declaration": true,
-    "declarationMap": true,
-    "allowSyntheticDefaultImports": true,
-    "module": "Node16",
-    "moduleResolution": "node16",
-    "noEmit": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "injecute": ["./src/index.ts"]
+    }
   },
-  "files": ["./src/index.ts"]
+  "include": ["src", "tests", "examples"],
+  "exclude": ["tests/types/fixtures"]
 }

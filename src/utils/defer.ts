@@ -1,31 +1,30 @@
-import { Func } from '../types';
+import { callableOf } from '../internal.ts';
 
-type MayBePromise<T> = T | Promise<T>;
-
-type MayBePromiseTuple<Tuple extends readonly any[]> = Tuple extends readonly [
-  infer Head extends any,
-  ...infer Rest extends readonly any[],
-]
-  ? [MayBePromise<Head>, ...MayBePromiseTuple<Rest>]
-  : [];
+/** Each argument, or a promise of it. */
+export type MaybePromises<T extends readonly unknown[]> = {
+  [I in keyof T]: T[I] | PromiseLike<T[I]>;
+};
 
 /**
- * Awaits all arguments before factory execution.
- * Factory result will be a promise.
- * @param factory
+ * Wraps a factory so it accepts promises for any of its arguments: they are awaited before the factory
+ * runs, and the wrapped factory returns a promise. Use it to register services that depend on async
+ * services in a synchronous container.
+ *
+ * @example
+ * ```ts
+ * app
+ *   .addSingleton('config', () => fetchConfig()) // Promise<Config>
+ *   .addSingleton('db', defer((config: Config) => connect(config.dbUrl)), ['config']);
+ *
+ * const db = await app.get('db');
+ * ```
  */
-export const defer = <
-  Factory extends Func<readonly any[], any>,
-  InitialArgs extends Factory extends Func<infer A, any> ? A : never,
-  ResultArgs extends MayBePromiseTuple<InitialArgs>,
-  Result extends Factory extends Func<any, infer R>
-    ? R extends Promise<infer PR>
-      ? PR
-      : R
-    : never,
->(
-  factory: Factory,
-) => {
-  return async (...dependencies: ResultArgs): Promise<Result> =>
-    Promise.all(dependencies).then((r) => factory(...(r as InitialArgs)));
-};
+export function defer<A extends unknown[], R>(
+  factory: ((...args: A) => R) | (new (...args: A) => R),
+): (...dependencies: MaybePromises<A>) => Promise<Awaited<R>> {
+  const call = callableOf(factory) as (...args: A) => R;
+  return async (...dependencies): Promise<Awaited<R>> => {
+    const resolved = (await Promise.all(dependencies)) as A;
+    return await (call(...resolved) as Awaited<R>);
+  };
+}
