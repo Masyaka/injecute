@@ -2,7 +2,11 @@
 
 Thanks for helping. Bug reports, docs fixes and pull requests are all welcome.
 
-- **Bugs, questions and ideas:** [open an issue](https://github.com/Masyaka/injecute/issues/new/choose).
+- **Bugs:** [open an issue](https://github.com/Masyaka/injecute/issues/new/choose).
+- **Questions:** ask in [Discussions → Q&A](https://github.com/Masyaka/injecute/discussions/categories/q-a).
+- **Ideas and feature proposals:** start in [Discussions → Ideas](https://github.com/Masyaka/injecute/discussions/categories/ideas);
+  once the direction is agreed, it becomes an issue.
+- **Built something with injecute?** Share it in [Discussions → Show and tell](https://github.com/Masyaka/injecute/discussions/categories/show-and-tell).
 - **Security issues:** report them privately, see [SECURITY.md](./SECURITY.md).
 
 ## Setup
@@ -51,6 +55,27 @@ Pick the bump type and write the summary for **users**: what changed and what to
 summaries become `CHANGELOG.md` and the GitHub Release notes. Breaking changes get a one-line
 "before → after" and a link to the migration guide section that explains them. Docs, tests and CI-only
 pull requests add an empty changeset: `npx changeset --empty`. CI fails a pull request without one.
+
+## Maintainers
+
+- [Iurii Barlukov (@Masyaka)](https://github.com/Masyaka): author and lead maintainer.
+
+Want to help maintain injecute? Contribute a few pull requests or answer questions in Discussions,
+then ask in an issue or a discussion.
+
+## How decisions are made
+
+- **Direction:** changes follow the [design principles](./docs/concepts/principles.md). A feature has to
+  pass the tests in [Keeping the direction](./docs/concepts/principles.md#keeping-the-direction); one that
+  bends a principle says so and is added to the Exceptions table. Features decided against are listed in
+  [ROADMAP.md](./ROADMAP.md) with the reasons.
+- **Proposals:** larger changes start as a discussion in
+  [Ideas](https://github.com/Masyaka/injecute/discussions/categories/ideas), so the design is agreed before
+  the code is written. The lead maintainer makes the final call and writes down the reasons.
+- **Reviews:** every pull request is reviewed by a maintainer; a maintainer's own pull requests may be
+  merged after CI passes. Expect a first response to issues and pull requests within a week; security
+  reports are answered first (see [SECURITY.md](./SECURITY.md)).
+- **Releases:** merging the "Version Packages" pull request is the release decision (below).
 
 ## Releasing (maintainers)
 
