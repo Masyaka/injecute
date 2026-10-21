@@ -18,6 +18,16 @@ const requestScope = app.fork().addInstance('requestId', 'req-1');
 requestScope.get('users') === app.get('users'); // true: parent singletons are shared
 // #endregion fork
 
+// #region fork-override
+// `users` (registered in `app`) depends on `db`: an override in a plain fork doesn't reach it.
+const overridden = app
+  .fork()
+  .addSingleton('db', Database, { dependencies: ['dbUrl'], replace: true });
+overridden.get('users') === app.get('users'); // true: `users` keeps the parent's `db`
+// without { replace: true }: INJECUTE_ALREADY_REGISTERED,
+// "users" (registered in a parent) depends on "db" and keeps the parent's "db"
+// #endregion fork-override
+
 // #region isolated
 // An isolated fork runs every service it resolves itself, so overrides reach the whole graph
 // and nothing leaks back into the parent.

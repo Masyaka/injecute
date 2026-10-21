@@ -72,7 +72,10 @@ describe('fork({ isolated: true })', () => {
     const app = new DIContainer()
       .addInstance('log', 'L')
       .fork()
-      .addSingleton('log', (log) => `wrapped(${log})`, ['log']);
+      .addSingleton('log', (log) => `wrapped(${log})`, {
+        dependencies: ['log'],
+        replace: true,
+      });
     const test = app.fork({ isolated: true });
     expect(test.get('log')).toBe('wrapped(L)');
   });

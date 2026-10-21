@@ -10,8 +10,8 @@ export const errorCodes = {
     hint: 'Register it (addSingleton / addTransient / addInstance) before resolving it, check the key for typos, or pass { optional: true } to get undefined instead.',
   },
   INJECUTE_ALREADY_REGISTERED: {
-    title: 'The key is already registered in this container',
-    hint: 'Pass { replace: true } to replace the registration, or use another key. A child container (fork) may register a key its parent has without replace.',
+    title: 'The key is already registered in this container or a parent',
+    hint: "Pass { replace: true } to replace the registration, or use another key. In a fork, { replace: true } is needed to override a parent's key too, and the override reaches only services resolved in the fork: services registered in the parent keep the parent's one. To replace it for every service, use fork({ isolated: true }).",
   },
   INJECUTE_CIRCULAR_DEPENDENCY: {
     title: 'Services depend on each other in a cycle',

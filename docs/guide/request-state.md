@@ -158,6 +158,10 @@ request module, in one place:
 - The types keep the layers apart. A root module can't depend on a request service, because the root
   doesn't have its key, so no singleton keeps the first request's instance. `extend()` checks that the
   root provides what the request modules need.
+- Don't register a request key in the root too (a default `tx`, say): root services that depend on it
+  would keep the root's one. A request module that registers it then throws
+  `INJECUTE_ALREADY_REGISTERED` and names those services (see
+  [Overriding a parent's service in a fork](./containers.md#overriding-a-parent-s-service-in-a-fork)).
 - A service that depends on a request service belongs in the request module too. Keep request modules
   small: what they register is created again in every request that uses it.
 

@@ -147,8 +147,13 @@ export interface RegistrationOptions<D, R extends boolean = boolean> {
   /** Dependency keys, passed to the factory in the same order. */
   dependencies?: D;
   /**
-   * Replace an existing registration of this key in the same container. With `replace: true` the
-   * service's type becomes the new one (see {@link Registered}).
+   * Replace an existing registration of this key: one in the same container, or a parent's one in a
+   * fork (required there too). With `replace: true` the service's type becomes the new one (see
+   * {@link Registered}).
+   *
+   * In a plain fork the replacement applies to services resolved in the fork: services registered in a
+   * parent keep the parent's instance. In an isolated fork it applies to every service resolved through
+   * the fork.
    */
   replace?: R;
 }
@@ -183,13 +188,16 @@ export interface SingletonFactoryOptions<
 
 /** Options for {@link ServiceRegistry.addInstance}. */
 export interface InstanceOptions<T, R extends boolean = boolean> {
-  /**
-   * Replace an existing registration of this key in the same container. With `replace: true` the
-   * service's type becomes the new one (see {@link Registered}).
-   */
+  /** Replace an existing registration of this key (see {@link RegistrationOptions.replace}). */
   replace?: R;
   /** The container does not own added instances; set this to dispose them with the container. Default: `false`. */
   dispose?: DisposeOption<T>;
+}
+
+/** Options for {@link ServiceRegistry.addAlias}. */
+export interface AliasOptions<R extends boolean = boolean> {
+  /** Replace an existing registration of this key (see {@link RegistrationOptions.replace}). */
+  replace?: R;
 }
 
 /** Options for {@link ServiceProvider.get}. */
@@ -559,12 +567,17 @@ export interface ServiceRegistry<
   ): ServiceRegistry<S, Registered<A, { [P in RegisteredKey<K>]: T }, R>>;
 
   /** Makes `key` resolve to the service registered under `target`. */
-  addAlias<K extends ServiceKey, T extends AliasTarget<K, S & A>>(
+  addAlias<
+    K extends ServiceKey,
+    T extends AliasTarget<K, S & A>,
+    const R extends boolean = false,
+  >(
     key: K,
     target: T,
+    options?: AliasOptions<R>,
   ): ServiceRegistry<
     S,
-    A & { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }
+    Registered<A, { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }, R>
   >;
 
   /**
@@ -760,12 +773,17 @@ export interface AsyncServiceRegistry<
   >;
 
   /** Makes `key` resolve to the service registered under `target`. */
-  addAlias<K extends ServiceKey, T extends AliasTarget<K, S & A>>(
+  addAlias<
+    K extends ServiceKey,
+    T extends AliasTarget<K, S & A>,
+    const R extends boolean = false,
+  >(
     key: K,
     target: T,
+    options?: AliasOptions<R>,
   ): AsyncServiceRegistry<
     S,
-    A & { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }
+    Registered<A, { [P in RegisteredKey<K>]: ResolveDependency<T, S, A> }, R>
   >;
 
   /**

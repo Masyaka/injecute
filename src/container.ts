@@ -48,6 +48,7 @@ import type {
   ServiceType,
   SingletonFactoryOptions,
   Registered,
+  AliasOptions,
   SealedDIContainer,
 } from './types.ts';
 
@@ -307,8 +308,9 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    *
    * @remarks Classes compiled to ES5 and bound classes cannot be detected; register them with
    * {@link construct}.
-   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` when `key` is registered in this container
-   * (pass `replace: true`), `INJECUTE_CIRCULAR_DEPENDENCY` when the dependencies form a cycle.
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` when `key` is registered in this container or
+   * a parent (pass `replace: true`; in a plain fork the override reaches only services resolved in the
+   * fork), `INJECUTE_CIRCULAR_DEPENDENCY` when the dependencies form a cycle.
    *
    * @example
    * ```ts
@@ -388,17 +390,28 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
   }
 
   /**
-   * Makes `key` resolve to the service registered under `target`.
+   * Makes `key` resolve to the service registered under `target`. Pass `replace: true` to replace an
+   * existing registration of `key`, here or in a parent.
+   *
+   * @throws {InjecuteError} `INJECUTE_ALREADY_REGISTERED` (see {@link addSingleton}).
    *
    * @example
    * ```ts
    * app.addAlias('logger', config.production ? 'jsonLogger' : 'prettyLogger');
+   * app.fork().addAlias('logger', 'prettyLogger', { replace: true }); // in this fork only
    * ```
    */
-  addAlias<K extends ServiceKey, T extends AliasTarget<K, S>>(
+  addAlias<
+    K extends ServiceKey,
+    T extends AliasTarget<K, S>,
+    const R extends boolean = false,
+  >(
     key: K,
     target: T,
-  ): DIContainer<S & { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }> {
+    options?: AliasOptions<R>,
+  ): DIContainer<
+    Registered<S, { [P in RegisteredKey<K>]: ResolveDependency<T, {}, S> }, R>
+  > {
     this.#assertNotSealed(`"${describeKey(key)}" cannot be registered`);
     this.#register(
       {
@@ -408,7 +421,7 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         target,
         dependencies: [{ type: 'key', key: target }],
       },
-      false,
+      !!options?.replace,
     );
     return this as any;
   }
@@ -974,6 +987,12 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
         `"${describeKey(key)}" is already registered in this container.`,
       );
     }
+    if (!existing && !replace && this.#parent?.has(key)) {
+      throw new InjecuteError(
+        'INJECUTE_ALREADY_REGISTERED',
+        this.#parentOverrideMessage(key),
+      );
+    }
     const usesPrevious = reg.dependencies.some((d) => d.type === 'previous');
     if (usesPrevious && !existing && !this.#parent?.has(key)) {
       throw new InjecuteError(
@@ -1003,6 +1022,85 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
       container: this.#view(),
       kind: stored.kind,
     });
+  }
+
+  /**
+   * Why registering `key` in this fork needs `replace: true`, and what the override reaches. Only built
+   * when the error is thrown, so forks that register new keys pay nothing for it.
+   */
+  #parentOverrideMessage(key: ServiceKey): string {
+    const k = `"${describeKey(key)}"`;
+    const head = `${k} is registered in a parent container.`;
+    if (this.#isolated) {
+      return `${head} Pass { replace: true } to override it in this isolated fork: every service resolved through the fork uses the replacement.`;
+    }
+    const dependents = this.#parent!.#dependentsOf(key);
+    if (dependents.length === 0) {
+      return `${head} Pass { replace: true } to override it in this fork only.`;
+    }
+    const shown = dependents.slice(0, 5).map((d) => `"${describeKey(d)}"`);
+    const more = dependents.length - shown.length;
+    const names =
+      more > 0 ? `${shown.join(', ')} and ${more} more` : shown.join(', ');
+    const one = dependents.length === 1;
+    return (
+      `${head} Pass { replace: true } to override it in this fork only: ${names} ` +
+      `(registered in a parent) ${one ? 'depends' : 'depend'} on ${k} and ${one ? 'keeps' : 'keep'} the parent's ${k}. ` +
+      `To give ${one ? 'it' : 'them'} this fork's ${k}, register ${one ? 'it' : 'them'} in this fork too; ` +
+      `to replace ${k} for every service, use fork({ isolated: true }).`
+    );
+  }
+
+  /**
+   * Keys visible from this container whose service depends on `target` (directly or through other
+   * services) as this container resolves it. Walks the registrations only; nothing is resolved.
+   */
+  #dependentsOf(target: ServiceKey): ServiceKey[] {
+    const resolvedTarget = (scope: DIContainer<any>) => {
+      const found = scope.#lookup(target);
+      return found && ('reg' in found ? found.reg : found.override);
+    };
+    const shadowed = resolvedTarget(this);
+    const memo = new Map<DIContainer<any>, Map<ServiceKey, boolean>>();
+    const reaches = (scope: DIContainer<any>, key: ServiceKey): boolean => {
+      let known = memo.get(scope);
+      if (!known) memo.set(scope, (known = new Map()));
+      const cached = known.get(key);
+      if (cached !== undefined) return cached;
+      known.set(key, false); // guards against cycles while walking
+      const found = scope.#lookup(key);
+      const result =
+        !!found && 'reg' in found && regReaches(found.reg, found.owner);
+      known.set(key, result);
+      return result;
+    };
+    const depReaches = (scope: DIContainer<any>, key: ServiceKey) =>
+      (key === target && resolvedTarget(scope) === shadowed) ||
+      reaches(scope, key);
+    const regReaches = (
+      reg: Registration,
+      owner: DIContainer<any>,
+    ): boolean => {
+      if (reg.kind === 'namespace-entry' || reg.kind === 'delegate') {
+        return depReaches(reg.container!, reg.target!);
+      }
+      return reg.dependencies.some((d) => {
+        switch (d.type) {
+          case 'key':
+          case 'optional':
+            return depReaches(owner, d.key);
+          case 'previous':
+            return reg.previous
+              ? regReaches(reg.previous, owner)
+              : !!owner.#parent && depReaches(owner.#parent, reg.key);
+          case 'collect':
+            return owner.#taggedKeys(d.tag).some((k) => depReaches(owner, k));
+          case 'function':
+            return false;
+        }
+      });
+    };
+    return this.keys.filter((k) => k !== target && reaches(this, k));
   }
 
   /** O(V+E) depth-first search over the key dependencies visible from this container. */

@@ -37,7 +37,9 @@ describe('injecute container', () => {
           .addEventListener('reset', parentHandler)
           .fork()
           .addEventListener('reset', handler)
-          .addSingleton('singleton', () => 'singleton value', []);
+          .addSingleton('singleton', () => 'singleton value', {
+            replace: true,
+          });
         container.reset({ keys: ['singleton'], resetParent: true });
         expect(resetContainer).toBe(container);
         container.removeEventListener('reset', handler);
@@ -162,7 +164,7 @@ describe('injecute container', () => {
           .addInstance('cfg', { configVar: 1 })
           .namespace('Generic', (generic) =>
             generic
-              .addTransient('cfg', () => ({ configVar: 1 }), [])
+              .addTransient('cfg', () => ({ configVar: 1 }), { replace: true })
               .addInstance('value', '23'),
           )
           .addInstance('x', 'x')
@@ -430,7 +432,7 @@ describe('injecute container', () => {
             const s = parent.get('s');
             return { ...s, y: 2 };
           },
-          [],
+          { replace: true },
         );
       });
       expect(child.get('s')).toEqual({ x: 1, y: 2 });

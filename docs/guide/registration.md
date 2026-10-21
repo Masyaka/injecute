@@ -51,12 +51,12 @@ app.addSingleton('mailer', createMailer, {
 ## Decorating a service
 
 A dependency on the key being registered receives its **previous definition**: the one it replaces in the
-same container (with `replace: true`), or the parent's one in a [fork](./containers.md#forks).
+same container, or the parent's one in a [fork](./containers.md#forks). Both need `replace: true`.
 
 <<< @/../examples/registration.ts#decorate
 
 With `replace: true` the service's type becomes the new one, also when it changes (a `string` replaced
-by a `number` is a `number` afterwards). Pass it in a fork too when the override changes the type:
+by a `number` is a `number` afterwards), in a fork too:
 
 ```ts
 const scope = app
@@ -64,8 +64,11 @@ const scope = app
   .addInstance('port', 0, { replace: true }); // port: number
 ```
 
-Without `replace: true`, and when a module replaces a service of the container it is applied to, the
-old and the new type are intersected; that is fine while the type stays the same (the usual decorator).
+When a module replaces a service of the container it is applied to, the old and the new type are
+intersected; that is fine while the type stays the same (the usual decorator).
+
+In a plain fork, a decoration (like any override) reaches only the services resolved in the fork: see
+[Overriding a parent's service in a fork](./containers.md#overriding-a-parent-s-service-in-a-fork).
 
 ## Classes that cannot be detected
 

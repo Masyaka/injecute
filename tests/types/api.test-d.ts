@@ -380,3 +380,30 @@ expectTypeOf(
     .use((_k, next) => next())
     .get('a'),
 ).toEqualTypeOf<number>();
+
+// ---- addAlias: replace changes the type, like the other registrations
+const aliased = new DIContainer()
+  .addInstance('json', { format: 'json' as const })
+  .addInstance('port', 8080)
+  .addAlias('target', 'json')
+  .addAlias('target', 'port', { replace: true });
+expectTypeOf(aliased.get('target')).toEqualTypeOf<number>();
+expectTypeOf(
+  aliased.fork().addAlias('target', 'json', { replace: true }).get('target'),
+).toEqualTypeOf<{ format: 'json' }>();
+
+// ---- request modules: a root service can't depend on a key only a request module registers
+class RequestDb {
+  begin() {
+    return { id: 1 };
+  }
+}
+const addRequestTx = (c: ServiceRegistry<{ db: RequestDb }>) =>
+  c.addSingleton('tx', (db) => db.begin(), ['db']);
+const requestRoot = new DIContainer().addSingleton('db', RequestDb);
+// @ts-expect-error 'tx' is registered by the request module, not in the root
+requestRoot.addSingleton('report', (tx: { id: number }) => tx, ['tx']);
+const requestScope = requestRoot.fork().extend(addRequestTx);
+expectTypeOf(
+  requestScope.addSingleton('report', (tx) => tx.id, ['tx']).get('report'),
+).toEqualTypeOf<number>();

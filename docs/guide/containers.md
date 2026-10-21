@@ -26,8 +26,18 @@ fits an argument, a factory with `using` or one instance per context. See
 [Per-request state](./request-state.md).
 :::
 
-It also means that overriding a dependency in a fork does not change parent services that already
-depend on it. For that, use an isolated fork.
+### Overriding a parent's service in a fork
+
+To register a key its parent has, a fork needs `{ replace: true }`, like a replacement in the same
+container. The override reaches only the services resolved in the fork: a service registered in the
+parent runs in the parent and keeps the parent's instance. Without `replace: true` the fork throws
+`INJECUTE_ALREADY_REGISTERED`, and the message names the parent services that would keep the parent's
+one:
+
+<<< @/../examples/containers.ts#fork-override
+
+To give a parent service the fork's instance, register that service in the fork too. To replace a
+dependency for every service, use an isolated fork.
 
 ## Isolated forks
 
