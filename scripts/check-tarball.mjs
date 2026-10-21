@@ -4,11 +4,13 @@
 // Run after a build (`npm run build`, or `attw --pack`, which runs prepack).
 import { execFileSync } from 'node:child_process';
 
-const [pack] = JSON.parse(
+const packed = JSON.parse(
   execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
     encoding: 'utf8',
   }),
 );
+// npm ≤ 11 prints an array of packages, npm 12 an object keyed by package name
+const pack = Array.isArray(packed) ? packed[0] : Object.values(packed)[0];
 const files = pack.files.map((file) => file.path);
 
 const required = [
@@ -20,6 +22,12 @@ const required = [
   'lib/index.js',
   'lib/index.d.ts',
   'lib/index.d.ts.map',
+  'lib/hints.js',
+  'lib/hints.browser.js',
+  'lib/hints-full.js',
+  'lib/hints-none.js',
+  'lib/hints-entry.js',
+  'lib/hints-entry.d.ts',
   'src/index.ts',
   'lib/docs/guide/getting-started.md',
   'lib/docs/errors/not-registered.md',
