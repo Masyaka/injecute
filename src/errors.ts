@@ -17,6 +17,10 @@ export const errorCodes = {
     title: 'Services depend on each other in a cycle',
     hint: 'Break the cycle: extract the shared part into its own service, or resolve one side lazily with a function dependency (() => container.get(key)).',
   },
+  INJECUTE_NOTHING_TO_REPLACE: {
+    title: 'A registration replaces a key that nothing is registered under',
+    hint: 'replace: true replaces a registration of this container or a parent. Nothing has this key, which usually means a registration is missing: a module that was not applied, or a typo in the key. Register the original first, or remove replace: true if this is the first registration.',
+  },
   INJECUTE_NO_PREVIOUS_DEFINITION: {
     title: 'A service depends on itself but there is nothing to decorate',
     hint: 'A dependency on the key being registered resolves its previous definition (the replaced one, or the parent one). Register the original service first.',

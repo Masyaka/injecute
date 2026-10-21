@@ -99,7 +99,10 @@ Keys are strings, numbers or symbols. Use symbols for services that should stay 
 in a namespace, they can't be resolved from outside it (see
 [Private services](./containers.md#private-services)).
 Registering the same key twice in one container throws
-[`INJECUTE_ALREADY_REGISTERED`](../errors/already-registered.md) unless you pass `replace: true`.
+[`INJECUTE_ALREADY_REGISTERED`](../errors/already-registered.md) unless you pass `replace: true`. The
+other way round, `replace: true` for a key that no container has throws
+[`INJECUTE_NOTHING_TO_REPLACE`](../errors/nothing-to-replace.md): a replacement without an original
+usually means a registration is missing, such as a module that wasn't applied.
 
 ### Reserved key forms
 

@@ -224,6 +224,60 @@ describe('overriding a parent key in a fork', () => {
     expect((await scope.get('report')).tx).toEqual({ id: 1 });
   });
 
+  it('throws INJECUTE_NOTHING_TO_REPLACE when replace: true finds nothing to replace', () => {
+    const app = createApp();
+    const error = thrown(() =>
+      app
+        .fork({ isolated: true })
+        .addInstance('dbb', new Db(), { replace: true }),
+    );
+    expect(error.code).toBe('INJECUTE_NOTHING_TO_REPLACE');
+    expect(error.message).toContain(
+      '"dbb" is registered with { replace: true }, but no container has "dbb" to replace.',
+    );
+    for (const register of [
+      (c: DIContainer<any>) => c.addSingleton('x', () => 1, { replace: true }),
+      (c: DIContainer<any>) => c.addTransient('x', () => 1, { replace: true }),
+      (c: DIContainer<any>) => c.addInstance('x', 1, { replace: true }),
+      (c: DIContainer<any>) => c.addAlias('x', 'db', { replace: true }),
+      (c: DIContainer<any>) =>
+        c.extend((r: ServiceRegistry) =>
+          r.addInstance('x', 1, { replace: true }),
+        ),
+    ]) {
+      expect(thrown(() => register(app.fork())).code).toBe(
+        'INJECUTE_NOTHING_TO_REPLACE',
+      );
+      expect(thrown(() => register(new DIContainer())).code).toBe(
+        'INJECUTE_NOTHING_TO_REPLACE',
+      );
+    }
+  });
+
+  it('throws INJECUTE_NOTHING_TO_REPLACE in async containers and namespaces too', () => {
+    expect(
+      thrown(() =>
+        new AsyncDIContainer().addInstance('x', 1, { replace: true }),
+      ).code,
+    ).toBe('INJECUTE_NOTHING_TO_REPLACE');
+    expect(
+      thrown(() =>
+        new DIContainer().namespace('Ns', (ns) =>
+          ns.addInstance('x', 1, { replace: true }),
+        ),
+      ).code,
+    ).toBe('INJECUTE_NOTHING_TO_REPLACE');
+  });
+
+  it('accepts replace: true for a key only a parent has', () => {
+    const scope = createApp().fork();
+    expect(
+      scope
+        .addInstance('report', { tx: { id: 0 } }, { replace: true })
+        .get('report'),
+    ).toEqual({ tx: { id: 0 } });
+  });
+
   it('still lets a fork register new keys without replace', () => {
     const scope = createApp().fork().addInstance('requestId', 'r1');
     expect(scope.get('requestId')).toBe('r1');
