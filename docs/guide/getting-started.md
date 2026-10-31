@@ -31,7 +31,7 @@ deno add jsr:@masyaka/injecute
 
 :::
 
-injecute is an ES module for Node.js ≥ 22, Deno, Bun and browsers, with no runtime dependencies. It also
+injecute is an ES module for Node.js ≥ 22.12, Deno, Bun and browsers, with no runtime dependencies. It also
 works [without a build step](./no-build.md).
 
 ## Your first container

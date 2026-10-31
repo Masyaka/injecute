@@ -11,7 +11,7 @@ Thanks for helping. Bug reports, docs fixes and pull requests are all welcome.
 
 ## Setup
 
-Node.js ≥ 22 (CI also runs 24 and 26). Deno and Bun are only needed for the smoke tests.
+Node.js ≥ 22.12 (CI also runs 24 and 26). Deno and Bun are only needed for the smoke tests.
 
 ```sh
 npm ci

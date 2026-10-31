@@ -59,4 +59,4 @@ import { DIContainer } from 'jsr:@masyaka/injecute';
 import { DIContainer } from 'injecute';
 ```
 
-Node.js ≥ 22 can also `require('injecute')`.
+Node.js ≥ 22.12 can also `require('injecute')`.

@@ -38,7 +38,10 @@ Type-safe dependency injection for TypeScript and JavaScript.
 - **Scopes that behave.** `fork()` for child containers, `fork({ isolated: true })` for tests.
 - **Owns what it creates.** `dispose()` and `await using` release singletons in reverse creation order.
 - **Errors that say how to fix it**, with stable codes and a docs page each.
-- **Runs everywhere.** ES module for Node.js ≥ 22, Deno, Bun and browsers. No runtime dependencies.
+- **Runs everywhere.** ES module for Node.js ≥ 22.12, Deno, Bun and browsers. No runtime dependencies.
+- **Stable.** Semantic versioning for the runtime and the types, a public API checked by a snapshot
+  test, and 6 months of fixes for the previous major. See
+  [Versioning and support](https://masyaka.github.io/injecute/guide/versioning).
 
 The [design principles](https://masyaka.github.io/injecute/concepts/principles) explain how injecute
 behaves and why.

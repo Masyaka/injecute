@@ -4,7 +4,7 @@
 
 | Version | Supported                                                                                       |
 | ------- | ----------------------------------------------------------------------------------------------- |
-| 1.x     | Yes                                                                                             |
+| 1.x     | Yes; after 2.0 ships, for 6 more months                                                         |
 | 0.x     | No: upgrade with the [migration guide](https://masyaka.github.io/injecute/migration/0.x-to-1.0) |
 
 ## Reporting a vulnerability
