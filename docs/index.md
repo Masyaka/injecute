@@ -29,7 +29,7 @@ features:
   - title: Tests without mocking libraries
     details: Replace any dependency for the whole graph in an isolated fork. The app container stays untouched.
   - title: Built for coding agents
-    details: The docs and an Agent Skill ship in the package, matching your installed version. Agents read explicit wiring and fix errors from their codes.
+    details: The docs and an Agent Skill ship in the package, matching your installed version. Agents write explicit wiring, you review every dependency as a line in a diff, and they fix errors from their codes.
 ---
 
 ## Where it fits

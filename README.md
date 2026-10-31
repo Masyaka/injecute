@@ -20,8 +20,8 @@ Type-safe dependency injection for TypeScript and JavaScript.
   [Building an SDK](https://masyaka.github.io/injecute/guide/sdk).
 - **A non-typical greenfield project.** Gives you a set of tools and flexibility to solve problems you can encounter in your architecture journey.
 - **Code written with coding agents.** The docs of the installed version and an Agent Skill ship in the
-  package (see [below](#using-injecute-with-ai-coding-agents)). The wiring is explicit, mistakes fail
-  the typecheck with a short feedback loop, and every runtime error has a stable code and a page that says how to fix it.
+  package (see [below](#using-injecute-with-ai-coding-agents)). The wiring is explicit, so you review
+  every dependency an agent adds as a line in a diff; mistakes fail the typecheck with a short feedback loop, and every runtime error has a stable code and a page that says how to fix it.
 
 ## Where it is not the best option
 
@@ -33,7 +33,9 @@ Type-safe dependency injection for TypeScript and JavaScript.
 
 - **Explicit, typed wiring.** Register each service with its dependency keys; the container type grows
   with every registration, so `get()` and factory parameters are inferred, and a typo in a key is a
-  compile error ("Did you mean …?").
+  compile error ("Did you mean …?"). Every dependency is a line you can review in a diff, including in
+  pull requests a coding agent wrote: that's why there is
+  [no auto-wiring](https://masyaka.github.io/injecute/concepts/principles#_1-explicit-wiring).
 - **No decorators, no reflection.** Your classes and functions stay free of container code. But there is a [recipe](https://masyaka.github.io/injecute/guide/custom-registration#services-from-decorators) if you really want decorators for some reason.
 - **Explicit scopes.** A session, a request or a transaction gets a
   [scope](https://masyaka.github.io/injecute/guide/request-state#scopes): a fork with its own services.

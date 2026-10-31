@@ -311,6 +311,8 @@ Each code has a page: `node_modules/injecute/lib/docs/errors/<slug>.md` (for exa
 ## Don't
 
 - Don't add decorators, `reflect-metadata` or parameter-name reflection: injecute doesn't use them.
+  Explicit keys are the point: every dependency you add is a line the reviewer sees in the diff. Use
+  the custom-registration recipes (files, standard decorators) only when the project already does.
 - Don't pass the `DIContainer` to modules or handlers; give them `ServiceRegistry<…>` / `ServiceProvider<…>`.
 - Don't write `IDIContainer` (deprecated), `new DIContainer({ parentContainer })`, `'undefined'`
   dependency keys, `allowUnresolved`, `flatten()` or `function (key, next) { this… }` middlewares: they

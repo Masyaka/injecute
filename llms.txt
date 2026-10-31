@@ -2,7 +2,7 @@
 
 > Type-safe, decorator-free dependency injection container for TypeScript. This file and the Markdown under `lib/docs/` document the installed version of injecute (1.x). Paths are relative to the package root (`node_modules/injecute/`).
 
-- Register services with explicit dependency keys: `addSingleton(key, factoryOrClass, [dependencyKeys])`. The factory receives the resolved services in the same order.
+- Register services with explicit dependency keys: `addSingleton(key, factoryOrClass, [dependencyKeys])`. The factory receives the resolved services in the same order. There is no auto-wiring on purpose: every dependency is a line a reviewer sees in a diff. Don't add decorators, folder scanning or parameter-name matching unless the project already uses the custom-registration recipes.
 - Classes are detected and constructed with `new`; use `construct(Class)` only for ES5-compiled or bound classes.
 - `fork()` creates a child container; `fork({ isolated: true })` makes overrides reach the whole graph (tests). A fork for one unit of work (a session, a request, a transaction, a job) is a scope: its services may depend on the root's, never the reverse; the alternatives are arguments, a factory with `using`, a context accessor or one instance per context.
 - Request data (trace id, tenant, user) goes in a context accessor: the host registers `{ current: () => storage.getStore() }` (an `AsyncLocalStorage`) first, and services read it when they use it.

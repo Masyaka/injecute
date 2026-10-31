@@ -18,6 +18,15 @@ Every registration lists the keys it depends on, next to the factory:
 **For you:** the wiring is in one place and readable without running anything. Nothing is matched by
 name, type or position behind your back.
 
+**Why there is no auto-wiring:** every dependency is a line you can review in a diff. A pull request
+that gives `payments` a new dependency changes
+`addSingleton('payments', GatewayPayments, ['tx', 'gateway'])`, and the reviewer sees it, including in
+pull requests a coding agent wrote. With decorators, scanning folders or matching parameter names, the
+same change is spread over files or decided at runtime, and the review has to trust it. Writing the
+keys is the cost: the compiler checks them, editors complete them, and agents write them. When you need
+to find services instead, [custom registration](../guide/custom-registration.md) shows how, and what
+the compiler still checks.
+
 ### 2. No decorators, no reflection
 
 Your classes and functions don't import the container, carry metadata or depend on parameter names.
