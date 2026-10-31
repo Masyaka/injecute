@@ -45,8 +45,8 @@ changes its wiring.
 | `createTestPlatform` | the SDK with fakes, in a testing entry (`platform-sdk/testing`) | yes    |
 
 The whole example is in `examples/sdk/` of the repository: the SDK in
-[`platform-sdk.ts`](https://github.com/Masyaka/injecute/blob/main/examples/sdk/platform-sdk.ts) and a
-consumer in [`consumer.ts`](https://github.com/Masyaka/injecute/blob/main/examples/sdk/consumer.ts).
+[`platform-sdk.ts`](https://github.com/Masyaka/injecute/blob/next/examples/sdk/platform-sdk.ts) and a
+consumer in [`consumer.ts`](https://github.com/Masyaka/injecute/blob/next/examples/sdk/consumer.ts).
 
 ## The contract
 
