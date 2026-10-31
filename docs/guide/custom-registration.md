@@ -1,6 +1,6 @@
 ---
 title: Custom registration
-description: Build your own way to register services (files in a directory, standard decorators) as a module applied with extend(), what the compiler still checks, and when a middleware fits instead.
+description: Build your own way to register services (files in a directory, wiring generated from files, standard decorators) as a module applied with extend(), what the compiler still checks, and when a middleware fits instead.
 ---
 
 # Custom registration
@@ -21,7 +21,8 @@ From then on these are ordinary registrations: they are created lazily, cached, 
 
 The compiler can't see what is found at runtime, so the module declares what it adds: it returns a
 `ServiceRegistry<Requires, Services>`. How much of that declaration the compiler can check depends on
-the approach. The two examples below show both ends.
+the approach. The examples below show both ends, and how generating the wiring from files gets the
+compiler's full checks back.
 
 ## Services from files
 
@@ -48,10 +49,78 @@ The app declares the services from the files' own types and applies the module:
   that the container has what the files need (`Requires`) when you call `extend()`.
 - **Not checked:** that a file exists for every declared key, and that `dependencies` match the
   factory's parameters. A missing file fails with `INJECUTE_NOT_REGISTERED` when something resolves
-  it. [Check the wiring](#checking-the-wiring) in a test to catch it before deploying.
+  it. [Check the wiring](#checking-the-wiring) in a test to catch it before deploying, or
+  [generate the wiring](#generating-the-wiring-from-files) and the compiler checks both.
 - `extend()` is synchronous: load the files first (`await`), then apply the module.
 - Bundled apps and browsers can't read a directory. With Vite,
   `import.meta.glob('./services/*.ts', { eager: true })` returns the same modules at build time.
+
+## Generating the wiring from files
+
+Instead of loading the files when the app starts, a script can write the wiring from them: plain
+`addSingleton()` calls, as you would write them by hand. The compiler then checks the generated file like
+any other wiring.
+
+**For files in your project, generate the wiring.** Load files at runtime only when they aren't known
+before the app starts, such as plugins installed later.
+
+The script reads the same files as the loader above: the file name is the key, the default export the
+factory, and `dependencies` the keys it receives. It orders the registrations so each service comes after
+its dependencies, and keys that no file provides become the module's requirements:
+
+<<< @/../examples/custom-registration/codegen/generate-wiring.ts#generate-wiring
+
+For the two files above, it writes:
+
+<<< @/../examples/custom-registration/codegen/services.generated.ts
+
+The app applies it like any module, without declaring `Services`:
+
+<<< @/../examples/custom-registration/codegen/app.ts#codegen
+
+- **Checked:** everything the compiler checks in hand-written wiring. `dependencies` that don't match
+  the factory's parameters are an error at that service's `addSingleton()`. A dependency that no file
+  and no registration provides is an error at `extend()`, and so is `get()` with a key that has no file.
+- **Not checked:** that the wiring file is up to date with the files. Run the script before type
+  checking, or compare its output with the committed file in a test:
+
+  ```ts
+  it('the wiring file is up to date', async () => {
+    const output = new URL('./services.generated.ts', import.meta.url);
+    const source = await generateWiring(
+      new URL('./services/', import.meta.url),
+      output,
+    );
+    expect(source).toBe(await readFile(output, 'utf8'));
+  });
+  ```
+
+- The script imports the files to read `dependencies`: run it with a runtime that runs TypeScript, such
+  as Node.js 22.18 or later, Deno or Bun. File names must be valid identifiers.
+- The wiring is ordinary imports, so bundlers and browsers need nothing extra.
+
+Mistakes in the files are compile errors. Dependencies in the wrong order:
+
+```ts
+export const dependencies = ['clock', 'config']; // the factory takes (config, clock)
+```
+
+```text
+services.generated.ts: Argument of type '(config: { greeting: string; }, clock: { now: () => Date; }) => …'
+  is not assignable to parameter of type 'Factory<["clock", "config"], …>'.
+    Types of parameters 'config' and 'args_0' are incompatible.
+```
+
+A dependency that no file provides and the app doesn't register:
+
+```ts
+export const dependencies = ['config', 'clock', 'mailer']; // there is no services/mailer.ts
+```
+
+```text
+app.ts: Argument of type '(registry: ServiceRegistry<Requires>) => …' is not assignable to parameter
+  of type '{ 'injecute: extension requires services that are not registered': "mailer"; }'.
+```
 
 ## Services from decorators
 

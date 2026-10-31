@@ -1,4 +1,5 @@
 // Runs every file in examples/ (the code the docs embed) and checks what the docs say it does.
+import { readFile } from 'node:fs/promises';
 import { checkWiring, DIContainer } from 'injecute';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -159,6 +160,27 @@ describe('examples', () => {
       code: 'INJECUTE_WIRING_FAILED',
       problems: [{ type: 'missing', key: 'greeter', affected: [] }],
     });
+  });
+
+  it('custom registration: generated wiring', async () => {
+    const { app } =
+      await import('../examples/custom-registration/codegen/app.ts');
+    expect(app.get('greeter').greet('Ada')).toBe(
+      'Hello, Ada (1970-01-01T00:00:00.000Z)',
+    );
+    // the committed wiring file is what the generator writes for the current files
+    const { generateWiring } =
+      await import('../examples/custom-registration/codegen/generate-wiring.ts');
+    const output = new URL(
+      '../examples/custom-registration/codegen/services.generated.ts',
+      import.meta.url,
+    );
+    await expect(
+      generateWiring(
+        new URL('../examples/custom-registration/services/', import.meta.url),
+        output,
+      ),
+    ).resolves.toBe(await readFile(output, 'utf8'));
   });
 
   it('custom registration: decorators', async () => {
