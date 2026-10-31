@@ -1,6 +1,6 @@
 ---
 title: Recipes
-description: A unit of work per operation, a fork per request, configuration-driven implementations, feature modules, a module's private services, an SDK for other teams, sharing services between containers.
+description: A unit of work per operation, a scope, configuration-driven implementations, feature modules, a module's private services, an SDK for other teams, sharing services between containers.
 ---
 
 # Recipes
@@ -13,21 +13,21 @@ A service creates what one operation owns with a factory, and `using` releases i
 
 [Open in the playground](../playground?example=recipes/unit-of-work)
 
-More patterns for state that belongs to one request, and a table for choosing between them, are in
-[Per-request state](./request-state.md).
+More patterns for state that belongs to one unit of work, and a table for choosing between them, are
+in [Scoped state](./request-state.md).
 
-## A fork per request
+## A scope
 
-When several per-request services share instances and depend on the app's services, a fork wires them
-and disposes them together:
+A fork for one unit of work, such as a request or a transaction, is a scope: several services that
+belong to it share its instances and use the app's services, and the scope disposes them together:
 
 <<< @/../examples/recipes/request-scope.ts#request-scope
 
 [Open in the playground](../playground?example=recipes/request-scope)
 
-Fork the root in one place (the handler or a framework hook) and dispose the fork at the end. Try the
-[alternatives](./request-state.md) first: forks per request make the container structure harder to
-follow.
+Create the scope in one place (the handler or a framework hook) and dispose it at the end. Its services
+may depend on the root's, never the reverse. See [Scopes](./request-state.md#scopes) for scope modules
+and how scopes compare with the other patterns.
 
 ## Choosing implementations from configuration
 

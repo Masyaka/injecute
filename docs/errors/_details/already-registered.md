@@ -27,9 +27,9 @@ app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
 What to do depends on what you want:
 
 - **Only the fork's own services should use the new one:** pass `{ replace: true }`.
-- **A parent service should use it too:** register that service in the fork as well (for per-request
-  services, in a [request module](../guide/request-state.md#per-request-registrations-in-modules)), and
-  don't register the key in the root.
+- **A parent service should use it too:** register that service in the fork as well (for a scope's
+  services, in a [scope module](../guide/request-state.md#scope-modules)), and don't register the key in
+  the root.
 - **Every service should use it** (tests, a variant of the app): use an
   [isolated fork](../guide/containers.md#isolated-forks), with `{ replace: true }`.
 

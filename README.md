@@ -35,7 +35,10 @@ Type-safe dependency injection for TypeScript and JavaScript.
   with every registration, so `get()` and factory parameters are inferred, and a typo in a key is a
   compile error ("Did you mean …?").
 - **No decorators, no reflection.** Your classes and functions stay free of container code. But there is a [recipe](https://masyaka.github.io/injecute/guide/custom-registration#services-from-decorators) if you really want decorators for some reason.
-- **Scopes that behave.** `fork()` for child containers, `fork({ isolated: true })` for tests.
+- **Explicit scopes.** A session, a request or a transaction gets a
+  [scope](https://masyaka.github.io/injecute/guide/request-state#scopes): a fork with its own services.
+  Scope services use the root's; root services can't depend on a scope's, and the compiler checks it.
+  `fork({ isolated: true })` replaces a dependency for the whole graph in tests.
 - **Owns what it creates.** `dispose()` and `await using` release singletons in reverse creation order.
 - **Errors that say how to fix it**, with stable codes and a docs page each.
 - **Runs everywhere.** ES module for Node.js ≥ 22.12, Deno, Bun and browsers. No runtime dependencies.

@@ -18,13 +18,19 @@ A service registered in the parent **runs in the parent** and is shared by all f
 is created once, and what a fork adds stays in the fork. Parent services can't depend on what a fork
 adds.
 
-::: tip Before you fork per request
-Forks per request make the container structure harder to follow: each service must be registered in the
-right layer, and request state pulls the services that use it into the fork. Request data (the trace id,
-the tenant, the user) fits a [context accessor](./request-context.md), and state a request owns usually
-fits an argument, a factory with `using` or one instance per context. See
-[Per-request state](./request-state.md).
-:::
+### Scopes
+
+A fork created for one unit of work, such as a user session, a request, a transaction or a job, is a
+**scope**: it registers the services that belong to that unit of work, uses the root's services, and is
+disposed when the work is done. The direction is fixed: a scope's services may depend on the root's,
+the root's never on a scope's.
+
+- The compiler checks it: a root service can't name a key that only a scope registers.
+- A scope that registers a key the root already has needs `replace: true`, and the error says which
+  root services keep the root's instance (see below).
+- Each feature with scoped services gives them their own module, applied to the scope in one place:
+  see [Scoped state](./request-state.md#scopes), which also compares scopes with patterns that keep
+  every service in the root.
 
 ### Overriding a parent's service in a fork
 
@@ -38,6 +44,14 @@ one:
 
 To give a parent service the fork's instance, register that service in the fork too. To replace a
 dependency for every service, use an isolated fork.
+
+### Decorating a root service in a scope
+
+A scope can decorate a root service for its own services, with a dependency on the key itself and
+`replace: true`. Here the scope's services log with the request id, and root services keep the root's
+logger:
+
+<<< @/../examples/containers.ts#scope-decorate
 
 ## Isolated forks
 
@@ -141,7 +155,8 @@ readable types (see [TypeScript](./typescript.md#seal-the-composition-root)).
 | You want to…                                                       | Use                                                          |
 | ------------------------------------------------------------------ | ------------------------------------------------------------ |
 | give services the trace id, tenant or user of the current request  | a [context accessor](./request-context.md)                   |
-| keep state that belongs to one request, like a transaction         | see [Per-request state](./request-state.md)                  |
+| register services for one session, request, transaction or job     | a [scope](#scopes): a fork with a scope module               |
+| choose between a scope and patterns that keep services in the root | [Scoped state](./request-state.md)                           |
 | replace a dependency for everything, without touching the original | `fork({ isolated: true })`                                   |
 | split registrations by feature                                     | modules with `extend()`                                      |
 | group services under a name, e.g. `Billing.*`                      | `namespace()`                                                |

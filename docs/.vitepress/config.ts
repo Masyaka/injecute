@@ -34,7 +34,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Building an SDK', link: '/guide/sdk' },
       { text: 'Async services', link: '/guide/async' },
       { text: 'Request context', link: '/guide/request-context' },
-      { text: 'Per-request state', link: '/guide/request-state' },
+      { text: 'Scoped state', link: '/guide/request-state' },
       { text: 'TypeScript', link: '/guide/typescript' },
       { text: 'Without a build step', link: '/guide/no-build' },
       { text: 'Recipes', link: '/guide/recipes' },
@@ -113,7 +113,7 @@ export default defineConfig({
         details: [
           'Services are registered with explicit dependency keys: `addSingleton(key, factoryOrClass, [dependencyKeys])`.',
           'Classes are detected and constructed with `new`; use `construct(Class)` for ES5-compiled or bound classes.',
-          '`fork()` creates a child container; `fork({ isolated: true })` makes overrides reach the whole graph (tests). For per-request state, prefer a factory with `using`, a context accessor or one instance per context over a fork per request.',
+          '`fork()` creates a child container; `fork({ isolated: true })` makes overrides reach the whole graph (tests). A fork for one unit of work (a session, a request, a transaction, a job) is a scope: its services may depend on root services, never the reverse.',
           'Request data (trace id, tenant, user) goes in a context accessor backed by AsyncLocalStorage, registered first in the root container.',
           'Modules are plain functions over `ServiceRegistry<{ …what they need }>` applied with `extend()`.',
           'Errors are `InjecuteError` with a stable `code`; each code has a page under /errors/.',

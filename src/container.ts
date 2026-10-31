@@ -658,10 +658,10 @@ export class DIContainer<S extends object = {}> implements ServiceRegistry<
    *   registered here. Overrides in the fork then reach the whole graph, and nothing leaks back.
    *   Use it for tests and per-tenant variants.
    *
-   * Services registered here can't depend on what a fork adds. Before forking per request, consider
-   * the alternatives in the "Per-request state" guide: an argument, a factory with `using`, a context
-   * accessor for request data (trace id, tenant, user), or one instance per context. A fork per request
-   * fits a group of services that share per-request instances and depend on this container's services.
+   * Services registered here can't depend on what a fork adds. A fork for one unit of work (a session,
+   * a request, a transaction, a job) is a scope: register its services in it with a scope module, and
+   * dispose it with `await using`. The "Scoped state" guide compares scopes with patterns that keep
+   * every service here (an argument, a factory with `using`, a context accessor).
    *
    * @example
    * ```ts

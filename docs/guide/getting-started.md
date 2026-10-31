@@ -74,7 +74,7 @@ app.addSingleton('server', createServer, ['adress']);
 - [Registering services](./registration.md): lifetimes, optional dependencies, aliases, decoration.
 - [Containers, forks and modules](./containers.md): forks, isolated forks for tests, modules.
 - [Request context](./request-context.md): the trace id, tenant and user of the current request in every service.
-- [Per-request state](./request-state.md): transactions, caches and per-tenant implementations without forks.
+- [Scoped state](./request-state.md): scopes for a session, a request or a transaction, and the patterns that keep every service in the root.
 - [Lifecycle and dispose](./lifecycle.md): releasing connections with `dispose()` and `await using`.
 - [Frameworks](../frameworks/index.md): Express, Fastify, Hono, Next.js and GraphQL; React, Vue and Solid; coming from NestJS.
 - [Roles](../concepts/roles.md): which part of your code gets which view of the container.

@@ -28,6 +28,32 @@ overridden.get('users') === app.get('users'); // true: `users` keeps the parent'
 // "users" (registered in a parent) depends on "db" and keeps the parent's "db"
 // #endregion fork-override
 
+// #region scope-decorate
+class PrefixLogger {
+  constructor(readonly prefix = '') {}
+  child(prefix: string) {
+    return new PrefixLogger(`${this.prefix}${prefix} `);
+  }
+}
+
+const logged = new DIContainer()
+  .addSingleton('logger', PrefixLogger)
+  .addSingleton('audit', (logger) => ({ logger }), ['logger']); // a root service
+
+// A scope decorates the root's logger for its own services: they log with the request id.
+const loggedScope = logged
+  .fork()
+  .addInstance('requestId', 'req-7')
+  .addSingleton('logger', (logger, id) => logger.child(id), {
+    dependencies: ['logger', 'requestId'],
+    replace: true,
+  })
+  .addSingleton('handler', (logger) => ({ logger }), ['logger']); // a scope service
+
+loggedScope.get('handler').logger.prefix; // "req-7 ": the scope's services get the decorated logger
+loggedScope.get('audit').logger.prefix; // "": root services keep the root's logger
+// #endregion scope-decorate
+
 // #region isolated
 // An isolated fork runs every service it resolves itself, so overrides reach the whole graph
 // and nothing leaks back into the parent.
@@ -129,5 +155,6 @@ export {
   host,
   root,
   perRequest,
+  loggedScope,
   Database,
 };

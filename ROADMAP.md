@@ -33,14 +33,12 @@ Open an issue to discuss any of them before starting work.
 - Dispose / utilization on reset: `dispose()` and `[Symbol.asyncDispose]` in 1.0.
 - Splitting the container interface into "adding" and "utilities" parts: `ServiceProvider` / `ServiceRegistry` / `DIContainer` in 1.0.
 
-## Decided against
+## Covered differently
 
-- **Scoped lifetime** (one instance per fork of a service registered in the root). Everything it does is
-  covered: [per-request state](docs/guide/request-state.md) without a fork, a
-  [request module per feature](docs/guide/request-state.md#per-request-registrations-in-modules) with
-  one, and [resources released with the request](docs/guide/request-state.md#release-what-a-request-creates)
-  for disposal. It would bend principle 5 (the container that runs a factory owns the instance), need a
-  new error and lifetime tracking in the types for a singleton that depends on a scoped service (the
-  request module split rules that out with the existing types), and add a second way to register
-  per-request services (test 12). It would also make forks per request, the least recommended option,
-  the easiest one.
+- **Scoped lifetime** (a lifetime flag on a service registered in the root, so each fork gets its own
+  instance). [Scopes](docs/guide/request-state.md#scopes) cover it explicitly: a scope is a fork with
+  its own services, registered by a [scope module per feature](docs/guide/request-state.md#scope-modules),
+  and a root service can't depend on a scope's service, which the types check without any lifetime
+  tracking. A lifetime flag would bend principle 5 (the container that runs a factory owns the
+  instance), need a new error and lifetime tracking in the types for a singleton that depends on a
+  scoped service, and add a second way to register scoped services (test 12).

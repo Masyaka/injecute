@@ -23,6 +23,9 @@ features:
     details: Keep your sources free of the framework. Only module files import from injecute, and only its types.
   - title: Wiring mistakes fail at compile time
     details: 'The container''s type grows with every registration. A missing service or a typo in a key is a compile error, with "Did you mean".'
+  - title: Explicit scopes
+    details: A session, a request or a transaction gets a fork with its own services. Scope services use the root's; the root can't depend on a scope's, and the compiler checks it.
+    link: /guide/request-state#scopes
   - title: Tests without mocking libraries
     details: Replace any dependency for the whole graph in an isolated fork. The app container stays untouched.
   - title: Built for coding agents

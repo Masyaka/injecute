@@ -38,6 +38,7 @@ describe('examples', () => {
       host,
       root,
       perRequest,
+      loggedScope,
       Database,
     } = await import('../examples/containers.ts');
     expect(requestScope.get('users')).toBe(app.get('users'));
@@ -61,6 +62,8 @@ describe('examples', () => {
     expect(host.get('Audit.dbUrl')).toBe('postgres://audit');
     expect(perRequest.get('users')).toBe(root.get('users'));
     expect(perRequest.get('requestId')).toBe('req-2');
+    expect(loggedScope.get('handler').logger.prefix).toBe('req-7 ');
+    expect(loggedScope.get('audit').logger.prefix).toBe('');
     expect(() =>
       (root as unknown as DIContainer).addInstance('flag', true),
     ).toThrow(/sealed/);

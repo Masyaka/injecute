@@ -13,18 +13,24 @@ filters by tenant, an audit log records the user. The recommended way is a **con
    and keeps the current context in [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html).
 3. Services stay singletons and read the context when they use it.
 
-For state that a request owns, such as a transaction or a per-request cache, see
-[Per-request state](./request-state.md).
+For state that a unit of work owns, such as a transaction or a per-request cache, see
+[Scoped state](./request-state.md).
 
-## Why not a fork
+## A context accessor or a scope
 
 A service registered in the root container runs in the root (see [Forks](./containers.md#forks)), so it
-can't depend on a `request` that a fork adds: in the root, the key is a type error and
-[`INJECUTE_NOT_REGISTERED`](../errors/not-registered.md) at runtime. To use the request, every service
-that needs it, and every service that depends on those, would have to be registered in the fork and
-created again on every request. An isolated fork per request re-creates the whole graph.
+can't depend on a `request` that a [scope](./containers.md#scopes) registers: in the root, the key is a
+type error and [`INJECUTE_NOT_REGISTERED`](../errors/not-registered.md) at runtime. Both options work;
+they differ in where the services live:
 
-With an accessor, the graph is built once, and each call reads the context of the request it runs in.
+- **A context accessor** keeps every service in the root, built once. Services read the request's data
+  when they run, so a logger, a repository or a domain service registered in the root can use it.
+- **A scope** gives the services that need the request a home of their own: they are registered in the
+  scope, take the request as an ordinary dependency, and are created again for every request.
+
+Data that many layers read, like the trace id, the tenant or the user, usually fits an accessor. A group
+of services that belong to the request fits a scope. [Scoped state](./request-state.md#choosing) has a
+table for choosing.
 
 ## The application declares what it needs
 
@@ -132,9 +138,9 @@ adds to it (authentication sets the user), let that step set a field of the cont
 ## Beyond ambient data
 
 The context carries data that many layers read. For state a request **owns** (a transaction, a
-per-request cache, a per-tenant implementation), see [Per-request state](./request-state.md): a factory
-with `using`, one instance per context or a strategy chosen by the context usually fit better than a
-fork per request, and the guide has a table for choosing.
+per-request cache, a per-tenant implementation), see [Scoped state](./request-state.md): a scope, a
+factory with `using`, one instance per context or a strategy chosen by the context, with a table for
+choosing.
 
 ## Testing
 

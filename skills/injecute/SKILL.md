@@ -131,20 +131,23 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     singleton, read it in a factory or constructor, or keep it in a field: the first request's context
     would stick. Use `run()`, not `enterWith()`.
 
-15. For state that belongs to one request, try these before a fork per request, in this order: pass it
-    as an argument; register a factory and let the caller own the instance with `using`
-    (`using work = unitOfWork.begin()`, a unit of work for a transaction); read it from the context
-    accessor; keep one instance per context in a singleton (a `WeakMap` keyed by the context object, for
-    caches and DataLoaders); for a resource several layers share and the request must release (a
-    transaction), add it to a per-request resources object the host releases with `await using`; pick a
-    per-tenant implementation in a singleton by the context (Strategy). Forks per request make the
-    container structure hard to follow.
+15. State that belongs to one unit of work (a session, a request, a transaction, a job) has two kinds
+    of options (see the Scoped state guide for a table):
+    - **A scope:** a fork for the unit of work with services of its own, created in one place and
+      disposed with `await using scope = app.fork().extend(addRequestModules)`. Its services may depend on
+      the root's; root services never depend on a scope's (a root service can't name a key that only a
+      scope registers). Each feature with scoped services gets a root module and a scope module. A scope
+      may decorate a root service for its own services with a self-dependency and `replace: true`;
+      root services keep the root's one.
+    - **Patterns that keep every service in the root:** pass it as an argument; register a factory and
+      let the caller own the instance with `using` (`using work = unitOfWork.begin()`); read request data
+      from the context accessor; keep one instance per context in a singleton (a `WeakMap` keyed by the
+      context object, for caches and DataLoaders); add a resource several layers share to a resources
+      object the host releases with `await using`; pick a per-tenant implementation in a singleton by
+      the context (Strategy).
 16. `app.fork()` is a child container: it sees the parent's services and shares the parent's singletons;
-    what it registers stays in the fork, and parent services can't depend on it. Fork per request only
-    for a group of services that share per-request instances and depend on the app's services; fork the
-    root in one place and dispose it: `await using scope = app.fork().addSingleton('tx', …)`. With
-    modules, give each feature a root module and a request module, and apply every request module in
-    that one place. There is no scoped lifetime: a singleton must not depend on a request service.
+    what it registers stays in the fork, and parent services can't depend on it. Registering a key the
+    parent has needs `replace: true`, and reaches only services resolved in the fork.
 17. In tests, override with an isolated fork. Every service it resolves is built inside the fork, so the
     override reaches the whole graph and `app` is untouched:
 

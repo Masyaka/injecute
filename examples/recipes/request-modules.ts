@@ -78,7 +78,7 @@ class Checkout {
 export const addOrders = (c: ServiceRegistry) =>
   c.addSingleton('gateway', Gateway);
 
-/** What one request owns: registered in each request's fork. */
+/** What one request owns: its scope module, applied to each request's scope. */
 export const addOrdersRequest = (
   c: ServiceRegistry<{ db: Database; gateway: Gateway }>,
 ) =>
@@ -99,11 +99,11 @@ export const createApp = () =>
 
 export type App = ReturnType<typeof createApp>;
 
-/** Every feature's request module, in one place. */
+/** Every feature's scope module for a request, in one place. */
 export const addRequestModules = (c: ServiceRegistry<ContainerServices<App>>) =>
   c.extend(addOrdersRequest);
 
-// server.ts: one fork per request, in one place, disposed at the end
+// server.ts: one scope per request, created in one place, disposed at the end
 
 export const createHandler =
   (app: App, addRequest = addRequestModules) =>
@@ -123,7 +123,7 @@ const testApp = createApp()
   .addInstance('db', new Database('memory'), { replace: true });
 await createHandler(testApp)('book', 1); // tx1: begin on memory, …
 
-// A per-request service: the handler applies the request modules, then the replacement.
+// A scoped service: the handler applies the scope modules, then the replacement.
 export const charged: number[] = [];
 const fakePayments: Payments = {
   charge: (amount) => void charged.push(amount),
