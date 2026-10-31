@@ -1,5 +1,5 @@
 // Runs every file in examples/ (the code the docs embed) and checks what the docs say it does.
-import { DIContainer } from 'injecute';
+import { checkWiring, DIContainer } from 'injecute';
 import { describe, expect, it, vi } from 'vitest';
 
 describe('examples', () => {
@@ -140,12 +140,22 @@ describe('examples', () => {
   });
 
   it('custom registration: file system', async () => {
-    const { app } =
+    const { app, checkServiceFiles } =
       await import('../examples/custom-registration/file-system.ts');
     expect(app.get('greeter').greet('Ada')).toBe(
       'Hello, Ada (1970-01-01T00:00:00.000Z)',
     );
     expect(app.get('clock')).toBe(app.get('clock'));
+    // checking the wiring: a declared service without a file fails
+    const missingGreeter = new DIContainer().addSingleton('clock', () => ({
+      now: () => new Date(0),
+    }));
+    await expect(
+      checkServiceFiles(missingGreeter as never),
+    ).rejects.toMatchObject({
+      code: 'INJECUTE_WIRING_FAILED',
+      problems: [{ type: 'missing', key: 'greeter', affected: [] }],
+    });
   });
 
   it('custom registration: decorators', async () => {
@@ -173,9 +183,23 @@ describe('examples', () => {
   });
 
   it('testing', async () => {
-    const { app, other } = await import('../examples/testing.ts');
+    const { app, other, createApp } = await import('../examples/testing.ts');
     expect(app.get('users').db.url).toBe('postgres://prod');
     expect(other.get('users').db.url).toBe('postgres://prod'); // reset() dropped the override
+    // checking the wiring: a service whose factory throws fails preload()
+    const broken = createApp()
+      .fork({ isolated: true })
+      .addSingleton(
+        'db',
+        (): never => {
+          throw new Error('no connection');
+        },
+        { replace: true },
+      );
+    await expect(checkWiring(broken, { resolve: true })).rejects.toMatchObject({
+      code: 'INJECUTE_WIRING_FAILED',
+      problems: [{ type: 'failed', key: 'db', affected: ['users'] }],
+    });
   });
 
   it('typescript', async () => {

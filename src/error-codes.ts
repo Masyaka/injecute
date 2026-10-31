@@ -74,6 +74,10 @@ export const errorCodes = {
     title: 'Some services failed to dispose',
     hint: 'Every other service was still disposed. The failures are in `cause` (an AggregateError).',
   },
+  INJECUTE_WIRING_FAILED: {
+    title: 'The wiring check found services that are missing or fail',
+    hint: 'Every problem is listed in the message and in error.problems. Register the missing keys (check for typos and for modules that were not applied), and fix the factories that failed: their errors are in each problem and in cause (an AggregateError).',
+  },
   INJECUTE_INVALID_OPTION: {
     title: 'An option is not supported here',
     hint: 'Transient services are not kept by the container, so they cannot have a dispose option. createTag() and createLifecycle() take unique, non-empty names without ":" or "."; startLifecycle() takes a lifecycle made by createLifecycle() and only its stages in "concurrent".',

@@ -48,7 +48,7 @@ The app declares the services from the files' own types and applies the module:
   that the container has what the files need (`Requires`) when you call `extend()`.
 - **Not checked:** that a file exists for every declared key, and that `dependencies` match the
   factory's parameters. A missing file fails with `INJECUTE_NOT_REGISTERED` when something resolves
-  it. Write a test that resolves every declared service to catch both before deploying.
+  it. [Check the wiring](#checking-the-wiring) in a test to catch it before deploying.
 - `extend()` is synchronous: load the files first (`await`), then apply the module.
 - Bundled apps and browsers can't read a directory. With Vite,
   `import.meta.glob('./services/*.ts', { eager: true })` returns the same modules at build time.
@@ -76,7 +76,8 @@ one file, with `createDecorators()` at the top.
   container has `Requires` when you call `extend()`, and has `Services` afterwards.
 - **Not checked:** that every key of `Services` has a decorated class. A decorator runs when its file
   is evaluated, so a class whose file nobody imports is never registered, and resolving it fails with
-  `INJECUTE_NOT_REGISTERED`. Import every decorated file from the wiring file that calls `extend()`.
+  `INJECUTE_NOT_REGISTERED`. Import every decorated file from the wiring file that calls `extend()`,
+  and [check the wiring](#checking-the-wiring) in a test.
 - Two classes under the same key fail with `INJECUTE_ALREADY_REGISTERED` at `extend()`.
 - The decorators only collect registrations. Instances live in the container that applies them, so
   every container, fork and test gets its own.
@@ -120,6 +121,24 @@ resolved through the fork uses the replacement.
 <<< @/../examples/custom-registration/decorators.ts#testing
 
 The same works for services registered from files.
+
+### Checking the wiring
+
+The compiler checks what you declare in `Services`, but not that every declared service is actually
+registered. List the keys in an object that `satisfies Record<keyof Services, true>`: the compiler then
+checks the list against `Services`, so a declared service can't be left out. Pass the list to
+[`checkWiring()`](./testing.md#check-the-wiring) in a test:
+
+<<< @/../examples/custom-registration/file-system.ts#check-wiring
+
+- **A declared service without a file or decorated class** is reported as not registered.
+- **A dependency key that nothing registers** (a typo in `dependencies`) is reported with every service
+  that needs it. Neither check runs a factory.
+- **Dependencies in the wrong order** are caught only if the factory fails with them: pass
+  `resolve: true` to run every factory (on an [isolated fork](./testing.md) with fakes). With files,
+  nothing compares `dependencies` with the factory's parameters; with the decorators, the compiler does.
+- The same check works for decorated classes: list the keys of the `Services` you passed to
+  `createDecorators()`.
 
 ## Keys nobody can list: a middleware
 

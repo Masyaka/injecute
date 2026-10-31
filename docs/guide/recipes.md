@@ -108,6 +108,9 @@ import { preload } from 'injecute';
 await preload(app); // resolves every service now, so configuration errors surface at boot
 ```
 
+`preload()` stops at the first failure, which is what a starting app needs. In a test, use
+[`checkWiring()`](./testing.md#check-the-wiring) instead: it reports every problem at once.
+
 To run modules' startup work (routes, subscriptions, consumers) and stop it gracefully, see
 [Startup and shutdown](./startup-shutdown.md).
 

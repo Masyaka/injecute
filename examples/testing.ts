@@ -1,4 +1,4 @@
-import { DIContainer, setCacheInstance } from 'injecute';
+import { checkWiring, DIContainer, setCacheInstance } from 'injecute';
 
 class Database {
   constructor(readonly url: string) {}
@@ -26,6 +26,16 @@ testContainer.get('users').db.url; // "memory://"
 app.get('users').db.url; // "postgres://prod": the app is untouched
 // #endregion isolated-fork
 
+// #region check-wiring
+// Checks that everything the services need is registered, then resolves every service once, in an
+// isolated fork with fakes for what reaches the outside world. Every missing registration and every
+// factory that throws is reported at once, instead of the first request finding one of them.
+await using wiring = createApp()
+  .fork({ isolated: true })
+  .addInstance('db', new Database('memory://'), { replace: true });
+await checkWiring(wiring, { resolve: true });
+// #endregion check-wiring
+
 // #region set-cache-instance
 // Or override one cached value on the container itself, until reset():
 const other = createApp();
@@ -34,4 +44,4 @@ other.get('users').db.url; // "memory://"
 other.reset();
 // #endregion set-cache-instance
 
-export { app, testContainer, other };
+export { app, testContainer, other, createApp };

@@ -155,6 +155,12 @@ c.addInstance('a', 1); c.get('a')` registers `a` but does not type-check. Chain,
     test.get('users'); // built with fakeDb
     ```
 
+    Add a test that checks the wiring: `await checkWiring(test, { resolve: true })` reports every
+    dependency key nothing registers and every factory that throws, at once (`WiringError`,
+    `error.problems`). For services found in files or registered by decorators, pass
+    `keys`: the declared keys, listed in an object that `satisfies Record<keyof Services, true>`.
+    Use `preload()` to create services at startup, not in this test.
+
 18. `await app.dispose()` (or `await using`) disposes the singletons the container created, in reverse
     creation order, via `[Symbol.asyncDispose]` / `[Symbol.dispose]` or the `dispose` option. Transient
     services are not kept, so they can't have a `dispose` option.

@@ -1,5 +1,10 @@
 import { readdir } from 'node:fs/promises';
-import { DIContainer, type ServiceRegistry } from 'injecute';
+import {
+  checkWiring,
+  DIContainer,
+  type ServiceProvider,
+  type ServiceRegistry,
+} from 'injecute';
 
 // #region add-service-files
 /** A file in the services directory: the file name is the key, the default export the factory. */
@@ -58,4 +63,22 @@ const app = new DIContainer()
 app.get('greeter').greet('Ada'); // "Hello, Ada (1970-01-01T00:00:00.000Z)"
 // #endregion file-system
 
-export { app };
+// #region check-wiring
+// The compiler can't see the directory, but it checks this list against `Services`: a key missing
+// here, or one that `Services` doesn't have, is a compile error.
+const declared = { clock: true, greeter: true } satisfies Record<
+  keyof Services,
+  true
+>;
+
+/** Reports every declared service without a file, and every dependency key that nothing registers. */
+async function checkServiceFiles(container: ServiceProvider<Services>) {
+  await checkWiring(container, {
+    keys: Object.keys(declared) as (keyof Services)[],
+  });
+}
+
+await checkServiceFiles(app);
+// #endregion check-wiring
+
+export { app, checkServiceFiles };

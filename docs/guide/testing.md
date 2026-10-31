@@ -20,6 +20,28 @@ Forks made from the isolated fork, such as one fork per request, get the replace
 service that a fork per request registers, see
 [Testing per-request services](./request-state.md#testing-per-request-services).
 
+## Check the wiring
+
+One test can check that every service is wired: `checkWiring()` reports every dependency key that
+nothing registers, and with `resolve: true` every service whose factory throws, all at once, instead of
+the first request finding one of them:
+
+<<< @/../examples/testing.ts#check-wiring
+
+- Without `resolve`, nothing runs: it only reads the registrations, so it needs no fakes. With
+  `resolve: true` it creates every service once: use an isolated fork with fakes for services that reach
+  the outside world (databases, queues, HTTP clients).
+- A failing service is reported once, with the services that need it, and its factory runs once:
+  services that depend on it are skipped, not reported again.
+- It rejects with a `WiringError` (`INJECUTE_WIRING_FAILED`) whose message lists every problem, so a
+  failing test shows them all; `error.problems` has them as data.
+- Services the compiler can't see, such as ones found in files or registered by decorators, can be
+  declared without being registered: pass their keys, see
+  [Checking the wiring](./custom-registration.md#checking-the-wiring).
+- To create services at startup, use
+  [`preload()`](./recipes.md#checking-the-wiring-at-startup) instead: it stops at the first failure,
+  which is what an app that is starting needs.
+
 ## Override one cached value: `setCacheInstance`
 
 <<< @/../examples/testing.ts#set-cache-instance

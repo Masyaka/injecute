@@ -65,3 +65,21 @@ class _WrongOrder extends Greeter {}
 // @ts-expect-error: a Clock is not a Greeter
 @services.singleton('greeter')
 class _WrongService extends Clock {}
+
+// -------------------------------------------- checking the wiring: the declared-keys list (guide)
+
+const declared = { clock: true, greeter: true } satisfies Record<
+  keyof Services,
+  true
+>;
+expectTypeOf(declared).toEqualTypeOf<{ clock: true; greeter: true }>();
+
+// @ts-expect-error: 'greeter' is missing from the list
+const _missing = { clock: true } satisfies Record<keyof Services, true>;
+
+const _unknown = {
+  clock: true,
+  greeter: true,
+  // @ts-expect-error: 'mailer' is not a key of Services
+  mailer: true,
+} satisfies Record<keyof Services, true>;

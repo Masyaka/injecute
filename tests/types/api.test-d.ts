@@ -1,6 +1,7 @@
 // Type-level tests. Checked by `npm run typecheck` (tsc), not executed.
 import { expectTypeOf } from 'vitest';
 import {
+  checkWiring,
   createProxyAccessor,
   createResolversTuple,
   DIContainer,
@@ -407,3 +408,13 @@ const requestScope = requestRoot.fork().extend(addRequestTx);
 expectTypeOf(
   requestScope.addSingleton('report', (tx) => tx.id, ['tx']).get('report'),
 ).toEqualTypeOf<number>();
+
+// ---- checkWiring(): keys are the container's keys
+const wired = new DIContainer()
+  .addInstance('clock', 1)
+  .addInstance('greeter', 'hi');
+expectTypeOf(checkWiring(wired, { keys: ['clock', 'greeter'] })).toEqualTypeOf<
+  Promise<void>
+>();
+// @ts-expect-error 'greter' is not a key of the container
+void checkWiring(wired, { keys: ['greter'] });

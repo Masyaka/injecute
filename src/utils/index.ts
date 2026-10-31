@@ -10,6 +10,12 @@ export {
 export { defer, type MaybePromises } from './defer.ts';
 export { preload } from './preload.ts';
 export {
+  checkWiring,
+  WiringError,
+  type CheckWiringOptions,
+  type WiringProblem,
+} from './check-wiring.ts';
+export {
   createLifecycle,
   lifecycle,
   startLifecycle,
