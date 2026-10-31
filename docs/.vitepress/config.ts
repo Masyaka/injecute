@@ -60,6 +60,7 @@ const guide: DefaultTheme.SidebarItem[] = [
       { text: 'Design principles', link: '/concepts/principles' },
       { text: 'Roles: provider, registry, container', link: '/concepts/roles' },
       { text: 'How resolution works', link: '/concepts/resolution' },
+      { text: 'Comparison', link: '/concepts/comparison' },
     ],
   },
   {

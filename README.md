@@ -49,7 +49,8 @@ Type-safe dependency injection for TypeScript and JavaScript.
   [Versioning and support](https://masyaka.github.io/injecute/guide/versioning).
 
 The [design principles](https://masyaka.github.io/injecute/concepts/principles) explain how injecute
-behaves and why.
+behaves and why, and the [comparison](https://masyaka.github.io/injecute/concepts/comparison) shows how it
+differs from typed-inject, needle-di, Awilix, InversifyJS, tsyringe, NestJS and Effect.
 
 ## Install
 
