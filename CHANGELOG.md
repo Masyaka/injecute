@@ -1,5 +1,29 @@
 # injecute
 
+## 1.0.0-rc.2
+
+### Major Changes
+
+- [#15](https://github.com/Masyaka/injecute/pull/15) [`f655b3e`](https://github.com/Masyaka/injecute/commit/f655b3ed3ce68eb3c30a4ccf8086f6a1ca26043c) Thanks [@Masyaka](https://github.com/Masyaka)! - **A fork needs `replace: true` to override a parent's key.** Registering a key that a parent container has now throws `INJECUTE_ALREADY_REGISTERED` unless `{ replace: true }` is passed, in plain forks, isolated forks, modules applied to a fork and `namespace()` callbacks. Before, the fork registered it silently, and services registered in the parent kept the parent's instance without anything saying so. The error now says what the override reaches: in a plain fork it names the parent services that depend on the key (directly or through other services) and keep the parent's instance, and how to give them the fork's one. `addAlias()` takes `{ replace: true }` too.
+  
+  Before → after: `app.fork().addInstance('logger', requestLogger)` → `app.fork().addInstance('logger', requestLogger, { replace: true })`. Decorating a parent's service in a fork needs it as well. See [A fork needs `replace: true` to override a parent's key](https://masyaka.github.io/injecute/migration/0.x-to-1.0#a-fork-needs-replace-true-to-override-a-parent-s-key).
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`f1c73da`](https://github.com/Masyaka/injecute/commit/f1c73da5349853e6812a387236d6e304f1a2fca4) Thanks [@Masyaka](https://github.com/Masyaka)! - **Node.js 22.12 or newer.** The minimum Node.js version is now 22.12, the first 22.x release where `require()` loads ES modules without a flag, so CommonJS code can `require('injecute')`. ES module imports worked on older 22.x releases, but `require()` didn't.
+  
+  Before → after: Node.js ≥ 22 → Node.js ≥ 22.12. See [Module format: ESM only](https://masyaka.github.io/injecute/migration/0.x-to-1.0#module-format-esm-only).
+
+- [#17](https://github.com/Masyaka/injecute/pull/17) [`dbcfd55`](https://github.com/Masyaka/injecute/commit/dbcfd552d1a5d95152e6762e2fa8c34a7dfadda4) Thanks [@Masyaka](https://github.com/Masyaka)! - **`replace: true` needs something to replace.** Registering a key with `{ replace: true }` when neither the container nor a parent has that key now throws the new `INJECUTE_NOTHING_TO_REPLACE` error. Before, it quietly registered a new service, so a typo in a test override, or a module that wasn't applied, left the original in place without anything saying so. This applies to `addSingleton`, `addTransient`, `addInstance` and `addAlias`, in every kind of container, module and namespace.
+  
+  Before → after: `new DIContainer().addInstance('config', cfg, { replace: true })` (first registration) → `new DIContainer().addInstance('config', cfg)`. See [A fork needs `replace: true` to override a parent's key](https://masyaka.github.io/injecute/migration/0.x-to-1.0#a-fork-needs-replace-true-to-override-a-parent-s-key).
+
+### Minor Changes
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`51bc8b2`](https://github.com/Masyaka/injecute/commit/51bc8b2f92793af50788f6483c79b7cff3926980) Thanks [@Masyaka](https://github.com/Masyaka)! - **Smaller browser bundles: error hints are left out of production builds.** Bundlers that build for browsers now leave the "how to fix it" hints out of injecute's error messages, which saves about 1.5 kB gzipped. Development builds with Vite and webpack keep them, through the `development` condition, and so do Node.js, Deno, Bun, server-side rendering and browsers without a bundler. Messages keep what happened and the docs link, and `error.code` and `error.docs` are the same everywhere.
+  
+  To have the hints in any build, import the new `injecute/hints` entry point, for example `if (import.meta.env.DEV) await import('injecute/hints')`, or `import 'injecute/hints'` for every build. With esbuild or Rolldown, adding the `development` condition works too. See [Hints in browser bundles](https://masyaka.github.io/injecute/errors/#hints-in-browser-bundles).
+
+- [#12](https://github.com/Masyaka/injecute/pull/12) [`2e93631`](https://github.com/Masyaka/injecute/commit/2e93631847084bd53a37ec93b05e296eff0a12f3) Thanks [@Masyaka](https://github.com/Masyaka)! - **`checkWiring()`: check every service's wiring in one test.** `await checkWiring(container)` reports every dependency key that nothing registers, without running any factory. With `{ resolve: true }` it also creates every service and reports the ones whose factory throws. Each failure is reported once, with the services that need it, and its factory runs once. `{ keys }` adds keys that must be registered, for services that the compiler can't see (found in files or registered by decorators). It rejects with a `WiringError` (`INJECUTE_WIRING_FAILED`) that lists every problem in its message and in `error.problems`. See [Check the wiring](https://masyaka.github.io/injecute/guide/testing#check-the-wiring).
+
 ## 1.0.0-rc.1
 
 ### Minor Changes
