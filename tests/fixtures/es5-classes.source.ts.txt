@@ -1,0 +1,19 @@
+// Source of tests/fixtures/es5-classes.cjs (compiled with TypeScript 6, target es5).
+export class WithMethods {
+  constructor(public dep: string) {}
+  hello(): string {
+    return 'hi ' + this.dep;
+  }
+}
+export class FieldsOnly {
+  constructor(public dep: string) {}
+}
+export class MethodsNoThis {
+  constructor() {}
+  hello(): string {
+    return 'hi';
+  }
+}
+export class Empty {
+  constructor() {}
+}
