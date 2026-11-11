@@ -1,0 +1,17 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./src/index.ts"],
+  "tsconfig": "./tsconfig.build.json",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+  "out": "./docs/api",
+  "docsRoot": "./docs",
+  "readme": "none",
+  "entryFileName": "index",
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "hidePageHeader": true,
+  "hideBreadcrumbs": true,
+  "sourceLinkTemplate": "https://github.com/Masyaka/injecute/blob/next/{path}#L{line}",
+  "gitRevision": "next"
+}

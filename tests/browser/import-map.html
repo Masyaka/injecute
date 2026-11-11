@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>import map</title>
+<script type="importmap">
+  { "imports": { "injecute": "/lib/index.js" } }
+</script>
+<pre id="out">pending</pre>
+<script type="module">
+  import { DIContainer } from 'injecute';
+  const container = new DIContainer().addSingleton('answer', () => 42, []);
+  document.getElementById('out').textContent =
+    container.get('answer') === 42 ? 'ok' : 'wrong';
+</script>
