@@ -14,6 +14,8 @@ exclude = [
   '^https://claude\.ai',
   '^https://chatgpt\.com',
   'example\.com',
+  # placeholder hosts in examples: .internal is reserved for private networks
+  '^https?://[^/]+\.internal(/|$)',
   '^https?://localhost',
 ]
 exclude_path = ["node_modules", "docs/.vitepress", "docs/api", "handoffs"]
