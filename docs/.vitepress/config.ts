@@ -150,7 +150,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/Masyaka/injecute' },
     ],
     editLink: {
-      pattern: 'https://github.com/Masyaka/injecute/edit/next/docs/:path',
+      pattern: 'https://github.com/Masyaka/injecute/edit/main/docs/:path',
       text: 'Edit this page on GitHub',
     },
     footer: { message: 'Released under the MIT License.' },

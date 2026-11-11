@@ -28,7 +28,7 @@ jobs:
 
   changeset:
     name: Changeset present
-    if: github.event_name == 'pull_request' && github.base_ref == 'next'
+    if: github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'next')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

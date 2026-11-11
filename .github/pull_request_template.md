@@ -1,4 +1,4 @@
-<!-- Target `next` until 1.0.0 is released, then `main`. -->
+<!-- Target `main`. -->
 
 ## What and why
 
