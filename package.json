@@ -101,7 +101,7 @@
     "@shikijs/vitepress-twoslash": "^4.4.3",
     "@types/d3": "^7.4.3",
     "@types/node": "^24.19.0",
-    "@vitest/coverage-v8": "^5.0.2",
+    "@vitest/coverage-v8": "^5.1.0",
     "@vitest/eslint-plugin": "^1.6.27",
     "d3": "^7.9.0",
     "eslint": "^10.11.0",
@@ -117,6 +117,6 @@
     "vite": "^8.3.1",
     "vitepress": "2.0.0-alpha.20",
     "vitepress-plugin-llms": "^1.14.0",
-    "vitest": "^5.0.2"
+    "vitest": "^5.1.0"
   }
 }
