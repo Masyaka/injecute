@@ -12,6 +12,6 @@
   "excludeProtected": true,
   "hidePageHeader": true,
   "hideBreadcrumbs": true,
-  "sourceLinkTemplate": "https://github.com/Masyaka/injecute/blob/next/{path}#L{line}",
+  "sourceLinkTemplate": "https://github.com/Masyaka/injecute/blob/main/{path}#L{line}",
   "gitRevision": "next"
 }

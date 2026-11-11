@@ -34,7 +34,7 @@ on and the tests a new feature has to pass.
 
 ## Pull requests
 
-Open pull requests against **`next`** until 1.0.0 is released, then against `main`.
+Open pull requests against **`main`**.
 
 1. The change passes the tests in [Keeping the direction](./docs/concepts/principles.md#keeping-the-direction);
    a change that bends a principle says so and adds it to the Exceptions table.
