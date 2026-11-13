@@ -1,56 +1,95 @@
 # injecute
 
-Type-safe dependency injection for TypeScript and JavaScript.
+Type-safe dependency injection for TypeScript and JavaScript: explicit wiring, plain classes, no
+decorators. Adopt it one module at a time in an existing app, or structure a new one without a
+framework's opinions.
 
 [![Tests](https://github.com/Masyaka/injecute/actions/workflows/tests.yml/badge.svg)](https://github.com/Masyaka/injecute/actions/workflows/tests.yml)
 [![npm](https://img.shields.io/npm/v/injecute)](https://www.npmjs.com/package/injecute)
 [![JSR](https://jsr.io/badges/@masyaka/injecute)](https://jsr.io/@masyaka/injecute)
 
-## Where it fits
-
-- **A large app you can't stop to rewrite.** Start with small local changes where you need them. It doesn't require changes to your pipelines or tech stack.
-- **A new module inside a big system.** It brings a container and nothing else: no opinions about
-  HTTP, modules or configuration, so the module gets the structure it needs.
-- **A modular monolith.** Each module declares the services it needs and the compiler checks them,
-  keeps its helpers [private](https://masyaka.github.io/injecute/guide/containers#private-services),
-  and contributes to other modules through [extension points](https://masyaka.github.io/injecute/guide/tags)
-  without importing them.
-- **An SDK that other teams install.** The SDK wires its services in a container of its own and gives
-  consumers a plain object with lazy services, start and stop, plugins and a test kit. See
-  [Building an SDK](https://masyaka.github.io/injecute/guide/sdk).
-- **A non-typical greenfield project.** Gives you a set of tools and flexibility to solve problems you can encounter in your architecture journey.
-- **Code written with coding agents.** The docs of the installed version and an Agent Skill ship in the
-  package (see [below](#using-injecute-with-ai-coding-agents)). The wiring is explicit, so you review
-  every dependency an agent adds as a line in a diff; mistakes fail the typecheck with a short feedback loop, and every runtime error has a stable code and a page that says how to fix it.
-
-## Where it is not the best option
-
-- For a small script or a typical single-page app, you don't need a container.
-- If you want one framework to decide HTTP, validation and modules for you, a full framework such as NestJS fits better.
-- If you need just a CRUD API.
-
 ## Features
 
-- **Explicit, typed wiring.** Register each service with its dependency keys; the container type grows
-  with every registration, so `get()` and factory parameters are inferred, and a typo in a key is a
-  compile error ("Did you mean …?"). Every dependency is a line you can review in a diff, including in
-  pull requests a coding agent wrote: that's why there is
-  [no auto-wiring](https://masyaka.github.io/injecute/concepts/principles#_1-explicit-wiring).
-- **No decorators, no reflection.** Your classes and functions stay free of container code. But there is a [recipe](https://masyaka.github.io/injecute/guide/custom-registration#services-from-decorators) if you really want decorators for some reason.
-- **Explicit scopes.** A session, a request or a transaction gets a
-  [scope](https://masyaka.github.io/injecute/guide/request-state#scopes): a fork with its own services.
-  Scope services use the root's; root services can't depend on a scope's, and the compiler checks it.
-  `fork({ isolated: true })` replaces a dependency for the whole graph in tests.
-- **Owns what it creates.** `dispose()` and `await using` release singletons in reverse creation order.
-- **Errors that say how to fix it**, with stable codes and a docs page each.
-- **Runs everywhere.** ES module for Node.js ≥ 22.12, Deno, Bun and browsers. No runtime dependencies.
-- **Stable.** Semantic versioning for the runtime and the types, a public API checked by a snapshot
-  test, and 6 months of fixes for the previous major. See
-  [Versioning and support](https://masyaka.github.io/injecute/guide/versioning).
+- **Typed from the registrations.** `get()` results and factory parameters are inferred; a missing
+  service or a wrong dependency key fails the typecheck. See [TypeScript](https://masyaka.github.io/injecute/guide/typescript).
+- **Explicit wiring, plain classes.** Dependencies are keys listed next to the factory. Your code has no
+  decorators, no reflection and no container imports ([why](https://masyaka.github.io/injecute/concepts/principles#_1-explicit-wiring)).
+- **Modules and private services.** Each module declares the services it needs, and the compiler checks
+  that the app provides them. See [Modules](https://masyaka.github.io/injecute/guide/containers#modules).
+- **Extension points.** Modules contribute routes, handlers or plugins through
+  [tags](https://masyaka.github.io/injecute/guide/tags), without importing each other.
+- **Scopes.** A fork per request, transaction or job, with its own services; the root can't depend on a
+  scope, and the compiler checks it. See [Scopes](https://masyaka.github.io/injecute/guide/request-state#scopes).
+- **Start, stop, dispose.** Starts servers and consumers in [stages](https://masyaka.github.io/injecute/guide/startup-shutdown),
+  stops them in reverse, then releases every singleton.
+- **Tests without mocking libraries.** An [isolated fork](https://masyaka.github.io/injecute/guide/testing)
+  replaces a dependency for the whole graph.
+- **Errors that say how to fix them.** Stable codes, the resolution path and a
+  [page](https://masyaka.github.io/injecute/errors/) for each.
+- **Runs everywhere.** ES module for Node.js ≥ 22.12, Deno, Bun and browsers, with no runtime
+  dependencies. Semantic versioning covers the types too ([versioning](https://masyaka.github.io/injecute/guide/versioning)).
 
-The [design principles](https://masyaka.github.io/injecute/concepts/principles) explain how injecute
-behaves and why, and the [comparison](https://masyaka.github.io/injecute/concepts/comparison) shows how it
-differs from typed-inject, needle-di, Awilix, InversifyJS, tsyringe, NestJS and Effect.
+## Example
+
+```ts
+import {
+  collect,
+  createTag,
+  DIContainer,
+  startable,
+  startLifecycle,
+  type ServiceRegistry,
+} from 'injecute';
+
+// Your classes stay plain (no decorators, no container imports):
+// Database(url) · UserRepository(db) · HttpServer(routes: Route[])
+
+// ① An extension point: modules add routes without importing the server
+const route = createTag('route').of<Route>();
+
+// ② A module asks only for what it needs
+const addUsers = (c: ServiceRegistry<{ db: Database }>) =>
+  c
+    .addSingleton('repo', UserRepository, ['db'])
+    .addSingleton(
+      route('list'),
+      (repo): Route => ({ path: '/users', handle: () => repo.findAll() }),
+      ['repo'],
+    );
+
+// ③ The composition root: every dependency is a key you review in a diff
+const app = new DIContainer()
+  .addInstance('dbUrl', 'postgres://localhost/app')
+  .addSingleton('db', Database, ['dbUrl']) // ['dbUlr'] → compile error: Did you mean '"dbUrl"'?
+  .namespace('Users', addUsers) // fails to compile if the app has no `db`
+  .extend(
+    startable('server', HttpServer, [collect(route)], {
+      start: (server) => server.listen(3000),
+      stop: (server) => server.close(),
+    }),
+  )
+  .seal();
+
+app.get('Users.repo'); // ④ UserRepository, inferred
+
+// ⑤ A scope per request: its own transaction, on top of the app's services
+async function handle() {
+  await using scope = app.fork().addSingleton('tx', (db) => db.begin(), ['db']);
+  scope.get('tx').commit(); // rolled back on dispose unless committed
+}
+
+// ⑥ Start the server; on SIGTERM stop it, then close the database
+const running = await startLifecycle(app);
+process.once('SIGTERM', () => running.stop());
+
+// ⑦ In tests: replace the database for the whole graph, without touching `app`
+await using test = app
+  .fork({ isolated: true })
+  .addInstance('db', fakeDb, { replace: true });
+```
+
+The full version with the classes is [`examples/readme.ts`](./examples/readme.ts); run it in the
+[playground](https://masyaka.github.io/injecute/playground?example=readme).
 
 ## Install
 
@@ -61,31 +100,22 @@ deno add jsr:@masyaka/injecute
 
 Or without a build step: `import { DIContainer } from 'https://esm.sh/injecute@1'`.
 
-## Example
+## Is it for me?
 
-```ts
-import { DIContainer } from 'injecute';
+| Your situation                                                | Choice                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A large app that can't stop for a rewrite                     | **injecute**: adopt it module by module                                                                                                                                                  |
+| A new service or module that will grow                        | **injecute**: explicit, typed wiring from day one                                                                                                                                        |
+| A modular monolith                                            | **injecute**: typed [modules](https://masyaka.github.io/injecute/guide/containers#modules) with [private services](https://masyaka.github.io/injecute/guide/containers#private-services) |
+| An SDK that other teams install                               | **injecute** inside, consumers get a plain object ([how](https://masyaka.github.io/injecute/guide/sdk))                                                                                  |
+| Much of the code is written by coding agents                  | **injecute**: docs and a skill in the package, errors agents can fix ([below](#using-injecute-with-ai-coding-agents))                                                                    |
+| You want one framework to decide HTTP, validation and modules | A full framework such as NestJS                                                                                                                                                          |
+| A small script or a typical single-page app                   | No container: imports are enough ([why](https://masyaka.github.io/injecute/frameworks/ui-frameworks))                                                                                    |
+| You need just a CRUD API                                      | A framework with CRUD built in                                                                                                                                                           |
 
-class Database {
-  constructor(readonly url: string) {}
-}
-
-class UserRepository {
-  constructor(private readonly db: Database) {}
-}
-
-const app = new DIContainer()
-  .addInstance('dbUrl', 'postgres://localhost/app')
-  .addSingleton('db', Database, ['dbUrl'])
-  .addSingleton('users', UserRepository, ['db']);
-
-const users = app.get('users'); // UserRepository
-
-// in tests: replace a dependency for the whole graph, without touching `app`
-await using test = app
-  .fork({ isolated: true })
-  .addInstance('db', fakeDb, { replace: true });
-```
+The [design principles](https://masyaka.github.io/injecute/concepts/principles) explain how injecute
+behaves and why, and the [comparison](https://masyaka.github.io/injecute/concepts/comparison) shows how it
+differs from typed-inject, needle-di, Awilix, InversifyJS, tsyringe, NestJS and Effect.
 
 ## Documentation
 
