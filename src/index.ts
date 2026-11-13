@@ -5,7 +5,7 @@
  * registration, so `get()` results and factory parameters are fully typed, and a typo in a
  * dependency key is a compile error.
  *
- * Install: `npm i injecute` · `deno add jsr:@masyaka/injecute` · `bun add injecute`,
+ * Install: `npm i injecute` · `deno add npm:injecute` · `bun add injecute`,
  * or import from a CDN: `https://esm.sh/injecute`.
  *
  * @example Register and resolve services

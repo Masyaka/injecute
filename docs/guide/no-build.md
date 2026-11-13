@@ -53,6 +53,17 @@ import { DIContainer } from 'jsr:@masyaka/injecute';
 // or from npm: import { DIContainer } from 'npm:injecute';
 ```
 
+The guides import from `'injecute'`. `deno add npm:injecute` maps that name to the npm package. To get
+the same name from JSR, map it in `deno.json`:
+
+```json
+{
+  "imports": {
+    "injecute": "jsr:@masyaka/injecute@^1.0.0"
+  }
+}
+```
+
 ## Bun and Node.js
 
 ```ts
