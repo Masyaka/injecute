@@ -191,12 +191,10 @@ from `cloudflare:workers`:
 
 ```ts
 // worker.ts
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { env } from 'cloudflare:workers';
 import { DIContainer } from 'injecute';
 import { addApp } from './app.ts';
-
-const storage = new AsyncLocalStorage<RequestContext>();
+import { storage } from './context.ts'; // the storage the HTTP module runs each request in
 
 const app = new DIContainer()
   .addInstance('context', { current: () => storage.getStore() })

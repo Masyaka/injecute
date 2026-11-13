@@ -95,7 +95,7 @@ The full version with the classes is [`examples/readme.ts`](./examples/readme.ts
 
 ```sh
 npm install injecute          # or: pnpm add injecute · bun add injecute
-deno add jsr:@masyaka/injecute
+deno add npm:injecute
 ```
 
 Or without a build step: `import { DIContainer } from 'https://esm.sh/injecute@1'`.

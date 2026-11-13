@@ -26,7 +26,7 @@ bun add injecute
 ```
 
 ```sh [deno]
-deno add jsr:@masyaka/injecute
+deno add npm:injecute
 ```
 
 :::
