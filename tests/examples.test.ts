@@ -547,6 +547,21 @@ describe('examples', () => {
     await Promise.all([a.stop(), b.stop()]);
   });
 
+  it('readme', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const example = await import('../examples/readme.ts');
+    log.mockRestore();
+    expect(example.users).toEqual(['alice', 'bob']);
+    expect(example.testResult).toEqual(['test-user']);
+    expect(example.log).toEqual([
+      'listening on 3000: /users',
+      'tx: commit',
+      'tx: rollback', // the test's database is an instance: the fork doesn't own it
+      'server closed',
+      'db closed: postgres://localhost/app',
+    ]);
+  });
+
   it('real world: context, logger, tracer and namespaces', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { responses, traces } = await import('../examples/real-world.ts');
