@@ -3,7 +3,7 @@ layout: home
 hero:
   name: injecute
   text: Type-safe dependency injection
-  tagline: Bring it into a legacy app, or build a new system without a framework's opinions. Plain classes, typed wiring, no decorators required, not invasive. It is easier than you think
+  tagline: Bring it into a legacy app, or build a new system without a framework's opinions. Plain classes, typed wiring, no decorators required. It is easier than you think
   actions:
     - theme: brand
       text: Get started
@@ -19,13 +19,17 @@ features:
     details: No big-bang migration needed. Your classes stay as they are; wire one module, ship it, then the next. Works in plain JavaScript too.
   - title: No framework opinions
     details: It wires your services and stops there. HTTP, routing, the database layer and your folder structure stay your choice.
-  - title: Non-invasive
-    details: Keep your sources free of the framework. Only module files import from injecute, and only its types.
+  - title: Stays in the composition root
+    details: It creates your services and manages their lifetime, and nothing else. Only the files that wire the app import injecute, one file in a small app. Your classes never do.
+    link: /guide/app-structure#keep-the-wiring-in-files-of-its-own
   - title: Wiring mistakes fail at compile time
     details: 'The container''s type grows with every registration. A missing service or a typo in a key is a compile error, with "Did you mean".'
   - title: Explicit scopes
     details: A session, a request or a transaction gets a fork with its own services. Scope services use the root's; the root can't depend on a scope's, and the compiler checks it.
     link: /guide/request-state#scopes
+  - title: Start, stop, dispose
+    details: Starts servers and consumers in stages, stops them in reverse on shutdown, then releases every singleton. No framework needed.
+    link: /guide/startup-shutdown
   - title: Tests without mocking libraries
     details: Replace any dependency for the whole graph in an isolated fork. The app container stays untouched.
   - title: Built for coding agents
