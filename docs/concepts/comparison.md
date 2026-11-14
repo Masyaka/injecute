@@ -23,6 +23,25 @@ versions in the first table. Found something wrong or out of date?
 | [NestJS](#nestjs)             | 12.3.2  | `@Injectable()` providers in modules, resolved by constructor type                      | a runtime error at bootstrap                                                | required                                          |
 | [Effect](#effect)             | 4.1.1   | Services (`Context.Service`) used with `yield*`, provided by layers                     | a compile error (unmet requirements stay in the type)                       | none                                              |
 
+## Footprint in your code
+
+What a service file (a class or function with dependencies) has to contain so the library can create it.
+The less it contains, the fewer files change when you adopt the library, upgrade it or remove it.
+
+| Library      | In each service file                                                                                     | Imports the library |
+| ------------ | -------------------------------------------------------------------------------------------------------- | ------------------- |
+| **injecute** | nothing: the [wiring files](../guide/app-structure.md#keep-the-wiring-in-files-of-its-own) list the keys | no                  |
+| typed-inject | a `static inject` array of tokens on the class or function                                               | no                  |
+| needle-di    | `inject(Token)` calls in constructor defaults or fields, or `@injectable()`                              | yes                 |
+| Awilix       | nothing, but parameter names or the destructured cradle must match the registered names                  | no                  |
+| InversifyJS  | `@injectable()` on the class and `@inject(id)` on its parameters                                         | yes                 |
+| tsyringe     | `@injectable()` on the class, `@inject(token)` where the type isn't enough                               | yes                 |
+| NestJS       | `@Injectable()` on the class, `@Inject(token)` where the type isn't enough                               | yes                 |
+| Effect       | the service is defined with `Context.Service` and used with `yield*`                                     | yes                 |
+
+With injecute the container only creates services and manages their lifetime. The files that import it
+are the composition root and, in a larger app, one wiring file per module; a small app has one.
+
 ## Lifetimes, async and disposal
 
 | Library      | Scoped services                                                          | A singleton that depends on a scoped service                                                                                                                             | Async services                                                                | Disposal                                                                                        |
@@ -57,6 +76,8 @@ Versions and dependencies are from the npm registry.
 
 ## Where injecute is different
 
+- **Nothing in your service files.** No decorators, no token arrays, no names to match: the dependency
+  keys live in the wiring files, so the library [stays in the composition root](#footprint-in-your-code).
 - **Explicit scopes that can't leak.** A root service can't name a key that only a scope registers, and a
   scope that re-registers a root key gets an error naming the root services that keep the root's instance.
   Of the libraries above, NestJS prevents the leak by making consumers request-scoped, Awilix detects it

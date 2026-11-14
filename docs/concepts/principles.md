@@ -32,7 +32,10 @@ the compiler still checks.
 Your classes and functions don't import the container, carry metadata or depend on parameter names.
 
 **For you:** they stay plain TypeScript, testable without a container, and work without build-time
-transforms. Adopting or removing injecute doesn't touch them.
+transforms. Adopting or removing injecute doesn't touch them. The concerns stay separate: the container
+decides how services are created and how long they live, and your classes decide what they do. Only the
+[files that wire the app](../guide/app-structure.md#keep-the-wiring-in-files-of-its-own) import injecute,
+and a small app has one.
 
 ### 3. Typed from the registrations
 
