@@ -27,6 +27,9 @@ features:
   - title: Explicit scopes
     details: A session, a request or a transaction gets a fork with its own services. Scope services use the root's; the root can't depend on a scope's, and the compiler checks it.
     link: /guide/request-state#scopes
+  - title: Start, stop, dispose
+    details: Starts servers and consumers in stages, stops them in reverse on shutdown, then releases every singleton. No framework needed.
+    link: /guide/startup-shutdown
   - title: Tests without mocking libraries
     details: Replace any dependency for the whole graph in an isolated fork. The app container stays untouched.
   - title: Built for coding agents
